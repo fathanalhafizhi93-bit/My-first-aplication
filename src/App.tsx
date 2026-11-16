@@ -4,10 +4,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { AboutView } from './components/AboutView';
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
 import { ExerciseManagerView } from './components/ExerciseManagerView';
+import { LaunchIntro } from './components/LaunchIntro';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner';
 import { RightUtilityPanel } from './components/RightUtilityPanel';
@@ -59,6 +61,7 @@ export default function App() {
   } = useGymData();
 
   const [activeTab, setActiveTab] = useState<AppTab>('today');
+  const [showIntro, setShowIntro] = useState(true);
   const [exerciseDayKey, setExerciseDayKey] = useState<DayKey>(todayDayKey);
   const [now, setNow] = useState<Date>(() => new Date());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -279,161 +282,187 @@ export default function App() {
     [schedules, now]
   );
 
-  if (!authReady) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0A0B0E] text-sm text-[#9CA3AF]">
-        Memuat sesi IronPulse...
-      </div>
-    );
-  }
+  const renderBody = () => {
+    if (!authReady) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#0A0B0E] text-sm text-[#9CA3AF]">
+          Memuat sesi IronPulse...
+        </div>
+      );
+    }
 
-  if (!user) {
-    return <AuthGate onSignIn={signInWithGoogle} authError={authError} />;
-  }
+    if (!user) {
+      return <AuthGate onSignIn={signInWithGoogle} authError={authError} />;
+    }
 
-  if (dataLoading || !profile || !schedules) {
+    if (dataLoading || !profile || !schedules) {
+      return (
+        <div className="min-h-screen bg-[#0A0B0E] text-[#F4F5F7]">
+          <TopBar
+            activeTab={activeTab}
+            onSelectTab={setActiveTab}
+            onTestAlarm={() => {}}
+          />
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+              <div className="space-y-4 lg:col-span-8">
+                <div className="h-44 animate-pulse rounded-2xl bg-[#13161C]" />
+                <div className="h-64 animate-pulse rounded-2xl bg-[#13161C]" />
+              </div>
+              <div className="space-y-4 lg:col-span-4">
+                <div className="h-40 animate-pulse rounded-2xl bg-[#13161C]" />
+                <div className="h-64 animate-pulse rounded-2xl bg-[#13161C]" />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="min-h-screen bg-[#0A0B0E] text-[#F4F5F7]">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+        className="min-h-screen bg-[#0A0B0E] text-[#F4F5F7]"
+      >
         <TopBar
           activeTab={activeTab}
           onSelectTab={setActiveTab}
-          onTestAlarm={() => {}}
+          onTestAlarm={handleTestAlarm}
         />
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className="space-y-4 lg:col-span-8">
-              <div className="h-44 animate-pulse rounded-2xl bg-[#13161C]" />
-              <div className="h-64 animate-pulse rounded-2xl bg-[#13161C]" />
+
+        {restFinishedBanner && (
+          <div className="border-b border-[#16A34A]/40 bg-[#16A34A]/15 px-4 py-2.5 text-center text-xs font-semibold text-[#86EFAC]">
+            Waktu istirahat selesai — lanjutkan set berikutnya.
+          </div>
+        )}
+
+        <main className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-12 lg:px-8">
+          <div className="mb-5 lg:hidden">
+            <PWAInstallCard />
+          </div>
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
+            {/* Primary Workspace Column */}
+            <div className="lg:col-span-8">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {activeTab === 'today' && (
+                    <TodayWorkoutView
+                      todayDayKey={todayDayKey}
+                      schedules={schedules}
+                      todayEntries={effectiveTodayEntries}
+                      onToggleSetComplete={handleToggleSetWithAutoRest}
+                      onUpdateSetMetrics={updateSetMetrics}
+                      onAddSet={addSetToExercise}
+                      onRemoveSet={removeSetFromExercise}
+                      onStartRestTimer={startRestTimer}
+                      onOpenExerciseManager={(dayKey) => {
+                        setExerciseDayKey(dayKey);
+                        setActiveTab('exercises');
+                      }}
+                      onOpenScheduleManager={() => setActiveTab('schedule')}
+                    />
+                  )}
+
+                  {activeTab === 'schedule' && (
+                    <WeeklyScheduleView
+                      todayDayKey={todayDayKey}
+                      schedules={schedules}
+                      customRingtones={customRingtones}
+                      onUpdateSchedule={updateSchedule}
+                      onOpenExerciseManager={(dayKey) => {
+                        setExerciseDayKey(dayKey);
+                        setActiveTab('exercises');
+                      }}
+                    />
+                  )}
+
+                  {activeTab === 'exercises' && (
+                    <ExerciseManagerView
+                      selectedDayKey={exerciseDayKey}
+                      onSelectDayKey={setExerciseDayKey}
+                      schedules={schedules}
+                      onAddExercise={addExerciseToDay}
+                      onUpdateExercise={updateExerciseInDay}
+                      onRemoveExercise={removeExerciseFromDay}
+                      onMoveExercise={moveExerciseInDay}
+                    />
+                  )}
+
+                  {activeTab === 'ringtones' && (
+                    <RingtoneManagerView
+                      profile={profile}
+                      customRingtones={customRingtones}
+                      onUpdateProfile={updateProfile}
+                      onUploadRingtone={addCustomRingtone}
+                      onDeleteRingtone={deleteCustomRingtone}
+                    />
+                  )}
+
+                  {activeTab === 'about' && <AboutView />}
+                </motion.div>
+              </AnimatePresence>
             </div>
-            <div className="space-y-4 lg:col-span-4">
-              <div className="h-40 animate-pulse rounded-2xl bg-[#13161C]" />
-              <div className="h-64 animate-pulse rounded-2xl bg-[#13161C]" />
+
+            {/* Persistent Utility Column */}
+            <div className="lg:col-span-4 lg:sticky lg:top-24">
+              <RightUtilityPanel
+                now={now}
+                nextAlarm={nextAlarm}
+                audioUnlocked={audioUnlocked}
+                onUnlockAudio={handleUnlockAudio}
+                restTotalSeconds={restTotalSeconds}
+                restRemaining={restRemaining}
+                restRunning={restRunning}
+                restExerciseLabel={restExerciseLabel}
+                onStartRest={startRestTimer}
+                onToggleRestPause={handleToggleRestPause}
+                onResetRest={handleResetRest}
+                onAdjustRest={handleAdjustRest}
+                profile={profile}
+                onSignOut={signOutUser}
+              />
             </div>
           </div>
-        </div>
-      </div>
+        </main>
+
+        <MobileBottomNav
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          restRemaining={restRemaining}
+          restRunning={restRunning}
+        />
+
+        {activeAlarm && (
+          <ActiveAlarmOverlay
+            schedule={activeAlarm.schedule}
+            snoozeMinutes={profile.snoozeMinutes}
+            ringtoneName={activeAlarm.ringtoneName}
+            isTest={activeAlarm.isTest}
+            onStartWorkout={handleStartWorkoutFromAlarm}
+            onSnooze={handleSnoozeAlarm}
+            onDismiss={handleDismissAlarm}
+          />
+        )}
+
+        <OfflineIndicator />
+      </motion.div>
     );
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-[#0A0B0E] text-[#F4F5F7]">
-      <TopBar
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        onTestAlarm={handleTestAlarm}
-      />
-
-      {restFinishedBanner && (
-        <div className="border-b border-[#16A34A]/40 bg-[#16A34A]/15 px-4 py-2.5 text-center text-xs font-semibold text-[#86EFAC]">
-          Waktu istirahat selesai — lanjutkan set berikutnya.
-        </div>
-      )}
-
-      <main className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-12 lg:px-8">
-        <div className="mb-5 lg:hidden">
-          <PWAInstallCard />
-        </div>
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
-          {/* Primary Workspace Column */}
-          <div className="lg:col-span-8">
-            {activeTab === 'today' && (
-              <TodayWorkoutView
-                todayDayKey={todayDayKey}
-                schedules={schedules}
-                todayEntries={effectiveTodayEntries}
-                onToggleSetComplete={handleToggleSetWithAutoRest}
-                onUpdateSetMetrics={updateSetMetrics}
-                onAddSet={addSetToExercise}
-                onRemoveSet={removeSetFromExercise}
-                onStartRestTimer={startRestTimer}
-                onOpenExerciseManager={(dayKey) => {
-                  setExerciseDayKey(dayKey);
-                  setActiveTab('exercises');
-                }}
-                onOpenScheduleManager={() => setActiveTab('schedule')}
-              />
-            )}
-
-            {activeTab === 'schedule' && (
-              <WeeklyScheduleView
-                todayDayKey={todayDayKey}
-                schedules={schedules}
-                customRingtones={customRingtones}
-                onUpdateSchedule={updateSchedule}
-                onOpenExerciseManager={(dayKey) => {
-                  setExerciseDayKey(dayKey);
-                  setActiveTab('exercises');
-                }}
-              />
-            )}
-
-            {activeTab === 'exercises' && (
-              <ExerciseManagerView
-                selectedDayKey={exerciseDayKey}
-                onSelectDayKey={setExerciseDayKey}
-                schedules={schedules}
-                onAddExercise={addExerciseToDay}
-                onUpdateExercise={updateExerciseInDay}
-                onRemoveExercise={removeExerciseFromDay}
-                onMoveExercise={moveExerciseInDay}
-              />
-            )}
-
-            {activeTab === 'ringtones' && (
-              <RingtoneManagerView
-                profile={profile}
-                customRingtones={customRingtones}
-                onUpdateProfile={updateProfile}
-                onUploadRingtone={addCustomRingtone}
-                onDeleteRingtone={deleteCustomRingtone}
-              />
-            )}
-
-            {activeTab === 'about' && <AboutView />}
-          </div>
-
-          {/* Persistent Utility Column */}
-          <div className="lg:col-span-4 lg:sticky lg:top-24">
-            <RightUtilityPanel
-              now={now}
-              nextAlarm={nextAlarm}
-              audioUnlocked={audioUnlocked}
-              onUnlockAudio={handleUnlockAudio}
-              restTotalSeconds={restTotalSeconds}
-              restRemaining={restRemaining}
-              restRunning={restRunning}
-              restExerciseLabel={restExerciseLabel}
-              onStartRest={startRestTimer}
-              onToggleRestPause={handleToggleRestPause}
-              onResetRest={handleResetRest}
-              onAdjustRest={handleAdjustRest}
-              profile={profile}
-              onSignOut={signOutUser}
-            />
-          </div>
-        </div>
-      </main>
-
-      <MobileBottomNav
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        restRemaining={restRemaining}
-        restRunning={restRunning}
-      />
-
-      {activeAlarm && (
-        <ActiveAlarmOverlay
-          schedule={activeAlarm.schedule}
-          snoozeMinutes={profile.snoozeMinutes}
-          ringtoneName={activeAlarm.ringtoneName}
-          isTest={activeAlarm.isTest}
-          onStartWorkout={handleStartWorkoutFromAlarm}
-          onSnooze={handleSnoozeAlarm}
-          onDismiss={handleDismissAlarm}
-        />
-      )}
-
-      <OfflineIndicator />
-    </div>
+    <>
+      <AnimatePresence>
+        {showIntro && <LaunchIntro onComplete={() => setShowIntro(false)} />}
+      </AnimatePresence>
+      {renderBody()}
+    </>
   );
 }
