@@ -25,6 +25,7 @@ import {
   formatLocalDateKey,
   getTodayDayKey,
 } from './lib/dateUtils';
+import { syncNativeWeeklyAlarms } from './lib/nativeAlarmBridge';
 import { AppTab, DayKey, DaySchedule } from './types/gym';
 
 interface TriggeredAlarmState {
@@ -184,6 +185,12 @@ export default function App() {
 
     return () => window.clearInterval(interval);
   }, [schedules, profile, snoozeTargetMs, triggerAlarm]);
+
+  // Sync scheduled alarms to native Android background scheduler when running in Capacitor APK
+  useEffect(() => {
+    if (!schedules) return;
+    void syncNativeWeeklyAlarms(schedules);
+  }, [schedules]);
 
   // Rest timer countdown loop
   useEffect(() => {
