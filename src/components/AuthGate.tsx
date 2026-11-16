@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dumbbell } from 'lucide-react';
+import { PWAInstallCard } from './PWAInstallBanner';
 
 interface AuthGateProps {
   onSignIn: () => Promise<void>;
@@ -90,6 +91,10 @@ export function AuthGate({ onSignIn, authError }: AuthGateProps) {
             {authError && (
               <p className="mt-3 text-sm font-medium text-[#F87171]">{authError}</p>
             )}
+          </div>
+
+          <div className="max-w-sm pt-2">
+            <PWAInstallCard />
           </div>
         </div>
       </main>

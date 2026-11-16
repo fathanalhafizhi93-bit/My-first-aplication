@@ -5,6 +5,7 @@ import {
   NextAlarmInfo,
 } from '../lib/dateUtils';
 import { UserProfile } from '../types/gym';
+import { PWAInstallCard } from './PWAInstallBanner';
 
 interface RightUtilityPanelProps {
   now: Date;
@@ -217,6 +218,10 @@ export function RightUtilityPanel({
           </button>
         </div>
       </section>
+
+      <div className="hidden lg:block">
+        <PWAInstallCard />
+      </div>
     </aside>
   );
 }

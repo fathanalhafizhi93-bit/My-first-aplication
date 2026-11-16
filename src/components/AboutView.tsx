@@ -18,8 +18,7 @@ export function AboutView() {
           className="mt-4 font-display text-2xl font-bold leading-snug tracking-tight text-[#F4F5F7] sm:text-3xl"
           style={{ textWrap: 'balance' }}
         >
-          This app its 100 percent made with Antigravity (gemini) and the concept, release, tester
-          is fathan alhafizhi
+          Yah gw di kacangin hiks hiks 😭
         </p>
 
         <div className="mt-6 grid grid-cols-1 gap-4 border-t border-white/10 pt-6 sm:grid-cols-3">

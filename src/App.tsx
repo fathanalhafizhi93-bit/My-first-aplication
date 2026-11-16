@@ -9,6 +9,7 @@ import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
 import { ExerciseManagerView } from './components/ExerciseManagerView';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner';
 import { RightUtilityPanel } from './components/RightUtilityPanel';
 import { RingtoneManagerView } from './components/RingtoneManagerView';
 import { TodayWorkoutView } from './components/TodayWorkoutView';
@@ -329,6 +330,9 @@ export default function App() {
       )}
 
       <main className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-12 lg:px-8">
+        <div className="mb-5 lg:hidden">
+          <PWAInstallCard />
+        </div>
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
           {/* Primary Workspace Column */}
           <div className="lg:col-span-8">
@@ -428,6 +432,8 @@ export default function App() {
           onDismiss={handleDismissAlarm}
         />
       )}
+
+      <OfflineIndicator />
     </div>
   );
 }
