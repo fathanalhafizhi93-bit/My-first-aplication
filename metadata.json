@@ -1,0 +1,6 @@
+{
+  "name": "IronPulse — Gym Reminder & Pelacak Latihan",
+  "description": "Aplikasi pengingat jadwal gym harian dengan pengaturan hari, ringtone kustom, daftar gerakan hari ini, pencatat beban/set/reps, dan timer istirahat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

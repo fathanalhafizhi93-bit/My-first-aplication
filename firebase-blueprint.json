@@ -1,0 +1,246 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User preferences, default ringtone configuration, volume, and timer settings.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "defaultRingtoneId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "restRingtoneId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "volume": {
+          "type": "number"
+        },
+        "notificationsEnabled": {
+          "type": "boolean"
+        },
+        "snoozeMinutes": {
+          "type": "number"
+        },
+        "autoStartRestTimer": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "email",
+        "defaultRingtoneId",
+        "restRingtoneId",
+        "volume",
+        "notificationsEnabled",
+        "snoozeMinutes",
+        "autoStartRestTimer",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DaySchedule": {
+      "title": "DaySchedule",
+      "description": "Weekly gym schedule configuration and exercise list for a specific day of the week.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "dayKey": {
+          "type": "string",
+          "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+          "maxLength": 10
+        },
+        "isGymDay": {
+          "type": "boolean"
+        },
+        "alarmEnabled": {
+          "type": "boolean"
+        },
+        "alarmTime": {
+          "type": "string",
+          "maxLength": 5,
+          "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+        },
+        "focusTitle": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "ringtoneId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "exercises": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "dayKey",
+        "isGymDay",
+        "alarmEnabled",
+        "alarmTime",
+        "focusTitle",
+        "ringtoneId",
+        "exercises",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WorkoutLog": {
+      "title": "WorkoutLog",
+      "description": "Daily workout execution log recording completed sets, weights (kg), and repetitions.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "dateKey": {
+          "type": "string",
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "dayKey": {
+          "type": "string",
+          "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+          "maxLength": 10
+        },
+        "focusTitle": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "entries": {
+          "type": "array"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "dateKey",
+        "dayKey",
+        "focusTitle",
+        "entries",
+        "completed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CustomRingtone": {
+      "title": "CustomRingtone",
+      "description": "User-uploaded custom alarm ringtone metadata and compact cloud-synced audio payload.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "mimeType": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "sizeBytes": {
+          "type": "number"
+        },
+        "durationSeconds": {
+          "type": "number"
+        },
+        "storageMode": {
+          "type": "string",
+          "enum": ["cloud", "local_idb"],
+          "maxLength": 20
+        },
+        "audioDataUrl": {
+          "type": "string",
+          "maxLength": 650000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "mimeType",
+        "sizeBytes",
+        "durationSeconds",
+        "storageMode",
+        "audioDataUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Per-user settings and ringtone preferences"
+    },
+    "/users/{userId}/schedules/{dayKey}": {
+      "schema": { "$ref": "#/entities/DaySchedule" },
+      "description": "Weekly workout schedule and exercises per day of week"
+    },
+    "/users/{userId}/workoutLogs/{dateKey}": {
+      "schema": { "$ref": "#/entities/WorkoutLog" },
+      "description": "Daily logged sets, weights, and reps"
+    },
+    "/users/{userId}/ringtones/{ringtoneId}": {
+      "schema": { "$ref": "#/entities/CustomRingtone" },
+      "description": "User uploaded custom ringtone records"
+    }
+  }
+}

@@ -1,0 +1,204 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDayKey(dayKey) {
+      return dayKey is string && dayKey in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+    }
+
+    function isValidDateKey(dateKey) {
+      return dateKey is string && dateKey.size() == 10 && dateKey.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId && request.auth.token.email_verified == true;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+        'userId', 'displayName', 'email', 'defaultRingtoneId', 'restRingtoneId',
+        'volume', 'notificationsEnabled', 'snoozeMinutes', 'autoStartRestTimer',
+        'createdAt', 'updatedAt'
+      ])
+      && data.keys().hasOnly([
+        'userId', 'displayName', 'email', 'defaultRingtoneId', 'restRingtoneId',
+        'volume', 'notificationsEnabled', 'snoozeMinutes', 'autoStartRestTimer',
+        'createdAt', 'updatedAt'
+      ])
+      && data.userId is string && data.userId == userId && isValidId(data.userId)
+      && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+      && data.email is string && data.email.size() <= 200
+      && data.defaultRingtoneId is string && data.defaultRingtoneId.size() >= 1 && data.defaultRingtoneId.size() <= 128
+      && data.restRingtoneId is string && data.restRingtoneId.size() >= 1 && data.restRingtoneId.size() <= 128
+      && data.volume is number && data.volume >= 0 && data.volume <= 1
+      && data.notificationsEnabled is bool
+      && data.snoozeMinutes is number && data.snoozeMinutes >= 1 && data.snoozeMinutes <= 60
+      && data.autoStartRestTimer is bool
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidDaySchedule(data, userId, dayKey) {
+      return data.keys().hasAll([
+        'userId', 'dayKey', 'isGymDay', 'alarmEnabled', 'alarmTime',
+        'focusTitle', 'ringtoneId', 'exercises', 'createdAt', 'updatedAt'
+      ])
+      && data.keys().hasOnly([
+        'userId', 'dayKey', 'isGymDay', 'alarmEnabled', 'alarmTime',
+        'focusTitle', 'ringtoneId', 'exercises', 'createdAt', 'updatedAt'
+      ])
+      && data.userId is string && data.userId == userId && isValidId(data.userId)
+      && data.dayKey is string && data.dayKey == dayKey && isValidDayKey(data.dayKey)
+      && data.isGymDay is bool
+      && data.alarmEnabled is bool
+      && data.alarmTime is string && data.alarmTime.size() == 5 && data.alarmTime.matches('^([01]\\d|2[0-3]):([0-5]\\d)$')
+      && data.focusTitle is string && data.focusTitle.size() >= 1 && data.focusTitle.size() <= 80
+      && data.ringtoneId is string && data.ringtoneId.size() >= 1 && data.ringtoneId.size() <= 128
+      && data.exercises is list && data.exercises.size() <= 30 && (data.exercises.size() == 0 || data.exercises[0] is map)
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidWorkoutLog(data, userId, dateKey) {
+      return data.keys().hasAll([
+        'userId', 'dateKey', 'dayKey', 'focusTitle', 'entries', 'completed', 'createdAt', 'updatedAt'
+      ])
+      && data.keys().hasOnly([
+        'userId', 'dateKey', 'dayKey', 'focusTitle', 'entries', 'completed', 'createdAt', 'updatedAt'
+      ])
+      && data.userId is string && data.userId == userId && isValidId(data.userId)
+      && data.dateKey is string && data.dateKey == dateKey && isValidDateKey(data.dateKey)
+      && data.dayKey is string && isValidDayKey(data.dayKey)
+      && data.focusTitle is string && data.focusTitle.size() >= 1 && data.focusTitle.size() <= 80
+      && data.entries is list && data.entries.size() <= 30 && (data.entries.size() == 0 || data.entries[0] is map)
+      && data.completed is bool
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    function isValidCustomRingtone(data, userId) {
+      return data.keys().hasAll([
+        'userId', 'name', 'mimeType', 'sizeBytes', 'durationSeconds',
+        'storageMode', 'audioDataUrl', 'createdAt', 'updatedAt'
+      ])
+      && data.keys().hasOnly([
+        'userId', 'name', 'mimeType', 'sizeBytes', 'durationSeconds',
+        'storageMode', 'audioDataUrl', 'createdAt', 'updatedAt'
+      ])
+      && data.userId is string && data.userId == userId && isValidId(data.userId)
+      && data.name is string && data.name.size() >= 1 && data.name.size() <= 80
+      && data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 60
+      && data.sizeBytes is number && data.sizeBytes >= 0 && data.sizeBytes <= 20000000
+      && data.durationSeconds is number && data.durationSeconds >= 0 && data.durationSeconds <= 3600
+      && data.storageMode is string && data.storageMode in ['cloud', 'local_idb']
+      && data.audioDataUrl is string && data.audioDataUrl.size() <= 650000
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isSignedIn() && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isValidId(userId)
+        && isVerifiedOwner(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'defaultRingtoneId', 'restRingtoneId', 'volume',
+          'notificationsEnabled', 'snoozeMinutes', 'autoStartRestTimer', 'updatedAt'
+        ]);
+      allow delete: if false;
+
+      match /schedules/{dayKey} {
+        allow get: if isValidId(userId) && isValidDayKey(dayKey) && isSignedIn() && request.auth.uid == userId;
+        allow list: if isSignedIn() && request.auth.uid == userId && resource.data.userId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidDayKey(dayKey)
+          && isVerifiedOwner(userId)
+          && isValidDaySchedule(incoming(), userId, dayKey)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidDayKey(dayKey)
+          && isVerifiedOwner(userId)
+          && isValidDaySchedule(incoming(), userId, dayKey)
+          && incoming().userId == existing().userId
+          && incoming().dayKey == existing().dayKey
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'isGymDay', 'alarmEnabled', 'alarmTime', 'focusTitle',
+            'ringtoneId', 'exercises', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidDayKey(dayKey) && isVerifiedOwner(userId);
+      }
+
+      match /workoutLogs/{dateKey} {
+        allow get: if isValidId(userId) && isValidDateKey(dateKey) && isSignedIn() && request.auth.uid == userId;
+        allow list: if isSignedIn() && request.auth.uid == userId && resource.data.userId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidDateKey(dateKey)
+          && isVerifiedOwner(userId)
+          && isValidWorkoutLog(incoming(), userId, dateKey)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidDateKey(dateKey)
+          && isVerifiedOwner(userId)
+          && isValidWorkoutLog(incoming(), userId, dateKey)
+          && incoming().userId == existing().userId
+          && incoming().dateKey == existing().dateKey
+          && incoming().dayKey == existing().dayKey
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'focusTitle', 'entries', 'completed', 'updatedAt'
+          ]);
+        allow delete: if isValidId(userId) && isValidDateKey(dateKey) && isVerifiedOwner(userId);
+      }
+
+      match /ringtones/{ringtoneId} {
+        allow get: if isValidId(userId) && isValidId(ringtoneId) && isSignedIn() && request.auth.uid == userId;
+        allow list: if isSignedIn() && request.auth.uid == userId && resource.data.userId == request.auth.uid;
+        allow create: if isValidId(userId) && isValidId(ringtoneId)
+          && isVerifiedOwner(userId)
+          && isValidCustomRingtone(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isValidId(userId) && isValidId(ringtoneId)
+          && isVerifiedOwner(userId)
+          && isValidCustomRingtone(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'updatedAt']);
+        allow delete: if isValidId(userId) && isValidId(ringtoneId) && isVerifiedOwner(userId);
+      }
+    }
+  }
+}
