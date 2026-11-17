@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import {
   Bell,
   BellRing,
+  Check,
   Clock,
   Globe,
   HelpCircle,
@@ -14,6 +15,7 @@ import {
   Smartphone,
   Sun,
   Sunrise,
+  User,
   Volume2,
 } from 'lucide-react';
 import { formatClockTime } from '../lib/dateUtils';
@@ -35,6 +37,7 @@ interface SettingsViewProps {
     patch: Partial<
       Pick<
         UserProfile,
+        | 'displayName'
         | 'volume'
         | 'notificationsEnabled'
         | 'snoozeMinutes'
@@ -69,6 +72,48 @@ export function SettingsView({
   const [androidDiag, setAndroidDiag] = useState<AndroidAlarmDiagnostics | null>(null);
   const [testNotifStatus, setTestNotifStatus] = useState<string | null>(null);
   const [schedulingTest, setSchedulingTest] = useState(false);
+
+  const [nameInput, setNameInput] = useState(profile.displayName);
+  const [savingName, setSavingName] = useState(false);
+  const [nameStatus, setNameStatus] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    setNameInput(profile.displayName);
+  }, [profile.displayName]);
+
+  const handleSaveDisplayName = async (e: FormEvent) => {
+    e.preventDefault();
+    const cleaned = nameInput.trim().slice(0, 100);
+    if (!cleaned) {
+      setNameStatus({
+        type: 'error',
+        text: t('Nama panggilan tidak boleh kosong.', 'Nickname cannot be empty.'),
+      });
+      return;
+    }
+    setSavingName(true);
+    setNameStatus(null);
+    try {
+      await onUpdateProfile({ displayName: cleaned });
+      setNameStatus({
+        type: 'success',
+        text: t(
+          `Tersimpan! Maskot akan menyapamu "${cleaned}".`,
+          `Saved! Your companion will greet you as "${cleaned}".`
+        ),
+      });
+    } catch {
+      setNameStatus({
+        type: 'error',
+        text: t('Gagal menyimpan nama.', 'Failed to save name.'),
+      });
+    } finally {
+      setSavingName(false);
+    }
+  };
 
   const refreshAndroidDiagnostics = useCallback(async () => {
     if (!runningNativeAndroid) return;
@@ -203,6 +248,66 @@ export function SettingsView({
         </p>
       </div>
 
+      {/* 0. Mascot Call Name & Profile */}
+      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-4">
+        <div>
+          <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+            {t('Nama Panggilan & Sapaan Karakter', 'Nickname & Companion Greeting')}
+          </h2>
+          <p className="mt-0.5 text-xs text-[#9CA3AF]">
+            {t(
+              'Nama ini dipakai oleh karakter maskot untuk menyapamu setiap kali membuka IronPulse.',
+              'Your workout companion uses this name to greet you whenever you open IronPulse.'
+            )}
+          </p>
+        </div>
+
+        <form onSubmit={handleSaveDisplayName} className="flex flex-col gap-2.5 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label
+              htmlFor="settings-display-name"
+              className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]"
+            >
+              <User className="h-4 w-4 text-[#C8FF2E]" />
+              <span>{t('Nama Panggilan Anda', 'Your Display Name')}</span>
+            </label>
+            <input
+              id="settings-display-name"
+              type="text"
+              maxLength={100}
+              value={nameInput}
+              onChange={(e) => {
+                setNameInput(e.target.value);
+                if (nameStatus) setNameStatus(null);
+              }}
+              placeholder={t('Masukkan nama panggilanmu', 'Enter your nickname')}
+              className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-sm font-semibold text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-[#C8FF2E] focus:outline-none"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={savingName || nameInput.trim() === profile.displayName.trim()}
+            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] transition-transform hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
+          >
+            <Check className="h-4 w-4" strokeWidth={2.5} />
+            {savingName
+              ? t('Menyimpan...', 'Saving...')
+              : t('Simpan Nama', 'Save Name')}
+          </button>
+        </form>
+
+        {nameStatus && (
+          <p
+            className={`text-xs font-medium ${
+              nameStatus.type === 'success' ? 'text-[#C8FF2E]' : 'text-[#FCA5A5]'
+            }`}
+          >
+            {nameStatus.text}
+          </p>
+        )}
+      </section>
+
       {/* 1. Language & Clock System */}
       <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-5">
         <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
@@ -299,8 +404,8 @@ export function SettingsView({
             </h2>
             <p className="mt-0.5 text-xs text-[#9CA3AF]">
               {t(
-                'Pilih otomatis mengikuti jam perangkat atau kunci tema Pagi, Siang, atau Malam.',
-                'Follow your device time automatically or lock Morning, Afternoon, or Night mood.'
+                'Default Auto mengikuti jam asli perangkat secara otomatis, atau kunci ke Pagi, Siang, atau Malam.',
+                'Auto follows your real device clock by default, or lock Morning, Afternoon, or Night mood.'
               )}
             </p>
           </div>

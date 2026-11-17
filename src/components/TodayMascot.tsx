@@ -12,9 +12,11 @@ export type MascotMood =
 interface TodayMascotProps {
   mood: MascotMood;
   timePhase: DayTimePhase;
-  cooldownRemaining: number;
+  restRemainingFormatted?: string;
   dayLabel: string;
+  userName?: string;
   dayJustChanged?: boolean;
+  isOpeningGreeting?: boolean;
 }
 
 const PHASE_ACCENT: Record<DayTimePhase, string> = {
@@ -26,11 +28,14 @@ const PHASE_ACCENT: Record<DayTimePhase, string> = {
 export function TodayMascot({
   mood,
   timePhase,
-  cooldownRemaining,
+  restRemainingFormatted,
   dayLabel,
+  userName,
   dayJustChanged = false,
+  isOpeningGreeting = false,
 }: TodayMascotProps) {
   const { lang, t } = useI18n();
+  const cleanName = (userName || '').trim();
 
   const phaseColor =
     mood === 'celebrate' || mood === 'clap'
@@ -41,16 +46,20 @@ export function TodayMascot({
 
   const greetingByPhase =
     timePhase === 'morning'
-      ? t('Selamat Pagi!', 'Good Morning!')
+      ? t('Selamat Pagi', 'Good Morning')
       : timePhase === 'afternoon'
-        ? t('Selamat Siang!', 'Good Afternoon!')
-        : t('Selamat Malam!', 'Good Evening!');
+        ? t('Selamat Siang', 'Good Afternoon')
+        : t('Selamat Malam', 'Good Evening');
+
+  const namedGreeting = cleanName ? `${greetingByPhase}, ${cleanName}!` : `${greetingByPhase}!`;
 
   const getMessage = (): { headline: string; subline: string } => {
     switch (mood) {
       case 'clap':
         return {
-          headline: t('Mantap! Tepuk tangan!', 'Nice! Clap it up!'),
+          headline: cleanName
+            ? t(`Mantap, ${cleanName}! Tepuk tangan!`, `Nice, ${cleanName}! Clap it up!`)
+            : t('Mantap! Tepuk tangan!', 'Nice! Clap it up!'),
           subline: t(
             'Satu set selesai! Tarik napas dulu sebelum set berikutnya.',
             'Set logged! Catch your breath before the next set.'
@@ -58,7 +67,9 @@ export function TodayMascot({
         };
       case 'celebrate':
         return {
-          headline: t('Sesi Hari Ini Tuntas!', 'Session Complete!'),
+          headline: cleanName
+            ? t(`Luar biasa, ${cleanName}! Sesi Tuntas!`, `Awesome, ${cleanName}! Session Complete!`)
+            : t('Sesi Hari Ini Tuntas!', 'Session Complete!'),
           subline: t(
             'Semua target set selesai dikerjakan. Kerja keras yang luar biasa!',
             'Every target set is complete. Outstanding work today!'
@@ -66,18 +77,29 @@ export function TodayMascot({
         };
       case 'rest':
         return {
-          headline:
-            cooldownRemaining > 0
-              ? t(`Istirahat dulu (${cooldownRemaining}d)`, `Rest up (${cooldownRemaining}s)`)
-              : t('Mode Istirahat Aktif', 'Rest Timer Running'),
+          headline: restRemainingFormatted
+            ? cleanName
+              ? t(
+                  `Timer Istirahat Aktif, ${cleanName} (${restRemainingFormatted})`,
+                  `Rest Timer Active, ${cleanName} (${restRemainingFormatted})`
+                )
+              : t(
+                  `Timer Istirahat Aktif (${restRemainingFormatted})`,
+                  `Rest Timer Active (${restRemainingFormatted})`
+                )
+            : cleanName
+              ? t(`Timer Istirahat Aktif, ${cleanName}`, `Rest Timer Active, ${cleanName}`)
+              : t('Timer Istirahat Aktif', 'Rest Timer Running'),
           subline: t(
-            'Biarkan otot pulih sejenak agar set berikutnya tetap kuat.',
-            'Let your muscles recover briefly so your next set stays strong.'
+            'Biarkan otot pulih sejenak sambil menunggu timer istirahat selesai.',
+            'Let your muscles recover briefly while the rest timer runs.'
           ),
         };
       case 'restday':
         return {
-          headline: `${greetingByPhase} ${t('Hari Istirahat', 'Rest Day')}`,
+          headline: cleanName
+            ? `${greetingByPhase}, ${cleanName}! ${t('Hari Istirahat', 'Rest Day')}`
+            : `${greetingByPhase}! ${t('Hari Istirahat', 'Rest Day')}`,
           subline: t(
             'Waktunya pemulihan, tidur cukup, dan hidrasi yang baik.',
             'Focus on recovery, quality sleep, and staying hydrated.'
@@ -86,17 +108,28 @@ export function TodayMascot({
       case 'welcome':
         return {
           headline: dayJustChanged
-            ? t(`Hari Baru: ${dayLabel}!`, `New Day: ${dayLabel}!`)
-            : `${greetingByPhase} ${t('Ayo Mulai!', "Let's Go!")}`,
-          subline: t(
-            `Selamat datang di jadwal ${dayLabel}. Siap angkat set pertama?`,
-            `Welcome to ${dayLabel}'s session. Ready for your first set?`
-          ),
+            ? cleanName
+              ? t(`Hari Baru, ${cleanName}! Selamat ${dayLabel}!`, `New Day, ${cleanName}! Happy ${dayLabel}!`)
+              : t(`Hari Baru: ${dayLabel}!`, `New Day: ${dayLabel}!`)
+            : isOpeningGreeting && cleanName
+              ? t(`Halo ${cleanName}! ${greetingByPhase}!`, `Hi ${cleanName}! ${greetingByPhase}!`)
+              : `${namedGreeting} ${t('Ayo Mulai!', "Let's Go!")}`,
+          subline: cleanName
+            ? t(
+                `Senang melihatmu lagi di hari ${dayLabel}, ${cleanName}. Siap latihan hari ini?`,
+                `Good to see you on ${dayLabel}, ${cleanName}. Ready to train today?`
+              )
+            : t(
+                `Selamat datang di jadwal ${dayLabel}. Siap angkat set pertama?`,
+                `Welcome to ${dayLabel}'s session. Ready for your first set?`
+              ),
         };
       case 'ready':
       default:
         return {
-          headline: `${greetingByPhase} ${t('Tetap Fokus', 'Stay Locked In')}`,
+          headline: cleanName
+            ? `${greetingByPhase}, ${cleanName}! ${t('Tetap Fokus', 'Stay Locked In')}`
+            : `${greetingByPhase}! ${t('Tetap Fokus', 'Stay Locked In')}`,
           subline: t(
             'Isi beban & repetisi lalu centang setiap set yang selesai.',
             'Enter weight & reps, then check off each completed set.'

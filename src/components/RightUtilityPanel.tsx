@@ -1,8 +1,7 @@
-import { Globe, HelpCircle, Info, LogOut, Pause, Play, RotateCcw, Settings, Volume2 } from 'lucide-react';
+import { Globe, HelpCircle, Info, LogOut, Settings, Volume2 } from 'lucide-react';
 import {
   formatAlarmTime,
   formatClockTime,
-  formatRestDuration,
   NextAlarmInfo,
 } from '../lib/dateUtils';
 import { useI18n } from '../lib/i18n';
@@ -14,14 +13,6 @@ interface RightUtilityPanelProps {
   nextAlarm: NextAlarmInfo | null;
   audioUnlocked: boolean;
   onUnlockAudio: () => Promise<void>;
-  restTotalSeconds: number;
-  restRemaining: number;
-  restRunning: boolean;
-  restExerciseLabel: string | null;
-  onStartRest: (seconds: number, label?: string) => void;
-  onToggleRestPause: () => void;
-  onResetRest: () => void;
-  onAdjustRest: (deltaSeconds: number) => void;
   profile: UserProfile;
   onSignOut: () => Promise<void>;
   onOpenSettings: () => void;
@@ -36,14 +27,6 @@ export function RightUtilityPanel({
   nextAlarm,
   audioUnlocked,
   onUnlockAudio,
-  restTotalSeconds,
-  restRemaining,
-  restRunning,
-  restExerciseLabel,
-  onStartRest,
-  onToggleRestPause,
-  onResetRest,
-  onAdjustRest,
   profile,
   onSignOut,
   onOpenSettings,
@@ -54,14 +37,6 @@ export function RightUtilityPanel({
 }: RightUtilityPanelProps) {
   const { lang, setLang, clockFormat, t } = useI18n();
   const formattedClock = formatClockTime(now, clockFormat, true);
-
-  const progressRatio =
-    restTotalSeconds > 0
-      ? Math.max(0, Math.min(1, restRemaining / restTotalSeconds))
-      : 0;
-  const circumference = 2 * Math.PI * 52;
-  const strokeDashoffset = circumference * (1 - progressRatio);
-  const secUnit = t('d', 's');
 
   return (
     <aside className="space-y-5">
@@ -115,112 +90,6 @@ export function RightUtilityPanel({
             )}
           </div>
         )}
-      </section>
-
-      {/* Inter-Set Rest Timer */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold tracking-tight text-[#F4F5F7]">
-            {t('Timer Istirahat', 'Rest Timer')}
-          </h2>
-          {restExerciseLabel && (
-            <span className="max-w-[140px] truncate text-xs text-[#9CA3AF]">
-              {restExerciseLabel}
-            </span>
-          )}
-        </div>
-
-        {/* SVG Circular Timer */}
-        <div className="mt-4 flex items-center justify-center">
-          <div className="relative flex h-32 w-32 items-center justify-center">
-            <svg className="h-32 w-32 -rotate-90" viewBox="0 0 120 120">
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                fill="none"
-                stroke="rgba(255,255,255,0.08)"
-                strokeWidth="7"
-              />
-              <circle
-                cx="60"
-                cy="60"
-                r="52"
-                fill="none"
-                stroke={restRemaining === 0 ? '#16A34A' : '#C8FF2E'}
-                strokeWidth="7"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                className="transition-all duration-300"
-              />
-            </svg>
-            <span className="absolute font-mono text-2xl font-bold tabular-nums text-[#F4F5F7]">
-              {formatRestDuration(restRemaining)}
-            </span>
-          </div>
-        </div>
-
-        {/* Quick Presets */}
-        <div className="mt-4 grid grid-cols-4 gap-2">
-          {[45, 60, 90, 120].map((sec) => (
-            <button
-              key={sec}
-              type="button"
-              onClick={() => onStartRest(sec)}
-              className="min-h-[38px] rounded-lg border border-white/10 bg-[#0A0B0E] font-mono text-xs font-semibold tabular-nums text-[#D1D5DB] hover:border-[#C8FF2E] hover:text-[#C8FF2E]"
-            >
-              {sec}
-              {secUnit}
-            </button>
-          ))}
-        </div>
-
-        {/* Timer Controls */}
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onAdjustRest(-15)}
-            className="min-h-[42px] rounded-xl border border-white/10 bg-[#1A1E26] px-3 font-mono text-xs font-bold text-[#D1D5DB] hover:bg-[#242B37]"
-          >
-            -15{secUnit}
-          </button>
-
-          <button
-            type="button"
-            onClick={onToggleRestPause}
-            className="flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
-          >
-            {restRunning ? (
-              <>
-                <Pause className="h-4 w-4 fill-current" />
-                {t('Jeda', 'Pause')}
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 fill-current" />
-                {restRemaining > 0 ? t('Mulai', 'Start') : t('Ulangi', 'Restart')}
-              </>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onAdjustRest(15)}
-            className="min-h-[42px] rounded-xl border border-white/10 bg-[#1A1E26] px-3 font-mono text-xs font-bold text-[#D1D5DB] hover:bg-[#242B37]"
-          >
-            +15{secUnit}
-          </button>
-
-          <button
-            type="button"
-            aria-label={t('Reset timer istirahat', 'Reset rest timer')}
-            onClick={onResetRest}
-            className="flex min-h-[42px] min-w-[42px] items-center justify-center rounded-xl border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </button>
-        </div>
       </section>
 
       {/* Account Sync, Language, Tutorial & About Card */}

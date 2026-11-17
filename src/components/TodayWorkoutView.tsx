@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import {
-  AlertCircle,
   Check,
   ChevronDown,
   ChevronUp,
   Clock,
   Dumbbell,
-  HelpCircle,
   Minus,
   Moon,
   Pause,
@@ -25,12 +23,12 @@ import {
 } from '../lib/dateUtils';
 import {
   DAY_LABELS,
-  DayTimeMode,
   MUSCLE_LABELS,
   resolveDayTimePhase,
   useI18n,
 } from '../lib/i18n';
 import { DayKey, DaySchedule, WorkoutLogEntry } from '../types/gym';
+import { CooldownAlertModal } from './CooldownAlertModal';
 import { MascotMood, TodayMascot } from './TodayMascot';
 
 interface CooldownTarget {
@@ -44,6 +42,7 @@ interface TodayWorkoutViewProps {
   todayDayKey: DayKey;
   schedules: Record<DayKey, DaySchedule>;
   todayEntries: WorkoutLogEntry[];
+  restTotalSeconds: number;
   restRemaining: number;
   restRunning: boolean;
   restExerciseLabel: string | null;
@@ -51,8 +50,11 @@ interface TodayWorkoutViewProps {
   cooldownAlertTarget: CooldownTarget | null;
   justClapped: boolean;
   dayJustChanged: boolean;
+  userName: string;
+  isOpeningGreeting: boolean;
   onToggleRestPause: () => void;
   onResetRest: () => void;
+  onAdjustRest: (deltaSeconds: number) => void;
   onToggleSetComplete: (
     exerciseId: string,
     setNumber: number,
@@ -68,10 +70,9 @@ interface TodayWorkoutViewProps {
   ) => Promise<void>;
   onAddSet: (exerciseId: string) => Promise<void>;
   onRemoveSet: (exerciseId: string) => Promise<void>;
-  onStartRestTimer: (seconds: number, exerciseName: string) => void;
+  onStartRestTimer: (seconds: number, exerciseName?: string) => void;
   onOpenExerciseManager: (dayKey: DayKey) => void;
   onOpenScheduleManager: () => void;
-  onOpenTutorial: () => void;
 }
 
 const PHASE_HERO_STYLES = {
@@ -103,6 +104,7 @@ export function TodayWorkoutView({
   todayDayKey,
   schedules,
   todayEntries,
+  restTotalSeconds,
   restRemaining,
   restRunning,
   restExerciseLabel,
@@ -110,8 +112,11 @@ export function TodayWorkoutView({
   cooldownAlertTarget,
   justClapped,
   dayJustChanged,
+  userName,
+  isOpeningGreeting,
   onToggleRestPause,
   onResetRest,
+  onAdjustRest,
   onToggleSetComplete,
   onBypassCooldownAndComplete,
   onDismissCooldownAlert,
@@ -121,9 +126,8 @@ export function TodayWorkoutView({
   onStartRestTimer,
   onOpenExerciseManager,
   onOpenScheduleManager,
-  onOpenTutorial,
 }: TodayWorkoutViewProps) {
-  const { lang, t, clockFormat, todayThemeMode, setTodayThemeMode } = useI18n();
+  const { lang, t, clockFormat, todayThemeMode } = useI18n();
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -155,15 +159,25 @@ export function TodayWorkoutView({
   let mascotMood: MascotMood = 'ready';
   if (justClapped) {
     mascotMood = totalSets > 0 && completedSets === totalSets ? 'celebrate' : 'clap';
+  } else if (dayJustChanged || isOpeningGreeting) {
+    mascotMood = 'welcome';
   } else if (!activeSchedule.isGymDay) {
     mascotMood = 'restday';
   } else if (totalSets > 0 && completedSets === totalSets) {
     mascotMood = 'celebrate';
-  } else if (cooldownRemaining > 0 || restRunning) {
+  } else if (restRunning) {
     mascotMood = 'rest';
-  } else if (dayJustChanged || completedSets === 0) {
+  } else if (completedSets === 0) {
     mascotMood = 'welcome';
   }
+
+  const restProgressRatio =
+    restTotalSeconds > 0
+      ? Math.max(0, Math.min(1, restRemaining / restTotalSeconds))
+      : 0;
+  const restCircumference = 2 * Math.PI * 38;
+  const restStrokeDashoffset = restCircumference * (1 - restProgressRatio);
+  const secUnit = t('d', 's');
 
   const toggleNotes = (id: string) => {
     setExpandedNotes((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -196,78 +210,41 @@ export function TodayWorkoutView({
         <div className={`absolute inset-0 bg-gradient-to-br ${phaseStyle.gradient}`} />
 
         <div className="relative z-10 p-5 sm:p-7 space-y-5">
-          {/* Row 1: Enlarged Time-of-Day Emblem + Live Clock & Theme Switcher */}
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-center gap-3.5">
-              <div
-                className={`flex h-12 w-12 sm:h-14 sm:w-14 shrink-0 items-center justify-center rounded-xl border ${phaseStyle.emblemBox}`}
-              >
-                <PhaseIcon className="h-6 w-6 sm:h-7 sm:w-7" strokeWidth={2.2} />
-              </div>
-
-              <div>
-                <div className="flex items-baseline gap-2">
-                  <span className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-[#F4F5F7]">
-                    {formattedClock.timeText}
-                  </span>
-                  {formattedClock.meridiem && (
-                    <span className="font-mono text-xs sm:text-sm font-bold text-[#C8FF2E]">
-                      {formattedClock.meridiem}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs font-medium text-[#9CA3AF]">
-                  <span className={`font-semibold ${phaseStyle.badgeText}`}>{phaseLabel}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className="font-mono tabular-nums">
-                    {activeSchedule.isGymDay
-                      ? activeSchedule.alarmEnabled
-                        ? `${t('Alarm', 'Alarm')} ${formattedAlarm}`
-                        : `${formattedAlarm} (${t('Alarm Mati', 'Alarm Off')})`
-                      : t('Hari Istirahat', 'Rest Day')}
-                  </span>
-                </div>
-              </div>
+          {/* Row 1: Enlarged Time-of-Day Emblem + Live Real Clock */}
+          <div className="flex items-center gap-3.5 sm:gap-4">
+            <div
+              className={`flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl border ${phaseStyle.emblemBox}`}
+            >
+              <PhaseIcon className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={2.2} />
             </div>
 
-            <div className="flex items-center gap-2">
-              <div
-                role="group"
-                aria-label={t('Tema waktu hari ini', 'Time of day theme')}
-                className="inline-flex rounded-lg border border-white/10 bg-[#0A0B0E]/80 p-0.5"
-              >
-                {(
-                  [
-                    { id: 'auto', label: 'Auto' },
-                    { id: 'morning', label: t('Pagi', 'AM') },
-                    { id: 'afternoon', label: t('Siang', 'Day') },
-                    { id: 'night', label: t('Malam', 'PM') },
-                  ] as const
-                ).map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setTodayThemeMode(item.id as DayTimeMode)}
-                    className={`min-h-[30px] rounded-md px-2 text-[11px] font-semibold transition-colors whitespace-nowrap ${
-                      todayThemeMode === item.id
-                        ? 'bg-[#C8FF2E] text-[#0A0B0E]'
-                        : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+            <div className="min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span className="font-mono text-4xl sm:text-5xl font-extrabold leading-none tracking-tight tabular-nums text-[#F4F5F7]">
+                  {formattedClock.timeText}
+                </span>
+                {formattedClock.meridiem && (
+                  <span className="font-mono text-sm sm:text-base font-bold text-[#C8FF2E]">
+                    {formattedClock.meridiem}
+                  </span>
+                )}
               </div>
 
-              <button
-                type="button"
-                onClick={onOpenTutorial}
-                className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-white/15 bg-[#13161C]/80 px-2.5 py-1 text-xs font-semibold text-[#D1D5DB] hover:border-[#C8FF2E]/40 hover:text-[#C8FF2E] whitespace-nowrap"
-              >
-                <HelpCircle className="h-3.5 w-3.5 text-[#C8FF2E]" />
-                {t('Panduan', 'Guide')}
-              </button>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className={`text-sm sm:text-base font-bold tracking-tight ${phaseStyle.badgeText}`}>
+                  {phaseLabel}
+                </span>
+                <span aria-hidden="true" className="text-[#6B7280]">
+                  ·
+                </span>
+                <span className="font-mono text-xs sm:text-sm font-medium tabular-nums text-[#9CA3AF]">
+                  {activeSchedule.isGymDay
+                    ? activeSchedule.alarmEnabled
+                      ? `${t('Alarm', 'Alarm')} ${formattedAlarm}`
+                      : `${formattedAlarm} (${t('Alarm Mati', 'Alarm Off')})`
+                    : t('Hari Istirahat', 'Rest Day')}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -291,9 +268,11 @@ export function TodayWorkoutView({
           <TodayMascot
             mood={mascotMood}
             timePhase={timePhase}
-            cooldownRemaining={cooldownRemaining}
+            restRemainingFormatted={restRunning ? formatRestDuration(restRemaining) : undefined}
             dayLabel={dayLabel}
+            userName={userName}
             dayJustChanged={dayJustChanged}
+            isOpeningGreeting={isOpeningGreeting}
           />
 
           {activeSchedule.isGymDay && activeSchedule.exercises.length > 0 && (
@@ -325,109 +304,145 @@ export function TodayWorkoutView({
         </div>
       </section>
 
-      {/* Global 30-Second Set Cooldown "Istirahat" Warning + Emergency Bypass */}
-      {cooldownRemaining > 0 && (
-        <section
-          role="status"
-          aria-live="polite"
-          className={`rounded-2xl border p-4 transition-colors ${
-            cooldownAlertTarget
-              ? 'border-[#F59E0B]/60 bg-[#F59E0B]/12'
-              : 'border-[#38BDF8]/40 bg-[#13161C]'
-          }`}
-        >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <AlertCircle
-                className={`mt-0.5 h-5 w-5 shrink-0 ${
-                  cooldownAlertTarget ? 'text-[#FBBF24]' : 'text-[#38BDF8]'
-                }`}
-              />
-              <div>
-                <p className="text-sm font-bold text-[#F4F5F7]">
-                  {t('Istirahat dulu!', 'Rest up!')}{' '}
-                  <span className="font-mono tabular-nums text-[#C8FF2E]">
-                    {cooldownRemaining}
-                    {t('d', 's')}
-                  </span>
-                </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-[#D1D5DB]">
-                  {cooldownAlertTarget
-                    ? t(
-                        `Tunggu ${cooldownRemaining} detik sebelum mencentang "${cooldownAlertTarget.exerciseName}" Set #${cooldownAlertTarget.setNumber}, atau gunakan Lewati Darurat jika sedang superset.`,
-                        `Wait ${cooldownRemaining}s before checking "${cooldownAlertTarget.exerciseName}" Set #${cooldownAlertTarget.setNumber}, or use Emergency Bypass for supersets.`
-                      )
-                    : t(
-                        'Jeda 30 detik antar centang set aktif agar otot pulih dan menghindari ketidaksengajaan.',
-                        '30-second set check cooldown active to pace your recovery and prevent mis-taps.'
-                      )}
-                </p>
-              </div>
+      {/* Centered Anti-Misclick Cooldown Popup when user taps too early */}
+      <CooldownAlertModal
+        open={Boolean(cooldownAlertTarget && cooldownRemaining > 0)}
+        cooldownRemaining={cooldownRemaining}
+        exerciseName={cooldownAlertTarget?.exerciseName || ''}
+        setNumber={cooldownAlertTarget?.setNumber || 1}
+        onBypass={onBypassCooldownAndComplete}
+        onDismiss={onDismissCooldownAlert}
+      />
+
+      {/* Dedicated Rest Timer Directly Below Hero (Desktop & Mobile) */}
+      <section
+        className={`rounded-2xl border bg-[#13161C] p-4 sm:p-5 transition-colors ${
+          restRunning
+            ? 'border-[#C8FF2E]/50'
+            : restRemaining === 0
+              ? 'border-[#16A34A]/50'
+              : 'border-white/10'
+        }`}
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left: Ring + Title & Status */}
+          <div className="flex items-center gap-4">
+            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+              <svg className="h-24 w-24 -rotate-90" viewBox="0 0 96 96" aria-hidden="true">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="38"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.08)"
+                  strokeWidth="6"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="38"
+                  fill="none"
+                  stroke={restRemaining === 0 ? '#16A34A' : '#C8FF2E'}
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={restCircumference}
+                  strokeDashoffset={restStrokeDashoffset}
+                  className="transition-all duration-300"
+                />
+              </svg>
+              <span className="absolute font-mono text-xl font-bold tabular-nums text-[#F4F5F7]">
+                {formatRestDuration(restRemaining)}
+              </span>
             </div>
 
-            {cooldownAlertTarget && (
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={onBypassCooldownAndComplete}
-                  className="min-h-[42px] rounded-xl bg-[#C8FF2E] px-3.5 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105 whitespace-nowrap"
-                >
-                  {t('Lewati Darurat (Centang)', 'Bypass & Check Set')}
-                </button>
-                <button
-                  type="button"
-                  onClick={onDismissCooldownAlert}
-                  className="min-h-[42px] rounded-xl border border-white/15 bg-[#1A1E26] px-3 py-2 text-xs font-semibold text-[#D1D5DB] hover:text-[#F4F5F7]"
-                >
-                  {t('Tunggu', 'Wait')}
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Mobile Compact Active Rest Timer Strip */}
-      {(restRunning || restRemaining === 0) && (
-        <section className="flex items-center justify-between gap-3 rounded-2xl border border-[#C8FF2E]/40 bg-[#13161C] px-4 py-3 lg:hidden">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#C8FF2E]">
-              {restRemaining === 0
-                ? t('Istirahat Selesai', 'Rest Complete')
-                : t('Timer Istirahat', 'Rest Timer')}
-            </p>
-            <p className="truncate text-xs text-[#9CA3AF]">
-              {restExerciseLabel || t('Antar set', 'Between sets')}
-            </p>
+            <div className="min-w-0">
+              <h2 className="font-display text-lg font-bold tracking-tight text-[#F4F5F7]">
+                {t('Timer Istirahat', 'Rest Timer')}
+              </h2>
+              <p className="mt-0.5 truncate text-xs text-[#9CA3AF]">
+                {restExerciseLabel || t('Waktu pemulihan antar set', 'Between-set recovery')}
+              </p>
+              <p
+                className={`mt-1 text-xs font-semibold ${
+                  restRemaining === 0
+                    ? 'text-[#4ADE80]'
+                    : restRunning
+                      ? 'text-[#C8FF2E]'
+                      : 'text-[#D1D5DB]'
+                }`}
+              >
+                {restRemaining === 0
+                  ? t('Istirahat selesai — lanjutkan set berikutnya', 'Rest complete — start next set')
+                  : restRunning
+                    ? t('Sedang berjalan', 'Running')
+                    : t('Siap dimulai', 'Ready to start')}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="font-mono text-xl font-bold tabular-nums text-[#F4F5F7]">
-              {formatRestDuration(restRemaining)}
-            </span>
-            <button
-              type="button"
-              aria-label={restRunning ? t('Jeda timer', 'Pause timer') : t('Mulai timer', 'Start timer')}
-              onClick={onToggleRestPause}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C8FF2E] text-[#0A0B0E]"
-            >
-              {restRunning ? (
-                <Pause className="h-4 w-4 fill-current" />
-              ) : (
-                <Play className="h-4 w-4 fill-current" />
-              )}
-            </button>
-            <button
-              type="button"
-              aria-label={t('Reset timer', 'Reset timer')}
-              onClick={onResetRest}
-              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[#1A1E26] text-[#9CA3AF]"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
+          {/* Right: Quick Presets & Controls */}
+          <div className="flex flex-col gap-2.5 sm:items-end">
+            <div className="grid grid-cols-4 gap-2 w-full sm:w-auto">
+              {[45, 60, 90, 120].map((sec) => (
+                <button
+                  key={sec}
+                  type="button"
+                  onClick={() => onStartRestTimer(sec, restExerciseLabel || undefined)}
+                  className="min-h-[38px] rounded-lg border border-white/10 bg-[#0A0B0E] px-3 font-mono text-xs font-semibold tabular-nums text-[#D1D5DB] hover:border-[#C8FF2E] hover:text-[#C8FF2E]"
+                >
+                  {sec}
+                  {secUnit}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => onAdjustRest(-15)}
+                className="min-h-[42px] rounded-xl border border-white/10 bg-[#1A1E26] px-3 font-mono text-xs font-bold text-[#D1D5DB] hover:bg-[#242B37] whitespace-nowrap"
+              >
+                -15{secUnit}
+              </button>
+
+              <button
+                type="button"
+                onClick={onToggleRestPause}
+                className="flex min-h-[42px] flex-1 sm:flex-initial sm:min-w-[116px] items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 text-xs font-bold text-[#0A0B0E] hover:brightness-105 whitespace-nowrap"
+              >
+                {restRunning ? (
+                  <>
+                    <Pause className="h-4 w-4 fill-current" />
+                    {t('Jeda', 'Pause')}
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 fill-current" />
+                    {restRemaining > 0 ? t('Mulai', 'Start') : t('Ulangi', 'Restart')}
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onAdjustRest(15)}
+                className="min-h-[42px] rounded-xl border border-white/10 bg-[#1A1E26] px-3 font-mono text-xs font-bold text-[#D1D5DB] hover:bg-[#242B37] whitespace-nowrap"
+              >
+                +15{secUnit}
+              </button>
+
+              <button
+                type="button"
+                aria-label={t('Reset timer istirahat', 'Reset rest timer')}
+                onClick={onResetRest}
+                className="flex min-h-[42px] min-w-[42px] items-center justify-center rounded-xl border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* Rest Day State */}
       {!activeSchedule.isGymDay && (

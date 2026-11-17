@@ -13,6 +13,7 @@ import { FeatureTutorialModal } from './components/FeatureTutorialModal';
 import { HistoryProgressView } from './components/HistoryProgressView';
 import { LaunchIntro } from './components/LaunchIntro';
 import { MobileBottomNav } from './components/MobileBottomNav';
+import { NamePromptModal } from './components/NamePromptModal';
 import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner';
 import { RightUtilityPanel } from './components/RightUtilityPanel';
 import { RingtoneManagerView } from './components/RingtoneManagerView';
@@ -76,8 +77,10 @@ function AppContent() {
 
   const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [showIntro, setShowIntro] = useState(true);
+  const [nameConfirmed, setNameConfirmed] = useState<boolean>(true);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStartWithLang, setTutorialStartWithLang] = useState(true);
+  const [isOpeningGreeting, setIsOpeningGreeting] = useState(true);
   const [exerciseDayKey, setExerciseDayKey] = useState<DayKey>(todayDayKey);
   const [now, setNow] = useState<Date>(() => new Date());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -329,6 +332,7 @@ function AppContent() {
         setCooldownUntilMs(Date.now() + 30_000);
         setCooldownAlertTarget(null);
         setDayJustChanged(false);
+        setIsOpeningGreeting(false);
         triggerClapBurst();
 
         if (profile?.autoStartRestTimer && schedules) {
@@ -360,6 +364,7 @@ function AppContent() {
     if (becameCompleted) {
       setCooldownUntilMs(Date.now() + 30_000);
       setDayJustChanged(false);
+      setIsOpeningGreeting(false);
       triggerClapBurst();
 
       if (profile?.autoStartRestTimer && schedules) {
@@ -409,9 +414,50 @@ function AppContent() {
     [schedules, now, lang]
   );
 
-  // Auto-open tutorial (starting with Language Picker) once per user on first entry
+  // Check whether signed-in user has confirmed their display name after login
   useEffect(() => {
-    if (showIntro || !authReady || !user || dataLoading || !profile || !schedules) return;
+    setIsOpeningGreeting(true);
+    if (!user) {
+      setNameConfirmed(true);
+      return;
+    }
+    try {
+      const key = `ironpulse_name_confirmed_${user.uid}`;
+      setNameConfirmed(localStorage.getItem(key) === '1');
+    } catch {
+      setNameConfirmed(true);
+    }
+  }, [user]);
+
+  const handleSaveNameFromPrompt = useCallback(
+    async (name: string) => {
+      await updateProfile({ displayName: name });
+      if (user) {
+        try {
+          localStorage.setItem(`ironpulse_name_confirmed_${user.uid}`, '1');
+        } catch {
+          // ignore storage errors
+        }
+      }
+      setNameConfirmed(true);
+      setIsOpeningGreeting(true);
+    },
+    [updateProfile, user]
+  );
+
+  // Auto-open tutorial (starting with Language Picker) once per user after name confirmation
+  useEffect(() => {
+    if (
+      showIntro ||
+      !authReady ||
+      !user ||
+      dataLoading ||
+      !profile ||
+      !schedules ||
+      !nameConfirmed
+    ) {
+      return;
+    }
     try {
       const seenKey = `ironpulse_tutorial_seen_${user.uid}`;
       if (!localStorage.getItem(seenKey)) {
@@ -421,7 +467,7 @@ function AppContent() {
     } catch {
       // ignore storage errors in restricted contexts
     }
-  }, [showIntro, authReady, user, dataLoading, profile, schedules]);
+  }, [showIntro, authReady, user, dataLoading, profile, schedules, nameConfirmed]);
 
   const handleOpenTutorialFromUi = useCallback(() => {
     setTutorialStartWithLang(false);
@@ -519,6 +565,7 @@ function AppContent() {
                       todayDayKey={todayDayKey}
                       schedules={schedules}
                       todayEntries={effectiveTodayEntries}
+                      restTotalSeconds={restTotalSeconds}
                       restRemaining={restRemaining}
                       restRunning={restRunning}
                       restExerciseLabel={restExerciseLabel}
@@ -526,8 +573,11 @@ function AppContent() {
                       cooldownAlertTarget={cooldownAlertTarget}
                       justClapped={justClapped}
                       dayJustChanged={dayJustChanged}
+                      userName={profile.displayName}
+                      isOpeningGreeting={isOpeningGreeting}
                       onToggleRestPause={handleToggleRestPause}
                       onResetRest={handleResetRest}
+                      onAdjustRest={handleAdjustRest}
                       onToggleSetComplete={handleToggleSetWithAutoRest}
                       onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
                       onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
@@ -540,7 +590,6 @@ function AppContent() {
                         setActiveTab('exercises');
                       }}
                       onOpenScheduleManager={() => setActiveTab('schedule')}
-                      onOpenTutorial={handleOpenTutorialFromUi}
                     />
                   )}
 
@@ -610,14 +659,6 @@ function AppContent() {
                 nextAlarm={nextAlarm}
                 audioUnlocked={audioUnlocked}
                 onUnlockAudio={handleUnlockAudio}
-                restTotalSeconds={restTotalSeconds}
-                restRemaining={restRemaining}
-                restRunning={restRunning}
-                restExerciseLabel={restExerciseLabel}
-                onStartRest={startRestTimer}
-                onToggleRestPause={handleToggleRestPause}
-                onResetRest={handleResetRest}
-                onAdjustRest={handleAdjustRest}
                 profile={profile}
                 onSignOut={signOutUser}
                 onOpenSettings={() => setActiveTab('settings')}
@@ -649,8 +690,14 @@ function AppContent() {
           />
         )}
 
+        <NamePromptModal
+          open={!showIntro && !nameConfirmed}
+          initialName={profile.displayName}
+          onSaveName={handleSaveNameFromPrompt}
+        />
+
         <FeatureTutorialModal
-          open={tutorialOpen}
+          open={tutorialOpen && nameConfirmed}
           startAtLanguageStep={tutorialStartWithLang}
           onComplete={handleCompleteTutorial}
           onJumpToTab={(tab) => setActiveTab(tab)}

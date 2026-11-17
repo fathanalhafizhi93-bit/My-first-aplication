@@ -347,10 +347,16 @@ export function useGymData() {
       >
     ) => {
       if (!user) return;
+      const sanitizedPatch = { ...patch };
+      if (typeof sanitizedPatch.displayName === 'string') {
+        const cleaned = sanitizedPatch.displayName.trim().slice(0, 100);
+        if (!cleaned) return;
+        sanitizedPatch.displayName = cleaned;
+      }
       const path = `users/${user.uid}`;
       try {
         await updateDoc(doc(db, 'users', user.uid), {
-          ...patch,
+          ...sanitizedPatch,
           updatedAt: serverTimestamp(),
         });
       } catch (err) {

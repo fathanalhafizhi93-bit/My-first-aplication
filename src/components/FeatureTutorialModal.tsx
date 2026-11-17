@@ -37,18 +37,18 @@ const TUTORIAL_STEPS: TutorialStep[] = [
     tabLabelId: 'Tab Hari Ini',
     tabLabelEn: 'Today Tab',
     summaryId:
-      'Ruang utama saat di gym dengan suasana Pagi/Siang/Malam, maskot penyemangat, serta jeda cooldown 30 detik antar set.',
+      'Ruang utama saat di gym dengan Timer Istirahat di bawah hero, suasana Pagi/Siang/Malam, maskot penyemangat, serta pengaman salah klik 30 detik.',
     summaryEn:
-      'Your gym-floor screen featuring Morning/Day/Night themes, an animated companion orb, and a 30s set cooldown.',
+      'Your gym-floor screen with the Rest Timer right below the hero, Morning/Day/Night themes, companion orb, and a 30s anti-misclick guard.',
     tipsId: [
-      'Isi beban (kg) dan repetisi lalu centang selesai; cooldown 30 detik menjaga ritme istirahat.',
-      'Jika sedang superset atau lupa mencentang, Anda bisa pakai tombol Lewati Darurat.',
-      'Maskot bulat akan menyapa di hari baru dan bertepuk tangan setiap set selesai.',
+      'Gunakan Timer Istirahat di bawah hero untuk menghitung waktu pemulihan antar set secara akurat.',
+      'Pengaman 30 detik mencegah salah klik atau ketukan beruntun; pakai Tetap Centang jika memang butuh cepat.',
+      'Maskot bulat menyapamu dengan namamu saat aplikasi dibuka dan bertepuk tangan setiap set selesai.',
     ],
     tipsEn: [
-      'Enter weight (kg) & reps and check off sets; a 30s cooldown keeps rest disciplined.',
-      'Use the emergency bypass button anytime for supersets or backfilling missed sets.',
-      'The circular companion greets new days and claps whenever you finish a set.',
+      'Use the Rest Timer right below the hero to track your between-set recovery accurately.',
+      'The 30s tap guard prevents accidental double-clicks; use Confirm Anyway whenever needed.',
+      'The circular companion greets you by name when opening the app and claps on every completed set.',
     ],
     Icon: PlayCircle,
   },
