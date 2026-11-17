@@ -16,7 +16,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        debug {
+            def customDebugKeystore = file('debug.keystore')
+            if (customDebugKeystore.exists()) {
+                storeFile customDebugKeystore
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
@@ -35,6 +49,7 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "com.google.firebase:firebase-auth:24.0.1"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
@@ -46,9 +61,12 @@ apply from: 'capacitor.build.gradle'
 
 try {
     def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
+    if (servicesJSON.exists() && servicesJSON.text.trim().length() > 0) {
         apply plugin: 'com.google.gms.google-services'
+    } else {
+        android.defaultConfig.resValue "string", "default_web_client_id", "665973010974-7jdegi3itd898lfmav78kbi265r7ilhb.apps.googleusercontent.com"
     }
 } catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+    logger.info("google-services.json not found, using fallback default_web_client_id")
+    android.defaultConfig.resValue "string", "default_web_client_id", "665973010974-7jdegi3itd898lfmav78kbi265r7ilhb.apps.googleusercontent.com"
 }

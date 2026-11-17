@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
+import {
+  GoogleAuthProvider,
+  User,
+  onAuthStateChanged,
+  signInWithCredential,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth';
 import {
   collection,
   deleteDoc,
@@ -238,15 +247,60 @@ export function useGymData() {
   const signInWithGoogle = useCallback(async () => {
     setAuthError(null);
     try {
+      if (Capacitor.isNativePlatform()) {
+        let nativeResult;
+        try {
+          nativeResult = await FirebaseAuthentication.signInWithGoogle({
+            skipNativeAuth: true,
+            useCredentialManager: true,
+          });
+        } catch (cmErr) {
+          const cmMsg = cmErr instanceof Error ? cmErr.message : String(cmErr);
+          const isCanceled = /cancel|dismiss|aborted|12501/i.test(cmMsg);
+          if (isCanceled) {
+            throw cmErr;
+          }
+          nativeResult = await FirebaseAuthentication.signInWithGoogle({
+            skipNativeAuth: true,
+            useCredentialManager: false,
+          });
+        }
+
+        const idToken = nativeResult.credential?.idToken;
+        if (!idToken) {
+          throw new Error(
+            'Token login Google tidak tersedia. Pastikan app Android dan SHA-1 sudah terdaftar di Firebase Console.'
+          );
+        }
+
+        const credential = GoogleAuthProvider.credential(idToken);
+        await signInWithCredential(auth, credential);
+        return;
+      }
+
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Gagal masuk dengan akun Google.';
-      setAuthError(msg);
+      const raw = err instanceof Error ? err.message : 'Gagal masuk dengan akun Google.';
+      if (/10:|DEVELOPER_ERROR|developer error/i.test(raw)) {
+        setAuthError(
+          'SHA-1 Android belum terdaftar di Firebase Console (Error 10). Tambahkan SHA-1 di Firebase Project Settings.'
+        );
+      } else if (/cancel|dismiss|12501/i.test(raw)) {
+        setAuthError('Login Google dibatalkan.');
+      } else {
+        setAuthError(raw);
+      }
     }
   }, []);
 
   const signOutUser = useCallback(async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        await FirebaseAuthentication.signOut();
+      } catch {
+        // ignore native signOut cleanup error
+      }
+    }
     await signOut(auth);
   }, []);
 
