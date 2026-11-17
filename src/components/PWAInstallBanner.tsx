@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Download, Smartphone, WifiOff, X } from 'lucide-react';
 import { useOnlineStatus, usePWAInstall } from '../hooks/usePWAInstall';
+import { useI18n } from '../lib/i18n';
 
 export function PWAInstallCard() {
+  const { t } = useI18n();
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
 
@@ -19,10 +21,13 @@ export function PWAInstallCard() {
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-display text-lg font-bold text-[#F4F5F7]">
-              Pasang di HP Android
+              {t('Pasang di HP Android', 'Install on Android')}
             </h3>
             <p className="mt-1 text-xs leading-relaxed text-[#9CA3AF]">
-              Instal IronPulse ke layar utama agar terbuka layar penuh seperti aplikasi asli.
+              {t(
+                'Instal IronPulse ke layar utama agar terbuka layar penuh seperti aplikasi asli.',
+                'Install IronPulse to your home screen for a full-screen app experience.'
+              )}
             </p>
             <button
               type="button"
@@ -30,7 +35,7 @@ export function PWAInstallCard() {
               className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
             >
               <Download className="h-4 w-4" />
-              Instal Aplikasi IronPulse
+              {t('Instal Aplikasi IronPulse', 'Install IronPulse App')}
             </button>
           </div>
         </div>
@@ -45,10 +50,13 @@ export function PWAInstallCard() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="font-display text-lg font-bold text-[#F4F5F7]">
-                Pasang di iPhone / iPad
+                {t('Pasang di iPhone / iPad', 'Install on iPhone / iPad')}
               </h3>
               <p className="mt-1 text-xs text-[#9CA3AF]">
-                Tambahkan ke Home Screen untuk tampilan penuh tanpa bar Safari.
+                {t(
+                  'Tambahkan ke Home Screen untuk tampilan penuh tanpa bar Safari.',
+                  'Add to Home Screen for a full-screen view without Safari bars.'
+                )}
               </p>
             </div>
             <button
@@ -56,7 +64,7 @@ export function PWAInstallCard() {
               onClick={() => setShowIOSGuide(true)}
               className="min-h-[40px] rounded-xl border border-[#C8FF2E]/40 bg-[#C8FF2E]/10 px-3.5 py-2 text-xs font-bold text-[#C8FF2E] whitespace-nowrap shrink-0"
             >
-              Cara Pasang
+              {t('Cara Pasang', 'How to Install')}
             </button>
           </div>
         </section>
@@ -70,7 +78,7 @@ export function PWAInstallCard() {
             <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#13161C] p-6">
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-xl font-bold text-[#F4F5F7]">
-                  Pasang di iPhone / iPad
+                  {t('Pasang di iPhone / iPad', 'Install on iPhone / iPad')}
                 </h3>
                 <button
                   type="button"
@@ -81,16 +89,31 @@ export function PWAInstallCard() {
                 </button>
               </div>
               <ol className="mt-4 space-y-2 text-sm text-[#D1D5DB]">
-                <li>1. Ketuk tombol Share (ikon kotak dengan panah ke atas) di toolbar Safari.</li>
-                <li>2. Gulir ke bawah dan pilih Add to Home Screen.</li>
-                <li>3. Ketuk Add di pojok kanan atas.</li>
+                <li>
+                  {t(
+                    '1. Ketuk tombol Share (ikon kotak dengan panah ke atas) di toolbar Safari.',
+                    '1. Tap the Share icon (square with an upward arrow) in Safari toolbar.'
+                  )}
+                </li>
+                <li>
+                  {t(
+                    '2. Gulir ke bawah dan pilih Add to Home Screen.',
+                    '2. Scroll down and select Add to Home Screen.'
+                  )}
+                </li>
+                <li>
+                  {t(
+                    '3. Ketuk Add di pojok kanan atas.',
+                    '3. Tap Add in the top-right corner.'
+                  )}
+                </li>
               </ol>
               <button
                 type="button"
                 onClick={() => setShowIOSGuide(false)}
                 className="mt-5 min-h-[44px] w-full rounded-xl bg-[#C8FF2E] text-xs font-bold text-[#0A0B0E]"
               >
-                Mengerti
+                {t('Mengerti', 'Got It')}
               </button>
             </div>
           </div>
@@ -103,6 +126,7 @@ export function PWAInstallCard() {
 }
 
 export function OfflineIndicator() {
+  const { t } = useI18n();
   const isOnline = useOnlineStatus();
 
   if (isOnline) return null;
@@ -113,7 +137,12 @@ export function OfflineIndicator() {
       className="fixed bottom-20 left-4 z-50 flex items-center gap-2 rounded-xl border border-[#D97706]/50 bg-[#1A1E26] px-3.5 py-2 text-xs font-semibold text-[#FCD34D] md:bottom-4"
     >
       <WifiOff className="h-4 w-4 shrink-0" />
-      <span>Mode Offline — Data tersimpan di cache perangkat</span>
+      <span>
+        {t(
+          'Mode Offline — Data tersimpan di cache perangkat',
+          'Offline Mode — Data saved in device cache'
+        )}
+      </span>
     </div>
   );
 }

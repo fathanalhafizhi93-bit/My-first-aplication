@@ -16,6 +16,7 @@ import { MobileBottomNav } from './components/MobileBottomNav';
 import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner';
 import { RightUtilityPanel } from './components/RightUtilityPanel';
 import { RingtoneManagerView } from './components/RingtoneManagerView';
+import { SettingsView } from './components/SettingsView';
 import { TodayWorkoutView } from './components/TodayWorkoutView';
 import { TopBar } from './components/TopBar';
 import { WeeklyScheduleView } from './components/WeeklyScheduleView';
@@ -27,6 +28,7 @@ import {
   formatLocalDateKey,
   getTodayDayKey,
 } from './lib/dateUtils';
+import { LanguageProvider, useI18n } from './lib/i18n';
 import { syncNativeWeeklyAlarms } from './lib/nativeAlarmBridge';
 import { AppTab, DayKey, DaySchedule } from './types/gym';
 
@@ -36,7 +38,14 @@ interface TriggeredAlarmState {
   isTest: boolean;
 }
 
-export default function App() {
+interface CooldownAlertTarget {
+  exerciseId: string;
+  setNumber: number;
+  exerciseName: string;
+}
+
+function AppContent() {
+  const { lang, t } = useI18n();
   const {
     user,
     authReady,
@@ -68,9 +77,20 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [showIntro, setShowIntro] = useState(true);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialStartWithLang, setTutorialStartWithLang] = useState(true);
   const [exerciseDayKey, setExerciseDayKey] = useState<DayKey>(todayDayKey);
   const [now, setNow] = useState<Date>(() => new Date());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+
+  // Midnight day-change detection + mascot reaction state
+  const lastDateKeyRef = useRef<string>(formatLocalDateKey());
+  const [dayJustChanged, setDayJustChanged] = useState(false);
+  const [justClapped, setJustClapped] = useState(false);
+  const clapTimeoutRef = useRef<number | null>(null);
+
+  // Global 30-second set check cooldown state
+  const [cooldownUntilMs, setCooldownUntilMs] = useState<number | null>(null);
+  const [cooldownAlertTarget, setCooldownAlertTarget] = useState<CooldownAlertTarget | null>(null);
 
   // Active alarm & snooze state
   const [activeAlarm, setActiveAlarm] = useState<TriggeredAlarmState | null>(null);
@@ -122,6 +142,26 @@ export default function App() {
     };
   }, []);
 
+  // Cleanup mascot clap timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (clapTimeoutRef.current !== null) {
+        window.clearTimeout(clapTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const triggerClapBurst = useCallback(() => {
+    if (clapTimeoutRef.current !== null) {
+      window.clearTimeout(clapTimeoutRef.current);
+    }
+    setJustClapped(true);
+    clapTimeoutRef.current = window.setTimeout(() => {
+      setJustClapped(false);
+      clapTimeoutRef.current = null;
+    }, 2800);
+  }, []);
+
   const triggerAlarm = useCallback(
     (sched: DaySchedule, isTest: boolean) => {
       const tone = resolveRingtoneMeta(sched.ringtoneId);
@@ -145,21 +185,29 @@ export default function App() {
       ) {
         try {
           new Notification(`IronPulse · ${sched.alarmTime}`, {
-            body: `Waktunya latihan: ${sched.focusTitle}`,
+            body: `${t('Waktunya latihan:', 'Time to train:')} ${sched.focusTitle}`,
           });
         } catch {
           // ignore notification error in restricted iframe contexts
         }
       }
     },
-    [resolveRingtoneMeta, profile, customRingtones]
+    [resolveRingtoneMeta, profile, customRingtones, t]
   );
 
-  // 1-second clock + alarm watcher
+  // 1-second clock + midnight rollover + alarm watcher
   useEffect(() => {
     const interval = window.setInterval(() => {
       const current = new Date();
       setNow(current);
+
+      const currentDateKey = formatLocalDateKey(current);
+      if (currentDateKey !== lastDateKeyRef.current) {
+        lastDateKeyRef.current = currentDateKey;
+        setDayJustChanged(true);
+        setCooldownUntilMs(null);
+        setCooldownAlertTarget(null);
+      }
 
       if (!schedules || !profile) return;
 
@@ -180,7 +228,7 @@ export default function App() {
       if (!sched || !sched.isGymDay || !sched.alarmEnabled) return;
 
       const hhmm = formatHHMM(current);
-      const slotKey = `${formatLocalDateKey(current)}_${hhmm}`;
+      const slotKey = `${currentDateKey}_${hhmm}`;
 
       if (sched.alarmTime === hhmm && lastTriggeredSlotRef.current !== slotKey) {
         lastTriggeredSlotRef.current = slotKey;
@@ -190,6 +238,19 @@ export default function App() {
 
     return () => window.clearInterval(interval);
   }, [schedules, profile, snoozeTargetMs, triggerAlarm]);
+
+  // Derived 30s cooldown remaining seconds
+  const cooldownRemaining = useMemo(() => {
+    if (cooldownUntilMs === null) return 0;
+    return Math.max(0, Math.ceil((cooldownUntilMs - now.getTime()) / 1000));
+  }, [cooldownUntilMs, now]);
+
+  useEffect(() => {
+    if (cooldownUntilMs !== null && now.getTime() >= cooldownUntilMs) {
+      setCooldownUntilMs(null);
+      setCooldownAlertTarget(null);
+    }
+  }, [cooldownUntilMs, now]);
 
   // Sync scheduled alarms to native Android background scheduler when running in Capacitor APK
   useEffect(() => {
@@ -252,17 +313,71 @@ export default function App() {
   }, []);
 
   const handleToggleSetWithAutoRest = useCallback(
-    async (exerciseId: string, setNumber: number) => {
+    async (exerciseId: string, setNumber: number, exerciseName: string) => {
+      const currentEntry = effectiveTodayEntries.find((e) => e.exerciseId === exerciseId);
+      const currentSet = currentEntry?.sets.find((s) => s.setNumber === setNumber);
+      const isCurrentlyCompleted = Boolean(currentSet?.completed);
+
+      // Block rapid subsequent check-offs during the 30s cooldown unless bypassed
+      if (!isCurrentlyCompleted && cooldownRemaining > 0) {
+        setCooldownAlertTarget({ exerciseId, setNumber, exerciseName });
+        return;
+      }
+
       const becameCompleted = await toggleSetComplete(exerciseId, setNumber);
-      if (becameCompleted && profile?.autoStartRestTimer && schedules) {
+      if (becameCompleted) {
+        setCooldownUntilMs(Date.now() + 30_000);
+        setCooldownAlertTarget(null);
+        setDayJustChanged(false);
+        triggerClapBurst();
+
+        if (profile?.autoStartRestTimer && schedules) {
+          const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
+          if (spec) {
+            startRestTimer(spec.restSeconds, spec.name);
+          }
+        }
+      }
+    },
+    [
+      effectiveTodayEntries,
+      cooldownRemaining,
+      toggleSetComplete,
+      triggerClapBurst,
+      profile,
+      schedules,
+      todayDayKey,
+      startRestTimer,
+    ]
+  );
+
+  const handleBypassCooldownAndComplete = useCallback(async () => {
+    if (!cooldownAlertTarget) return;
+    const { exerciseId, setNumber } = cooldownAlertTarget;
+    const becameCompleted = await toggleSetComplete(exerciseId, setNumber);
+    setCooldownAlertTarget(null);
+
+    if (becameCompleted) {
+      setCooldownUntilMs(Date.now() + 30_000);
+      setDayJustChanged(false);
+      triggerClapBurst();
+
+      if (profile?.autoStartRestTimer && schedules) {
         const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
         if (spec) {
           startRestTimer(spec.restSeconds, spec.name);
         }
       }
-    },
-    [toggleSetComplete, profile, schedules, todayDayKey, startRestTimer]
-  );
+    }
+  }, [
+    cooldownAlertTarget,
+    toggleSetComplete,
+    triggerClapBurst,
+    profile,
+    schedules,
+    todayDayKey,
+    startRestTimer,
+  ]);
 
   const handleTestAlarm = useCallback(() => {
     if (!schedules) return;
@@ -290,22 +405,28 @@ export default function App() {
   }, []);
 
   const nextAlarm = useMemo(
-    () => (schedules ? computeNextAlarm(schedules, now) : null),
-    [schedules, now]
+    () => (schedules ? computeNextAlarm(schedules, now, lang) : null),
+    [schedules, now, lang]
   );
 
-  // Auto-open 5-step tutorial once per user on first entry after LaunchIntro & data ready
+  // Auto-open tutorial (starting with Language Picker) once per user on first entry
   useEffect(() => {
     if (showIntro || !authReady || !user || dataLoading || !profile || !schedules) return;
     try {
       const seenKey = `ironpulse_tutorial_seen_${user.uid}`;
       if (!localStorage.getItem(seenKey)) {
+        setTutorialStartWithLang(true);
         setTutorialOpen(true);
       }
     } catch {
       // ignore storage errors in restricted contexts
     }
   }, [showIntro, authReady, user, dataLoading, profile, schedules]);
+
+  const handleOpenTutorialFromUi = useCallback(() => {
+    setTutorialStartWithLang(false);
+    setTutorialOpen(true);
+  }, []);
 
   const handleCompleteTutorial = useCallback(() => {
     if (user) {
@@ -322,7 +443,7 @@ export default function App() {
     if (!authReady) {
       return (
         <div className="flex min-h-screen items-center justify-center bg-[#0A0B0E] text-sm text-[#9CA3AF]">
-          Memuat sesi IronPulse...
+          {t('Memuat sesi IronPulse...', 'Loading IronPulse session...')}
         </div>
       );
     }
@@ -370,7 +491,10 @@ export default function App() {
 
         {restFinishedBanner && (
           <div className="border-b border-[#16A34A]/40 bg-[#16A34A]/15 px-4 py-2.5 text-center text-xs font-semibold text-[#86EFAC]">
-            Waktu istirahat selesai — lanjutkan set berikutnya.
+            {t(
+              'Waktu istirahat selesai — lanjutkan set berikutnya.',
+              'Rest time finished — start your next set.'
+            )}
           </div>
         )}
 
@@ -391,15 +515,22 @@ export default function App() {
                 >
                   {activeTab === 'today' && (
                     <TodayWorkoutView
+                      now={now}
                       todayDayKey={todayDayKey}
                       schedules={schedules}
                       todayEntries={effectiveTodayEntries}
                       restRemaining={restRemaining}
                       restRunning={restRunning}
                       restExerciseLabel={restExerciseLabel}
+                      cooldownRemaining={cooldownRemaining}
+                      cooldownAlertTarget={cooldownAlertTarget}
+                      justClapped={justClapped}
+                      dayJustChanged={dayJustChanged}
                       onToggleRestPause={handleToggleRestPause}
                       onResetRest={handleResetRest}
                       onToggleSetComplete={handleToggleSetWithAutoRest}
+                      onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
+                      onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
                       onUpdateSetMetrics={updateSetMetrics}
                       onAddSet={addSetToExercise}
                       onRemoveSet={removeSetFromExercise}
@@ -409,7 +540,7 @@ export default function App() {
                         setActiveTab('exercises');
                       }}
                       onOpenScheduleManager={() => setActiveTab('schedule')}
-                      onOpenTutorial={() => setTutorialOpen(true)}
+                      onOpenTutorial={handleOpenTutorialFromUi}
                     />
                   )}
 
@@ -456,6 +587,17 @@ export default function App() {
                     />
                   )}
 
+                  {activeTab === 'settings' && (
+                    <SettingsView
+                      now={now}
+                      profile={profile}
+                      onUpdateProfile={updateProfile}
+                      onOpenRingtones={() => setActiveTab('ringtones')}
+                      onOpenTutorial={handleOpenTutorialFromUi}
+                      onSignOut={signOutUser}
+                    />
+                  )}
+
                   {activeTab === 'about' && <AboutView />}
                 </motion.div>
               </AnimatePresence>
@@ -478,8 +620,10 @@ export default function App() {
                 onAdjustRest={handleAdjustRest}
                 profile={profile}
                 onSignOut={signOutUser}
+                onOpenSettings={() => setActiveTab('settings')}
                 onOpenAbout={() => setActiveTab('about')}
-                onOpenTutorial={() => setTutorialOpen(true)}
+                onOpenTutorial={handleOpenTutorialFromUi}
+                isSettingsActive={activeTab === 'settings'}
                 isAboutActive={activeTab === 'about'}
               />
             </div>
@@ -507,6 +651,7 @@ export default function App() {
 
         <FeatureTutorialModal
           open={tutorialOpen}
+          startAtLanguageStep={tutorialStartWithLang}
           onComplete={handleCompleteTutorial}
           onJumpToTab={(tab) => setActiveTab(tab)}
         />
@@ -523,5 +668,13 @@ export default function App() {
       </AnimatePresence>
       {renderBody()}
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   );
 }

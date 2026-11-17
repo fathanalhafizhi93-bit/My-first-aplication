@@ -1,4 +1,6 @@
 import { BellRing, Clock, Play, VolumeX } from 'lucide-react';
+import { formatAlarmTime } from '../lib/dateUtils';
+import { useI18n } from '../lib/i18n';
 import { DaySchedule } from '../types/gym';
 
 interface ActiveAlarmOverlayProps {
@@ -20,6 +22,8 @@ export function ActiveAlarmOverlay({
   onSnooze,
   onDismiss,
 }: ActiveAlarmOverlayProps) {
+  const { clockFormat, t } = useI18n();
+
   return (
     <div
       role="dialog"
@@ -29,8 +33,14 @@ export function ActiveAlarmOverlay({
     >
       <div className="w-full max-w-lg rounded-2xl border border-[#C8FF2E]/40 bg-[#13161C] p-6 sm:p-8">
         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-[#C8FF2E]">
-          <span>{isTest ? 'Pratinjau Alarm Gym' : 'Waktunya Latihan Gym'}</span>
-          <span className="font-mono tabular-nums text-[#F4F5F7]">{schedule.alarmTime}</span>
+          <span>
+            {isTest
+              ? t('Pratinjau Alarm Gym', 'Gym Alarm Preview')
+              : t('Waktunya Latihan Gym', 'Time for Gym Workout')}
+          </span>
+          <span className="font-mono tabular-nums text-[#F4F5F7]">
+            {formatAlarmTime(schedule.alarmTime, clockFormat)}
+          </span>
         </div>
 
         <div className="mt-6 flex items-center gap-4">
@@ -45,14 +55,17 @@ export function ActiveAlarmOverlay({
               {schedule.focusTitle}
             </h2>
             <p className="mt-1 text-sm text-[#9CA3AF]">
-              {schedule.exercises.length} gerakan terjadwal · Nada: {ringtoneName}
+              {schedule.exercises.length} {t('gerakan terjadwal', 'scheduled exercises')} ·{' '}
+              {t('Nada:', 'Tone:')} {ringtoneName}
             </p>
           </div>
         </div>
 
         {schedule.exercises.length > 0 && (
           <div className="mt-6 border-t border-white/10 pt-4">
-            <p className="text-xs font-medium text-[#9CA3AF]">Gerakan pembuka hari ini:</p>
+            <p className="text-xs font-medium text-[#9CA3AF]">
+              {t('Gerakan pembuka hari ini:', "Today's opening exercises:")}
+            </p>
             <ul className="mt-2 space-y-1.5 text-sm text-[#E5E7EB]">
               {schedule.exercises.slice(0, 4).map((ex, idx) => (
                 <li key={ex.id} className="flex items-center justify-between">
@@ -75,7 +88,7 @@ export function ActiveAlarmOverlay({
             className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-5 py-3 text-sm font-bold text-[#0A0B0E] transition-transform hover:brightness-105 active:scale-[0.98]"
           >
             <Play className="h-4 w-4 fill-current" />
-            Mulai Latihan
+            {t('Mulai Latihan', 'Start Workout')}
           </button>
 
           <button
@@ -84,7 +97,7 @@ export function ActiveAlarmOverlay({
             className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#1A1E26] px-4 py-3 text-sm font-semibold text-[#F4F5F7] transition-colors hover:bg-[#222834]"
           >
             <Clock className="h-4 w-4" />
-            Tunda {snoozeMinutes}m
+            {t('Tunda', 'Snooze')} {snoozeMinutes}m
           </button>
 
           <button
@@ -93,7 +106,7 @@ export function ActiveAlarmOverlay({
             className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-[#DC2626]/40 bg-[#DC2626]/15 px-4 py-3 text-sm font-semibold text-[#FCA5A5] transition-colors hover:bg-[#DC2626]/25"
           >
             <VolumeX className="h-4 w-4" />
-            Matikan
+            {t('Matikan', 'Dismiss')}
           </button>
         </div>
       </div>

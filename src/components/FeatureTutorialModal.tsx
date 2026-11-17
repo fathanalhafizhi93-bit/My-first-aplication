@@ -6,86 +6,137 @@ import {
   CalendarDays,
   CheckCircle2,
   Dumbbell,
+  Globe,
   History,
   Music,
   PlayCircle,
   X,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { AppLanguage, useI18n } from '../lib/i18n';
 import { AppTab } from '../types/gym';
 
 interface TutorialStep {
   id: AppTab;
-  title: string;
-  tabLabel: string;
-  summary: string;
-  tips: string[];
+  titleId: string;
+  titleEn: string;
+  tabLabelId: string;
+  tabLabelEn: string;
+  summaryId: string;
+  summaryEn: string;
+  tipsId: string[];
+  tipsEn: string[];
   Icon: typeof PlayCircle;
 }
 
 const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'today',
-    title: 'Catat Latihan Hari Ini',
-    tabLabel: 'Tab Hari Ini',
-    summary:
-      'Halaman utama saat berada di gym. Langsung isi beban (kg) dan jumlah repetisi untuk setiap set latihan hari ini.',
-    tips: [
-      'Tekan tombol centang hijau saat satu set selesai dikerjakan.',
-      'Timer istirahat otomatis berjalan setelah set dicentang selesai.',
-      'Gunakan tombol + Tambah Set jika Anda menambah set ekstra.',
+    titleId: 'Catat Latihan Hari Ini',
+    titleEn: "Log Today's Workout",
+    tabLabelId: 'Tab Hari Ini',
+    tabLabelEn: 'Today Tab',
+    summaryId:
+      'Ruang utama saat di gym dengan suasana Pagi/Siang/Malam, maskot penyemangat, serta jeda cooldown 30 detik antar set.',
+    summaryEn:
+      'Your gym-floor screen featuring Morning/Day/Night themes, an animated companion orb, and a 30s set cooldown.',
+    tipsId: [
+      'Isi beban (kg) dan repetisi lalu centang selesai; cooldown 30 detik menjaga ritme istirahat.',
+      'Jika sedang superset atau lupa mencentang, Anda bisa pakai tombol Lewati Darurat.',
+      'Maskot bulat akan menyapa di hari baru dan bertepuk tangan setiap set selesai.',
+    ],
+    tipsEn: [
+      'Enter weight (kg) & reps and check off sets; a 30s cooldown keeps rest disciplined.',
+      'Use the emergency bypass button anytime for supersets or backfilling missed sets.',
+      'The circular companion greets new days and claps whenever you finish a set.',
     ],
     Icon: PlayCircle,
   },
   {
     id: 'schedule',
-    title: 'Atur Hari Gym & Jam Alarm',
-    tabLabel: 'Tab Jadwal',
-    summary:
-      'Pilih hari apa saja Anda berlatih dari Senin sampai Minggu, lengkap dengan jam alarm pengingat dan fokus otot.',
-    tips: [
-      'Ubah status hari menjadi Hari Gym atau Rest Day dengan satu ketukan.',
-      'Setel jam pengingat dan aktifkan ikon lonceng untuk tiap hari.',
-      'Di APK Android, jadwal alarm otomatis tersinkron ke sistem perangkat.',
+    titleId: 'Atur Hari Gym & Jam Alarm',
+    titleEn: 'Weekly Days & Alarm Times',
+    tabLabelId: 'Tab Jadwal',
+    tabLabelEn: 'Schedule Tab',
+    summaryId:
+      'Pilih hari latihan dari Senin sampai Minggu, atur jam pengingat harian, fokus otot, dan nada alarm khusus.',
+    summaryEn:
+      'Pick your active gym days Monday through Sunday, set alarm times, muscle focus, and custom ringtones.',
+    tipsId: [
+      'Ubah status tiap hari menjadi Hari Gym atau Rest Day dengan satu ketukan.',
+      'Setel jam pengingat dan aktifkan ikon lonceng untuk hari yang dipilih.',
+      'Di APK Android, alarm mingguan otomatis tersinkron ke sistem perangkat.',
+    ],
+    tipsEn: [
+      'Toggle any day between Gym Day and Rest Day in one tap.',
+      'Set the reminder time and toggle the bell icon for active days.',
+      'On the Android APK, weekly alarms sync automatically to device notifications.',
     ],
     Icon: CalendarDays,
   },
   {
     id: 'exercises',
-    title: 'Kelola Daftar & Pustaka Gerakan',
-    tabLabel: 'Tab Gerakan',
-    summary:
-      'Susun variasi gerakan untuk masing-masing hari latihan menggunakan pustaka siap pakai atau buat gerakan sendiri.',
-    tips: [
+    titleId: 'Kelola Daftar & Pustaka Gerakan',
+    titleEn: 'Manage Exercises & Library',
+    tabLabelId: 'Tab Gerakan',
+    tabLabelEn: 'Exercises Tab',
+    summaryId:
+      'Susun daftar gerakan tiap hari dari pustaka siap pakai atau buat gerakan kustom beserta target set dan istirahat.',
+    summaryEn:
+      'Build each day’s exercise list from the built-in library or add custom movements with set & rest targets.',
+    tipsId: [
       'Pilih hari di bagian atas untuk mengatur daftar gerakan hari tersebut.',
-      'Gunakan pencarian cepat di Pustaka Gerakan lalu tekan + Tambah.',
-      'Atur target set, repetisi, beban awal, dan durasi istirahat tiap gerakan.',
+      'Cari gerakan di Pustaka lalu tekan + Tambah untuk memasukkannya ke jadwal.',
+      'Atur target set, repetisi, beban awal, serta catatan teknik gerakan.',
+    ],
+    tipsEn: [
+      'Select a day at the top to edit its planned exercises.',
+      'Search the Exercise Library and tap + Add to add movements quickly.',
+      'Customize target sets, reps, starting weight, and form notes.',
     ],
     Icon: Dumbbell,
   },
   {
     id: 'history',
-    title: 'Pantau Kalender & Grafik Beban',
-    tabLabel: 'Tab Riwayat',
-    summary:
-      'Lihat konsistensi mingguan Anda di kalender bulanan serta pantau kenaikan beban maksimal dari minggu ke minggu.',
-    tips: [
-      'Ketuk tanggal mana pun di kalender untuk membuka rincian set yang sudah tercatat.',
-      'Pilih gerakan pada Grafik Progres untuk melihat rekor terbaik (PR) Anda.',
-      'Ganti tampilan antara Beban Maks (kg) dan Total Volume sesuai kebutuhan.',
+    titleId: 'Pantau Kalender & Detail Sesi',
+    titleEn: 'Consistency Calendar & Logs',
+    tabLabelId: 'Tab Riwayat',
+    tabLabelEn: 'History Tab',
+    summaryId:
+      'Lihat streak mingguan, total volume bulanan, dan buka kembali catatan beban serta set dari tanggal-tanggal sebelumnya.',
+    summaryEn:
+      'Track your weekly streak, monthly volume, and review logged weights and sets from past training dates.',
+    tipsId: [
+      'Tanggal hijau menandakan sesi selesai penuh, biru menandakan sebagian set selesai.',
+      'Ketuk tanggal mana pun di kalender untuk membuka Detail Sesi di bawahnya.',
+      'Semua riwayat tersimpan otomatis ke akun Cloud Anda.',
+    ],
+    tipsEn: [
+      'Lime dates mark fully completed sessions; blue dates mark partial sessions.',
+      'Tap any date on the calendar to inspect its full Session Detail below.',
+      'Every logged session stays safely synced to your Cloud account.',
     ],
     Icon: History,
   },
   {
     id: 'ringtones',
-    title: 'Ringtone & Optimasi Alarm Android',
-    tabLabel: 'Tab Ringtone',
-    summary:
-      'Sesuaikan nada dering alarm gym, suara selesai istirahat, serta pastikan alarm tetap berbunyi di background APK Android.',
-    tips: [
-      'Pilih nada bawaan IronPulse atau unggah file audio Anda sendiri.',
-      'Gunakan tombol Tes Alarm di pojok kanan atas untuk mengecek suara.',
-      'Jika memakai APK Android, cek status Exact Alarm dan jalankan Uji Notifikasi 5 Detik.',
+    titleId: 'Ringtone & Optimasi Alarm Android',
+    titleEn: 'Ringtones & Android Alarms',
+    tabLabelId: 'Tab Ringtone',
+    tabLabelEn: 'Ringtones Tab',
+    summaryId:
+      'Atur nada dering alarm gym, suara selesai istirahat, unggah audio sendiri, serta cek izin Exact Alarm di APK Android.',
+    summaryEn:
+      'Customize alarm and rest tones, upload your own audio, and verify Android Exact Alarm background settings.',
+    tipsId: [
+      'Pilih nada bawaan IronPulse atau unggah file MP3/WAV/OGG favorit Anda.',
+      'Gunakan tombol Tes Alarm di pojok kanan atas untuk mencoba suara alarm.',
+      'Di APK Android, cek status Exact Alarm dan jalankan Uji Notifikasi 5 Detik.',
+    ],
+    tipsEn: [
+      'Choose built-in IronPulse tones or upload your own MP3/WAV/OGG audio.',
+      'Tap Test Alarm in the top right to preview the full-screen gym alert.',
+      'On Android APK, check Exact Alarm permission and run the 5s Notification Test.',
     ],
     Icon: Music,
   },
@@ -93,34 +144,47 @@ const TUTORIAL_STEPS: TutorialStep[] = [
 
 interface FeatureTutorialModalProps {
   open: boolean;
+  startAtLanguageStep?: boolean;
   onComplete: () => void;
   onJumpToTab: (tab: AppTab) => void;
 }
 
 export function FeatureTutorialModal({
   open,
+  startAtLanguageStep = true,
   onComplete,
   onJumpToTab,
 }: FeatureTutorialModalProps) {
-  const [stepIndex, setStepIndex] = useState(0);
+  const { lang, setLang, t } = useI18n();
+  // -1 = opening language selection step; 0..4 = 5 feature steps
+  const [stepIndex, setStepIndex] = useState(startAtLanguageStep ? -1 : 0);
   const [confirmSkip, setConfirmSkip] = useState(false);
 
   useEffect(() => {
     if (open) {
-      setStepIndex(0);
+      setStepIndex(startAtLanguageStep ? -1 : 0);
       setConfirmSkip(false);
     }
-  }, [open]);
+  }, [open, startAtLanguageStep]);
 
   if (!open) return null;
 
-  const step = TUTORIAL_STEPS[stepIndex];
+  const isLanguageStep = stepIndex === -1;
+  const step = !isLanguageStep ? TUTORIAL_STEPS[stepIndex] : TUTORIAL_STEPS[0];
   const StepIcon = step.Icon;
-  const isFirst = stepIndex === 0;
-  const isLast = stepIndex === TUTORIAL_STEPS.length - 1;
+  const isFirstFeature = stepIndex === 0;
+  const isLastFeature = stepIndex === TUTORIAL_STEPS.length - 1;
+
+  const handleSelectLanguage = (chosen: AppLanguage) => {
+    setLang(chosen);
+  };
 
   const handleNext = () => {
-    if (isLast) {
+    if (isLanguageStep) {
+      setStepIndex(0);
+      return;
+    }
+    if (isLastFeature) {
       onComplete();
       return;
     }
@@ -128,6 +192,10 @@ export function FeatureTutorialModal({
   };
 
   const handlePrev = () => {
+    if (isFirstFeature && startAtLanguageStep) {
+      setStepIndex(-1);
+      return;
+    }
     setStepIndex((i) => Math.max(0, i - 1));
   };
 
@@ -144,110 +212,7 @@ export function FeatureTutorialModal({
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-lg rounded-2xl border border-white/15 bg-[#13161C] p-6 shadow-2xl"
       >
-        {!confirmSkip ? (
-          <>
-            {/* Top Step Progress & Skip */}
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 font-mono text-xs font-semibold tabular-nums text-[#C8FF2E]">
-                <span>
-                  Langkah {stepIndex + 1} / {TUTORIAL_STEPS.length}
-                </span>
-                <span className="text-[#6B7280]">·</span>
-                <span className="text-[#9CA3AF]">{step.tabLabel}</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setConfirmSkip(true)}
-                className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-xs font-semibold text-[#9CA3AF] hover:bg-white/5 hover:text-[#F4F5F7]"
-              >
-                Lewati
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* 5-Segment Progress Bar */}
-            <div className="mt-3 grid grid-cols-5 gap-1.5">
-              {TUTORIAL_STEPS.map((item, idx) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-label={`Buka langkah ${idx + 1}: ${item.title}`}
-                  onClick={() => setStepIndex(idx)}
-                  className={`h-1.5 rounded-full transition-colors ${
-                    idx <= stepIndex ? 'bg-[#C8FF2E]' : 'bg-white/10 hover:bg-white/25'
-                  }`}
-                />
-              ))}
-            </div>
-
-            {/* Step Body */}
-            <div className="mt-6 space-y-4">
-              <div className="flex items-start gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#C8FF2E]/30 bg-[#C8FF2E]/10 text-[#C8FF2E]">
-                  <StepIcon className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2
-                    id="tutorial-modal-title"
-                    className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7]"
-                    style={{ textWrap: 'balance' }}
-                  >
-                    {step.title}
-                  </h2>
-                  <p className="mt-1 text-sm leading-relaxed text-[#D1D5DB]">
-                    {step.summary}
-                  </p>
-                </div>
-              </div>
-
-              <ul className="space-y-2.5 border-t border-white/10 pt-4">
-                {step.tips.map((tip, idx) => (
-                  <li key={idx} className="flex items-start gap-2.5 text-xs leading-relaxed text-[#D1D5DB]">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#C8FF2E]" />
-                    <span>{tip}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Footer Controls */}
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  onJumpToTab(step.id);
-                  onComplete();
-                }}
-                className="min-h-[44px] rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-xs font-semibold text-[#D1D5DB] hover:border-[#C8FF2E]/40 hover:text-[#C8FF2E]"
-              >
-                Buka {step.tabLabel}
-              </button>
-
-              <div className="flex items-center gap-2">
-                {!isFirst && (
-                  <button
-                    type="button"
-                    onClick={handlePrev}
-                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 bg-[#1A1E26] px-4 text-xs font-semibold text-[#F4F5F7] hover:bg-[#242B37]"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Kembali
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[#C8FF2E] px-5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
-                >
-                  {isLast ? 'Selesai & Mulai' : 'Lanjut'}
-                  {!isLast && <ArrowRight className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-          </>
-        ) : (
+        {confirmSkip ? (
           /* Gentle Skip Warning Confirmation */
           <div className="space-y-5">
             <div className="flex items-start gap-3.5">
@@ -259,13 +224,17 @@ export function FeatureTutorialModal({
                   id="tutorial-modal-title"
                   className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7]"
                 >
-                  Lewati Panduan Fitur?
+                  {t('Lewati Panduan Fitur?', 'Skip Feature Guide?')}
                 </h2>
                 <p className="mt-1.5 text-sm leading-relaxed text-[#D1D5DB]">
-                  Tidak apa-apa jika Anda ingin langsung masuk dan mencoba sendiri. Namun kalau
-                  nanti bingung mencari letak pengaturan jadwal, gerakan, atau alarm, Anda selalu
-                  bisa membuka ulang panduan ini lewat tombol{' '}
-                  <span className="font-semibold text-[#C8FF2E]">Panduan Fitur</span>.
+                  {t(
+                    'Tidak apa-apa jika Anda ingin langsung masuk dan mencoba sendiri. Namun kalau nanti bingung mencari letak pengaturan jadwal, gerakan, atau alarm, Anda selalu bisa membuka ulang panduan ini lewat tombol ',
+                    'That is totally fine if you want to jump right in. If you ever get lost looking for schedule, exercise, or alarm controls, you can always reopen this guide from '
+                  )}
+                  <span className="font-semibold text-[#C8FF2E]">
+                    {t('Panduan Fitur', 'Feature Guide')}
+                  </span>
+                  .
                 </p>
               </div>
             </div>
@@ -276,17 +245,210 @@ export function FeatureTutorialModal({
                 onClick={() => setConfirmSkip(false)}
                 className="min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
               >
-                Kembali ke Panduan
+                {t('Kembali ke Panduan', 'Back to Guide')}
               </button>
               <button
                 type="button"
                 onClick={onComplete}
                 className="min-h-[44px] rounded-xl border border-white/15 bg-[#1A1E26] px-4 text-xs font-semibold text-[#D1D5DB] hover:bg-[#242B37] hover:text-[#F4F5F7]"
               >
-                Ya, Lewati Sekarang
+                {t('Ya, Lewati Sekarang', 'Yes, Skip for Now')}
               </button>
             </div>
           </div>
+        ) : isLanguageStep ? (
+          /* Opening Step: Language Picker (Indonesia & English) */
+          <div className="space-y-5">
+            <div className="flex items-center justify-between gap-4">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#C8FF2E]">
+                {t('Selamat Datang di IronPulse', 'Welcome to IronPulse')}
+              </span>
+              <button
+                type="button"
+                onClick={() => setConfirmSkip(true)}
+                className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-xs font-semibold text-[#9CA3AF] hover:bg-white/5 hover:text-[#F4F5F7]"
+              >
+                {t('Lewati', 'Skip')}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#C8FF2E]/30 bg-[#C8FF2E]/10 text-[#C8FF2E]">
+                <Globe className="h-5 w-5" />
+              </div>
+              <div>
+                <h2
+                  id="tutorial-modal-title"
+                  className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7]"
+                >
+                  Pilih Bahasa · Choose Language
+                </h2>
+                <p className="mt-1 text-sm text-[#D1D5DB]">
+                  {t(
+                    'Pilih bahasa utama Anda. Bahasa bisa diganti kapan saja di menu Akun.',
+                    'Select your preferred language. You can switch it anytime in your Account panel.'
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => handleSelectLanguage('id')}
+                className={`flex min-h-[68px] flex-col items-start justify-center rounded-xl border px-4 py-3 text-left transition-colors ${
+                  lang === 'id'
+                    ? 'border-[#C8FF2E] bg-[#C8FF2E]/15 text-[#F4F5F7]'
+                    : 'border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/25'
+                }`}
+              >
+                <span className="text-sm font-bold">Bahasa Indonesia</span>
+                <span className="mt-0.5 text-xs text-[#9CA3AF]">
+                  {lang === 'id' ? 'Dipilih · Antarmuka Indonesia' : 'Gunakan Bahasa Indonesia'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSelectLanguage('en')}
+                className={`flex min-h-[68px] flex-col items-start justify-center rounded-xl border px-4 py-3 text-left transition-colors ${
+                  lang === 'en'
+                    ? 'border-[#C8FF2E] bg-[#C8FF2E]/15 text-[#F4F5F7]'
+                    : 'border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/25'
+                }`}
+              >
+                <span className="text-sm font-bold">English</span>
+                <span className="mt-0.5 text-xs text-[#9CA3AF]">
+                  {lang === 'en' ? 'Selected · English Interface' : 'Use English interface'}
+                </span>
+              </button>
+            </div>
+
+            <div className="flex justify-end border-t border-white/10 pt-4">
+              <button
+                type="button"
+                onClick={handleNext}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[#C8FF2E] px-5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+              >
+                {t('Mulai Panduan (5 Langkah)', 'Start Guide (5 Steps)')}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Feature Steps 1 - 5 */
+          <>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 font-mono text-xs font-semibold tabular-nums text-[#C8FF2E]">
+                <span>
+                  {t(
+                    `Langkah ${stepIndex + 1} / ${TUTORIAL_STEPS.length}`,
+                    `Step ${stepIndex + 1} / ${TUTORIAL_STEPS.length}`
+                  )}
+                </span>
+                <span className="text-[#6B7280]">·</span>
+                <span className="text-[#9CA3AF]">
+                  {t(step.tabLabelId, step.tabLabelEn)}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setConfirmSkip(true)}
+                className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-2.5 text-xs font-semibold text-[#9CA3AF] hover:bg-white/5 hover:text-[#F4F5F7]"
+              >
+                {t('Lewati', 'Skip')}
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-5 gap-1.5">
+              {TUTORIAL_STEPS.map((item, idx) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-label={`${t('Langkah', 'Step')} ${idx + 1}: ${t(
+                    item.titleId,
+                    item.titleEn
+                  )}`}
+                  onClick={() => setStepIndex(idx)}
+                  className={`h-1.5 rounded-full transition-colors ${
+                    idx <= stepIndex ? 'bg-[#C8FF2E]' : 'bg-white/10 hover:bg-white/25'
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#C8FF2E]/30 bg-[#C8FF2E]/10 text-[#C8FF2E]">
+                  <StepIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2
+                    id="tutorial-modal-title"
+                    className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7]"
+                    style={{ textWrap: 'balance' }}
+                  >
+                    {t(step.titleId, step.titleEn)}
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-[#D1D5DB]">
+                    {t(step.summaryId, step.summaryEn)}
+                  </p>
+                </div>
+              </div>
+
+              <ul className="space-y-2.5 border-t border-white/10 pt-4">
+                {(lang === 'en' ? step.tipsEn : step.tipsId).map((tip, idx) => (
+                  <li
+                    key={idx}
+                    className="flex items-start gap-2.5 text-xs leading-relaxed text-[#D1D5DB]"
+                  >
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#C8FF2E]" />
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  onJumpToTab(step.id);
+                  onComplete();
+                }}
+                className="min-h-[44px] rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-xs font-semibold text-[#D1D5DB] hover:border-[#C8FF2E]/40 hover:text-[#C8FF2E]"
+              >
+                {t(`Buka ${step.tabLabelId}`, `Open ${step.tabLabelEn}`)}
+              </button>
+
+              <div className="flex items-center gap-2">
+                {(!isFirstFeature || startAtLanguageStep) && (
+                  <button
+                    type="button"
+                    onClick={handlePrev}
+                    className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 bg-[#1A1E26] px-4 text-xs font-semibold text-[#F4F5F7] hover:bg-[#242B37]"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    {t('Kembali', 'Back')}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[#C8FF2E] px-5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+                >
+                  {isLastFeature
+                    ? t('Selesai & Mulai', 'Finish & Start')
+                    : t('Lanjut', 'Next')}
+                  {!isLastFeature && <ArrowRight className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </motion.div>
     </div>

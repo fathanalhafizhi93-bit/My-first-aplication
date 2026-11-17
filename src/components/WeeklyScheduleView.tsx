@@ -1,5 +1,7 @@
 import { Bell, BellOff, ChevronRight } from 'lucide-react';
 import { BUILTIN_RINGTONES } from '../lib/audioEngine';
+import { formatAlarmTime } from '../lib/dateUtils';
+import { DAY_LABELS, useI18n } from '../lib/i18n';
 import {
   CustomRingtone,
   DAY_LIST,
@@ -30,6 +32,7 @@ export function WeeklyScheduleView({
   onUpdateSchedule,
   onOpenExerciseManager,
 }: WeeklyScheduleViewProps) {
+  const { lang, clockFormat, t } = useI18n();
   const activeGymDaysCount = DAY_LIST.filter((d) => schedules[d.key]?.isGymDay).length;
   const activeAlarmsCount = DAY_LIST.filter(
     (d) => schedules[d.key]?.isGymDay && schedules[d.key]?.alarmEnabled
@@ -40,18 +43,20 @@ export function WeeklyScheduleView({
       <div className="flex flex-col gap-2 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
-            Jadwal &amp; Alarm Mingguan
+            {t('Jadwal & Alarm Mingguan', 'Weekly Schedule & Alarms')}
           </h1>
           <p className="mt-1 text-sm text-[#9CA3AF]">
-            Pilih hari latihan Senin sampai Minggu, atur jam pengingat, dan tentukan fokus otot
-            tiap hari.
+            {t(
+              'Pilih hari latihan Senin sampai Minggu, atur jam pengingat, dan tentukan fokus otot tiap hari.',
+              'Choose training days Monday through Sunday, set reminder times, and define each day’s muscle focus.'
+            )}
           </p>
         </div>
         <div className="text-xs font-medium text-[#D1D5DB] whitespace-nowrap">
           <span className="font-mono tabular-nums text-[#C8FF2E]">{activeGymDaysCount}/7</span>{' '}
-          Hari Gym ·{' '}
-          <span className="font-mono tabular-nums text-[#C8FF2E]">{activeAlarmsCount}</span> Alarm
-          Aktif
+          {t('Hari Gym', 'Gym Days')} ·{' '}
+          <span className="font-mono tabular-nums text-[#C8FF2E]">{activeAlarmsCount}</span>{' '}
+          {t('Alarm Aktif', 'Active Alarms')}
         </div>
       </div>
 
@@ -60,6 +65,7 @@ export function WeeklyScheduleView({
           const sched = schedules[day.key];
           if (!sched) return null;
           const isToday = day.key === todayDayKey;
+          const localizedDayLabel = DAY_LABELS[lang][day.key].label;
 
           return (
             <div
@@ -75,18 +81,18 @@ export function WeeklyScheduleView({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-                      {day.label}
+                      {localizedDayLabel}
                     </h2>
                     {isToday && (
                       <span className="text-xs font-semibold text-[#C8FF2E]">
-                        · Hari Ini
+                        · {t('Hari Ini', 'Today')}
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-[#9CA3AF]">
                     {sched.isGymDay
-                      ? `${sched.exercises.length} gerakan terjadwal`
-                      : 'Hari istirahat · alarm nonaktif'}
+                      ? `${sched.exercises.length} ${t('gerakan terjadwal', 'scheduled exercises')}`
+                      : t('Hari istirahat · alarm nonaktif', 'Rest day · alarm off')}
                   </p>
                 </div>
 
@@ -105,7 +111,7 @@ export function WeeklyScheduleView({
                         : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]'
                     }`}
                   >
-                    {sched.isGymDay ? 'Hari Gym' : 'Rest Day'}
+                    {sched.isGymDay ? t('Hari Gym', 'Gym Day') : 'Rest Day'}
                   </button>
 
                   {sched.isGymDay && (
@@ -114,7 +120,7 @@ export function WeeklyScheduleView({
                       onClick={() => onOpenExerciseManager(day.key)}
                       className="inline-flex min-h-[42px] items-center gap-1 rounded-xl border border-white/10 bg-[#1A1E26] px-3.5 py-2 text-xs font-semibold text-[#F4F5F7] hover:bg-[#242B37] whitespace-nowrap"
                     >
-                      Gerakan
+                      {t('Gerakan', 'Exercises')}
                       <ChevronRight className="h-4 w-4 text-[#9CA3AF]" />
                     </button>
                   )}
@@ -127,7 +133,7 @@ export function WeeklyScheduleView({
                   {/* Focus Title */}
                   <div className="sm:col-span-5">
                     <label className="mb-1 block text-[11px] font-medium text-[#9CA3AF]">
-                      Fokus Latihan
+                      {t('Fokus Latihan', 'Workout Focus')}
                     </label>
                     <input
                       type="text"
@@ -140,16 +146,23 @@ export function WeeklyScheduleView({
                           void onUpdateSchedule(day.key, { focusTitle: val });
                         }
                       }}
-                      placeholder="Misal: Push — Dada & Bahu"
+                      placeholder={t('Misal: Push — Dada & Bahu', 'e.g. Push — Chest & Shoulders')}
                       className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
                     />
                   </div>
 
                   {/* Alarm Time + Bell */}
                   <div className="sm:col-span-3">
-                    <label className="mb-1 block text-[11px] font-medium text-[#9CA3AF]">
-                      Jam Alarm
-                    </label>
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                      <label className="block text-[11px] font-medium text-[#9CA3AF]">
+                        {t('Jam Alarm', 'Alarm Time')}
+                      </label>
+                      {clockFormat === '12h' && (
+                        <span className="font-mono text-[11px] font-semibold tabular-nums text-[#C8FF2E]">
+                          {formatAlarmTime(sched.alarmTime, '12h')}
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <input
                         type="time"
@@ -165,7 +178,7 @@ export function WeeklyScheduleView({
                       />
                       <button
                         type="button"
-                        aria-label={`Toggle alarm hari ${day.label}`}
+                        aria-label={`${t('Toggle alarm hari', 'Toggle alarm for')} ${localizedDayLabel}`}
                         onClick={() =>
                           onUpdateSchedule(day.key, {
                             alarmEnabled: !sched.alarmEnabled,
@@ -189,7 +202,7 @@ export function WeeklyScheduleView({
                   {/* Per-day Ringtone */}
                   <div className="sm:col-span-4">
                     <label className="mb-1 block text-[11px] font-medium text-[#9CA3AF]">
-                      Nada Alarm
+                      {t('Nada Alarm', 'Alarm Tone')}
                     </label>
                     <select
                       value={sched.ringtoneId}
@@ -198,8 +211,10 @@ export function WeeklyScheduleView({
                       }
                       className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
                     >
-                      <option value="default">Ikuti Ringtone Utama</option>
-                      <optgroup label="Nada Bawaan">
+                      <option value="default">
+                        {t('Ikuti Ringtone Utama', 'Use Default Ringtone')}
+                      </option>
+                      <optgroup label={t('Nada Bawaan', 'Built-in Tones')}>
                         {BUILTIN_RINGTONES.map((rt) => (
                           <option key={rt.id} value={rt.id}>
                             {rt.name}
@@ -207,7 +222,7 @@ export function WeeklyScheduleView({
                         ))}
                       </optgroup>
                       {customRingtones.length > 0 && (
-                        <optgroup label="Ringtone Upload Sendiri">
+                        <optgroup label={t('Ringtone Upload Sendiri', 'Uploaded Ringtones')}>
                           {customRingtones.map((rt) => (
                             <option key={rt.id} value={rt.id}>
                               {rt.name}

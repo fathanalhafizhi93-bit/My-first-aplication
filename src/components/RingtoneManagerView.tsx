@@ -14,6 +14,7 @@ import {
   Volume2,
 } from 'lucide-react';
 import { audioEngine, BUILTIN_RINGTONES } from '../lib/audioEngine';
+import { useI18n } from '../lib/i18n';
 import {
   AndroidAlarmDiagnostics,
   getAndroidAlarmDiagnostics,
@@ -51,6 +52,7 @@ export function RingtoneManagerView({
   onUploadRingtone,
   onDeleteRingtone,
 }: RingtoneManagerViewProps) {
+  const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [customTitle, setCustomTitle] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export function RingtoneManagerView({
   const [schedulingTest, setSchedulingTest] = useState(false);
 
   const runningNativeAndroid = isNativeAndroid();
+  const secUnit = t('d', 's');
 
   const refreshAndroidDiagnostics = useCallback(async () => {
     if (!runningNativeAndroid) return;
@@ -107,12 +110,20 @@ export function RingtoneManagerView({
       if (fileInputRef.current) fileInputRef.current.value = '';
       setUploadSuccess(
         created.storageMode === 'cloud'
-          ? `Ringtone "${created.name}" tersimpan & tersinkron ke Cloud.`
-          : `Ringtone "${created.name}" tersimpan lokal di browser ini (ukuran > 450 KB).`
+          ? t(
+              `Ringtone "${created.name}" tersimpan & tersinkron ke Cloud.`,
+              `Ringtone "${created.name}" saved & synced to Cloud.`
+            )
+          : t(
+              `Ringtone "${created.name}" tersimpan lokal di browser ini (ukuran > 450 KB).`,
+              `Ringtone "${created.name}" saved locally on this browser (> 450 KB).`
+            )
       );
     } catch (err) {
       setUploadError(
-        err instanceof Error ? err.message : 'Gagal mengunggah file audio.'
+        err instanceof Error
+          ? err.message
+          : t('Gagal mengunggah file audio.', 'Failed to upload audio file.')
       );
     } finally {
       setUploading(false);
@@ -142,18 +153,31 @@ export function RingtoneManagerView({
     try {
       const res = await scheduleAndroidTestNotification(5);
       if (!res.granted) {
-        setTestNotifStatus('Izin notifikasi Android belum diberikan. Aktifkan izin terlebih dahulu.');
+        setTestNotifStatus(
+          t(
+            'Izin notifikasi Android belum diberikan. Aktifkan izin terlebih dahulu.',
+            'Android notification permission has not been granted yet. Please allow it first.'
+          )
+        );
       } else {
         setTestNotifStatus(
           res.exact
-            ? 'Tes alarm dijadwalkan 5 detik lagi (mode Exact Alarm aktif). Anda bisa keluar aplikasi atau kunci layar sekarang.'
-            : 'Tes notifikasi dijadwalkan 5 detik lagi. Aktifkan izin Exact Alarm agar waktu pemicuan selalu tepat saat layar mati.'
+            ? t(
+                'Tes alarm dijadwalkan 5 detik lagi (mode Exact Alarm aktif). Anda bisa keluar aplikasi atau kunci layar sekarang.',
+                'Test alarm scheduled in 5 seconds (Exact Alarm active). You can exit the app or lock your screen now.'
+              )
+            : t(
+                'Tes notifikasi dijadwalkan 5 detik lagi. Aktifkan izin Exact Alarm agar waktu pemicuan selalu tepat saat layar mati.',
+                'Test notification scheduled in 5 seconds. Enable Exact Alarm permission for reliable timing when screen is off.'
+              )
         );
       }
       await refreshAndroidDiagnostics();
     } catch (err) {
       setTestNotifStatus(
-        err instanceof Error ? err.message : 'Gagal menjadwalkan tes notifikasi Android.'
+        err instanceof Error
+          ? err.message
+          : t('Gagal menjadwalkan tes notifikasi Android.', 'Failed to schedule Android test notification.')
       );
     } finally {
       setSchedulingTest(false);
@@ -164,11 +188,13 @@ export function RingtoneManagerView({
     <div className="space-y-6">
       <div className="border-b border-white/10 pb-5">
         <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
-          Pengaturan Ringtone &amp; Audio Alarm
+          {t('Pengaturan Ringtone & Audio Alarm', 'Ringtones & Alarm Audio Settings')}
         </h1>
         <p className="mt-1 text-sm text-[#9CA3AF]">
-          Pilih nada alarm bawaan atau unggah file musik/audio Anda sendiri untuk pengingat jadwal
-          gym dan penanda selesai istirahat.
+          {t(
+            'Pilih nada alarm bawaan atau unggah file musik/audio Anda sendiri untuk pengingat jadwal gym dan penanda selesai istirahat.',
+            'Choose built-in alarm tones or upload your own audio files for workout reminders and rest completion.'
+          )}
         </p>
       </div>
 
@@ -180,18 +206,20 @@ export function RingtoneManagerView({
               <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-[#C8FF2E]" />
               <div>
                 <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-                  Status Alarm Background Android
+                  {t('Status Alarm Background Android', 'Android Background Alarm Status')}
                 </h2>
                 <p className="mt-0.5 text-xs text-[#9CA3AF]">
-                  Pastikan izin notifikasi dan Exact Alarm aktif agar pengingat gym berbunyi tepat
-                  waktu saat aplikasi ditutup atau layar HP terkunci.
+                  {t(
+                    'Pastikan izin notifikasi dan Exact Alarm aktif agar pengingat gym berbunyi tepat waktu saat aplikasi ditutup atau layar HP terkunci.',
+                    'Ensure Notification & Exact Alarm permissions are active so reminders fire accurately even when closed or locked.'
+                  )}
                 </p>
               </div>
             </div>
 
             {androidDiag && (
               <span className="font-mono text-xs font-semibold tabular-nums text-[#C8FF2E]">
-                {androidDiag.pendingCount} Jadwal Terdaftar
+                {androidDiag.pendingCount} {t('Jadwal Terdaftar', 'Pending Alarms')}
               </span>
             )}
           </div>
@@ -206,11 +234,13 @@ export function RingtoneManagerView({
                   <ShieldAlert className="h-4 w-4 shrink-0 text-[#FBBF24]" />
                 )}
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#F4F5F7]">Izin Notifikasi</p>
+                  <p className="text-sm font-semibold text-[#F4F5F7]">
+                    {t('Izin Notifikasi', 'Notification Permission')}
+                  </p>
                   <p className="text-xs text-[#9CA3AF]">
                     {androidDiag?.notificationPermission === 'granted'
-                      ? 'Aktif & siap tampil'
-                      : 'Belum diizinkan'}
+                      ? t('Aktif & siap tampil', 'Granted & ready')
+                      : t('Belum diizinkan', 'Not granted yet')}
                   </p>
                 </div>
               </div>
@@ -220,7 +250,7 @@ export function RingtoneManagerView({
                   onClick={handleRequestNotifications}
                   className="min-h-[40px] shrink-0 rounded-lg bg-[#C8FF2E] px-3 text-xs font-bold text-[#0A0B0E]"
                 >
-                  Izinkan
+                  {t('Izinkan', 'Allow')}
                 </button>
               )}
             </div>
@@ -237,8 +267,8 @@ export function RingtoneManagerView({
                   <p className="text-sm font-semibold text-[#F4F5F7]">Exact Alarm</p>
                   <p className="text-xs text-[#9CA3AF]">
                     {androidDiag?.exactAlarmPermission === 'granted'
-                      ? 'Presisi tepat waktu'
-                      : 'Perlu diaktifkan di sistem'}
+                      ? t('Presisi tepat waktu', 'Exact timing active')
+                      : t('Perlu diaktifkan di sistem', 'Enable in system settings')}
                   </p>
                 </div>
               </div>
@@ -248,14 +278,17 @@ export function RingtoneManagerView({
                 className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-[#1A1E26] px-3 text-xs font-semibold text-[#F4F5F7] hover:bg-[#252B36]"
               >
                 <Settings className="h-3.5 w-3.5" />
-                Atur
+                {t('Atur', 'Settings')}
               </button>
             </div>
           </div>
 
           <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-[#9CA3AF]">
-              Channel notifikasi Android menggunakan audio alarm bawaan IronPulse berprioritas tinggi.
+              {t(
+                'Channel notifikasi Android menggunakan audio alarm bawaan IronPulse berprioritas tinggi.',
+                'Android notification channel uses high-priority native IronPulse alarm audio.'
+              )}
             </p>
             <button
               type="button"
@@ -264,7 +297,9 @@ export function RingtoneManagerView({
               className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105 disabled:opacity-60"
             >
               <BellRing className="h-4 w-4" />
-              {schedulingTest ? 'Menjadwalkan...' : 'Uji Notifikasi 5 Detik'}
+              {schedulingTest
+                ? t('Menjadwalkan...', 'Scheduling...')
+                : t('Uji Notifikasi 5 Detik', '5s Notification Test')}
             </button>
           </div>
 
@@ -277,7 +312,7 @@ export function RingtoneManagerView({
       {/* Master Audio & Behavior Controls */}
       <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-5">
         <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-          Preferensi Suara &amp; Notifikasi
+          {t('Preferensi Suara & Notifikasi', 'Sound & Notification Preferences')}
         </h2>
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -285,7 +320,7 @@ export function RingtoneManagerView({
             <div className="mb-2 flex items-center justify-between text-xs font-medium text-[#D1D5DB]">
               <span className="flex items-center gap-2">
                 <Volume2 className="h-4 w-4 text-[#C8FF2E]" />
-                Volume Alarm &amp; Timer
+                {t('Volume Alarm & Timer', 'Alarm & Timer Volume')}
               </span>
               <span className="font-mono tabular-nums text-[#C8FF2E]">
                 {Math.round(profile.volume * 100)}%
@@ -306,7 +341,7 @@ export function RingtoneManagerView({
 
           <div>
             <label className="mb-2 block text-xs font-medium text-[#D1D5DB]">
-              Durasi Tunda Alarm (Snooze)
+              {t('Durasi Tunda Alarm (Snooze)', 'Snooze Duration')}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[5, 10, 15].map((mins) => (
@@ -320,7 +355,7 @@ export function RingtoneManagerView({
                       : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:text-[#F4F5F7]'
                   }`}
                 >
-                  {mins} Menit
+                  {mins} {t('Menit', 'Min')}
                 </button>
               ))}
             </div>
@@ -331,10 +366,13 @@ export function RingtoneManagerView({
           <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
             <div>
               <p className="text-sm font-semibold text-[#F4F5F7]">
-                Timer Istirahat Otomatis
+                {t('Timer Istirahat Otomatis', 'Auto-Start Rest Timer')}
               </p>
               <p className="text-xs text-[#9CA3AF]">
-                Mulai hitung mundur saat set dicentang selesai.
+                {t(
+                  'Mulai hitung mundur saat set dicentang selesai.',
+                  'Start rest countdown whenever a set is checked off.'
+                )}
               </p>
             </div>
             <button
@@ -348,21 +386,26 @@ export function RingtoneManagerView({
                   : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF]'
               }`}
             >
-              {profile.autoStartRestTimer ? 'Aktif' : 'Manual'}
+              {profile.autoStartRestTimer ? t('Aktif', 'Active') : 'Manual'}
             </button>
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
             <div>
               <p className="text-sm font-semibold text-[#F4F5F7]">
-                {runningNativeAndroid ? 'Notifikasi Perangkat' : 'Notifikasi Desktop'}
+                {runningNativeAndroid
+                  ? t('Notifikasi Perangkat', 'Device Notifications')
+                  : t('Notifikasi Desktop', 'Desktop Notifications')}
               </p>
               <p className="text-xs text-[#9CA3AF]">
                 {(runningNativeAndroid
                   ? androidDiag?.notificationPermission === 'granted'
                   : notifPermission === 'granted')
-                  ? 'Izin notifikasi sudah aktif.'
-                  : 'Tampilkan popup pengingat saat jam tiba.'}
+                  ? t('Izin notifikasi sudah aktif.', 'Notifications are allowed.')
+                  : t(
+                      'Tampilkan popup pengingat saat jam tiba.',
+                      'Show reminder alert popup when alarm triggers.'
+                    )}
               </p>
             </div>
             <button
@@ -380,8 +423,8 @@ export function RingtoneManagerView({
               {(runningNativeAndroid
                 ? androidDiag?.notificationPermission === 'granted'
                 : notifPermission === 'granted')
-                ? 'Diizinkan'
-                : 'Izinkan'}
+                ? t('Diizinkan', 'Allowed')
+                : t('Izinkan', 'Allow')}
             </button>
           </div>
         </div>
@@ -391,11 +434,13 @@ export function RingtoneManagerView({
       <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-4">
         <div>
           <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-            Unggah Ringtone Sendiri
+            {t('Unggah Ringtone Sendiri', 'Upload Custom Ringtone')}
           </h2>
           <p className="mt-1 text-xs text-[#9CA3AF]">
-            Format didukung: MP3, WAV, OGG, M4A. File ≤ 450 KB otomatis tersinkron ke Cloud; file
-            lebih besar tersimpan aman di browser perangkat ini.
+            {t(
+              'Format didukung: MP3, WAV, OGG, M4A. File ≤ 450 KB otomatis tersinkron ke Cloud; file lebih besar tersimpan aman di browser perangkat ini.',
+              'Supported: MP3, WAV, OGG, M4A. Files ≤ 450 KB sync to Cloud automatically; larger files stay stored locally on this device.'
+            )}
           </p>
         </div>
 
@@ -405,7 +450,10 @@ export function RingtoneManagerView({
             maxLength={80}
             value={customTitle}
             onChange={(e) => setCustomTitle(e.target.value)}
-            placeholder="Nama ringtone (opsional, misal: Lagu Semangat Pagi)"
+            placeholder={t(
+              'Nama ringtone (opsional, misal: Lagu Semangat Pagi)',
+              'Ringtone name (optional, e.g. Morning Pump)'
+            )}
             className="h-11 flex-1 rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
           />
 
@@ -422,7 +470,9 @@ export function RingtoneManagerView({
             className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] hover:brightness-105 whitespace-nowrap shrink-0"
           >
             <Upload className="h-4 w-4" />
-            {uploading ? 'Memproses Audio...' : 'Pilih File Audio'}
+            {uploading
+              ? t('Memproses Audio...', 'Processing Audio...')
+              : t('Pilih File Audio', 'Choose Audio File')}
           </label>
         </div>
 
@@ -450,10 +500,10 @@ export function RingtoneManagerView({
                     <p className="truncate font-semibold text-[#F4F5F7]">{rt.name}</p>
                     <p className="mt-0.5 text-xs text-[#9CA3AF]">
                       {Math.round(rt.sizeBytes / 1024)} KB ·{' '}
-                      {rt.durationSeconds > 0 ? `${rt.durationSeconds}d · ` : ''}
+                      {rt.durationSeconds > 0 ? `${rt.durationSeconds}${secUnit} · ` : ''}
                       {rt.storageMode === 'cloud'
-                        ? 'Tersinkron ke Cloud'
-                        : 'Lokal di Perangkat Ini'}
+                        ? t('Tersinkron ke Cloud', 'Synced to Cloud')
+                        : t('Lokal di Perangkat Ini', 'Local on This Device')}
                     </p>
                   </div>
 
@@ -471,7 +521,7 @@ export function RingtoneManagerView({
                       ) : (
                         <>
                           <Play className="h-3.5 w-3.5 fill-current text-[#C8FF2E]" />
-                          Putar
+                          {t('Putar', 'Play')}
                         </>
                       )}
                     </button>
@@ -486,7 +536,7 @@ export function RingtoneManagerView({
                       }`}
                     >
                       {isMain && <Check className="h-3.5 w-3.5" />}
-                      Alarm Gym
+                      {t('Alarm Gym', 'Gym Alarm')}
                     </button>
 
                     <button
@@ -499,12 +549,12 @@ export function RingtoneManagerView({
                       }`}
                     >
                       {isRest && <Check className="h-3.5 w-3.5" />}
-                      Nada Istirahat
+                      {t('Nada Istirahat', 'Rest Tone')}
                     </button>
 
                     <button
                       type="button"
-                      aria-label={`Hapus ringtone ${rt.name}`}
+                      aria-label={`${t('Hapus ringtone', 'Delete ringtone')} ${rt.name}`}
                       onClick={() => onDeleteRingtone(rt.id)}
                       className="flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-white/10 bg-[#13161C] text-[#9CA3AF] hover:border-[#DC2626]/60 hover:text-[#FCA5A5]"
                     >
@@ -521,7 +571,7 @@ export function RingtoneManagerView({
       {/* Built-in Synthesized Ringtones */}
       <section className="space-y-3">
         <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-          Nada Alarm Bawaan IronPulse
+          {t('Nada Alarm Bawaan IronPulse', 'Built-in IronPulse Alarm Tones')}
         </h2>
 
         <div className="divide-y divide-white/10 rounded-2xl border border-white/10 bg-[#13161C]">
@@ -556,7 +606,7 @@ export function RingtoneManagerView({
                     ) : (
                       <>
                         <Play className="h-3.5 w-3.5 fill-current text-[#C8FF2E]" />
-                        Putar
+                        {t('Putar', 'Play')}
                       </>
                     )}
                   </button>
@@ -571,7 +621,7 @@ export function RingtoneManagerView({
                     }`}
                   >
                     {isMain && <Check className="h-3.5 w-3.5" />}
-                    Alarm Gym
+                    {t('Alarm Gym', 'Gym Alarm')}
                   </button>
 
                   <button
@@ -584,7 +634,7 @@ export function RingtoneManagerView({
                     }`}
                   >
                     {isRest && <Check className="h-3.5 w-3.5" />}
-                    Nada Istirahat
+                    {t('Nada Istirahat', 'Rest Tone')}
                   </button>
                 </div>
               </div>
