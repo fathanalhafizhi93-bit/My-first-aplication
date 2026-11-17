@@ -1,3 +1,4 @@
+import { Info } from 'lucide-react';
 import { AppTab } from '../types/gym';
 
 interface TopBarProps {
@@ -8,16 +9,16 @@ interface TopBarProps {
 
 const NAV_ITEMS: { id: AppTab; label: string }[] = [
   { id: 'today', label: 'Hari Ini' },
-  { id: 'schedule', label: 'Jadwal Hari' },
+  { id: 'schedule', label: 'Jadwal' },
+  { id: 'history', label: 'Riwayat' },
   { id: 'exercises', label: 'Gerakan' },
   { id: 'ringtones', label: 'Ringtone' },
-  { id: 'about', label: 'About' },
 ];
 
 export function TopBar({ activeTab, onSelectTab, onTestAlarm }: TopBarProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#0A0B0E]/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-8 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:gap-8 lg:px-8">
         {/* Zone 1: Single-line brand wordmark */}
         <button
           type="button"
@@ -27,7 +28,7 @@ export function TopBar({ activeTab, onSelectTab, onTestAlarm }: TopBarProps) {
           IronPulse
         </button>
 
-        {/* Zone 2: 4 single-line text nav links */}
+        {/* Zone 2: 5 single-line text nav links */}
         <nav className="hidden md:flex items-center gap-7" aria-label="Navigasi Utama">
           {NAV_ITEMS.map((item) => {
             const isActive = activeTab === item.id;
@@ -51,8 +52,21 @@ export function TopBar({ activeTab, onSelectTab, onTestAlarm }: TopBarProps) {
           })}
         </nav>
 
-        {/* Zone 3: 1 primary CTA button */}
-        <div className="flex items-center shrink-0">
+        {/* Zone 3: Mobile About shortcut + primary CTA button */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            aria-label="Tentang & Fitur Upcoming"
+            onClick={() => onSelectTab('about')}
+            className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border transition-colors md:hidden ${
+              activeTab === 'about'
+                ? 'border-[#C8FF2E]/50 bg-[#C8FF2E]/15 text-[#C8FF2E]'
+                : 'border-white/10 bg-[#13161C] text-[#9CA3AF] hover:text-[#F4F5F7]'
+            }`}
+          >
+            <Info className="h-4 w-4" />
+          </button>
+
           <button
             type="button"
             onClick={onTestAlarm}

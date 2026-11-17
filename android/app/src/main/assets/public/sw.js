@@ -87,7 +87,7 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "revision": "257bbf5f81d68bbbbc0e33446ce8a2cc"
   }, {
     "url": "index.html",
-    "revision": "432a9963d054db02e4a7312a269997d2"
+    "revision": "4aa0c0da8f3be25df21c4c9ec4c1b3b3"
   }, {
     "url": "icon.svg",
     "revision": "530aa00db64595a7a382365ba3fdb6f7"
@@ -95,22 +95,28 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "url": "apple-touch-icon.png",
     "revision": "010d473f09985af8d5e7f2db14c5995b"
   }, {
+    "url": "src/assets/images/ironpulse_splash_emblem_1794926961620.jpg",
+    "revision": "b701808d8eaf36f5de4939cc7a2160fd"
+  }, {
     "url": "src/assets/images/gym_arena_backdrop_1794848258829.jpg",
     "revision": "6fa90785c23e7202d51e2c7b83be559d"
   }, {
     "url": "assets/workbox-window.prod.es5-Bd17z0YL.js",
     "revision": null
   }, {
-    "url": "assets/web-HjCljPUI.js",
+    "url": "assets/web-Q6-ebsvB.js",
     "revision": null
   }, {
-    "url": "assets/web-BOGAy-bB.js",
+    "url": "assets/web-CzfyxDeY.js",
     "revision": null
   }, {
-    "url": "assets/index-DZ5TYGhX.js",
+    "url": "assets/ironpulse_splash_emblem_1794926961620-DAUEbrK4.jpg",
     "revision": null
   }, {
-    "url": "assets/index-CTAZLpe1.css",
+    "url": "assets/index-j9_Wewsr.css",
+    "revision": null
+  }, {
+    "url": "assets/index-BZZbOUJ4.js",
     "revision": null
   }, {
     "url": "apple-touch-icon.png",

@@ -9,6 +9,8 @@ import { AboutView } from './components/AboutView';
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
 import { ExerciseManagerView } from './components/ExerciseManagerView';
+import { FeatureTutorialModal } from './components/FeatureTutorialModal';
+import { HistoryProgressView } from './components/HistoryProgressView';
 import { LaunchIntro } from './components/LaunchIntro';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner';
@@ -44,6 +46,8 @@ export default function App() {
     schedules,
     customRingtones,
     todayDayKey,
+    workoutHistory,
+    historyLoading,
     effectiveTodayEntries,
     signInWithGoogle,
     signOutUser,
@@ -63,6 +67,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [showIntro, setShowIntro] = useState(true);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
   const [exerciseDayKey, setExerciseDayKey] = useState<DayKey>(todayDayKey);
   const [now, setNow] = useState<Date>(() => new Date());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
@@ -289,6 +294,30 @@ export default function App() {
     [schedules, now]
   );
 
+  // Auto-open 5-step tutorial once per user on first entry after LaunchIntro & data ready
+  useEffect(() => {
+    if (showIntro || !authReady || !user || dataLoading || !profile || !schedules) return;
+    try {
+      const seenKey = `ironpulse_tutorial_seen_${user.uid}`;
+      if (!localStorage.getItem(seenKey)) {
+        setTutorialOpen(true);
+      }
+    } catch {
+      // ignore storage errors in restricted contexts
+    }
+  }, [showIntro, authReady, user, dataLoading, profile, schedules]);
+
+  const handleCompleteTutorial = useCallback(() => {
+    if (user) {
+      try {
+        localStorage.setItem(`ironpulse_tutorial_seen_${user.uid}`, '1');
+      } catch {
+        // ignore storage errors
+      }
+    }
+    setTutorialOpen(false);
+  }, [user]);
+
   const renderBody = () => {
     if (!authReady) {
       return (
@@ -365,6 +394,11 @@ export default function App() {
                       todayDayKey={todayDayKey}
                       schedules={schedules}
                       todayEntries={effectiveTodayEntries}
+                      restRemaining={restRemaining}
+                      restRunning={restRunning}
+                      restExerciseLabel={restExerciseLabel}
+                      onToggleRestPause={handleToggleRestPause}
+                      onResetRest={handleResetRest}
                       onToggleSetComplete={handleToggleSetWithAutoRest}
                       onUpdateSetMetrics={updateSetMetrics}
                       onAddSet={addSetToExercise}
@@ -375,6 +409,7 @@ export default function App() {
                         setActiveTab('exercises');
                       }}
                       onOpenScheduleManager={() => setActiveTab('schedule')}
+                      onOpenTutorial={() => setTutorialOpen(true)}
                     />
                   )}
 
@@ -388,6 +423,14 @@ export default function App() {
                         setExerciseDayKey(dayKey);
                         setActiveTab('exercises');
                       }}
+                    />
+                  )}
+
+                  {activeTab === 'history' && (
+                    <HistoryProgressView
+                      workoutHistory={workoutHistory}
+                      loading={historyLoading}
+                      onGoToToday={() => setActiveTab('today')}
                     />
                   )}
 
@@ -435,6 +478,9 @@ export default function App() {
                 onAdjustRest={handleAdjustRest}
                 profile={profile}
                 onSignOut={signOutUser}
+                onOpenAbout={() => setActiveTab('about')}
+                onOpenTutorial={() => setTutorialOpen(true)}
+                isAboutActive={activeTab === 'about'}
               />
             </div>
           </div>
@@ -458,6 +504,12 @@ export default function App() {
             onDismiss={handleDismissAlarm}
           />
         )}
+
+        <FeatureTutorialModal
+          open={tutorialOpen}
+          onComplete={handleCompleteTutorial}
+          onJumpToTab={(tab) => setActiveTab(tab)}
+        />
 
         <OfflineIndicator />
       </motion.div>

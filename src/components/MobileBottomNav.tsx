@@ -1,4 +1,4 @@
-import { CalendarDays, Dumbbell, Info, Music, PlayCircle } from 'lucide-react';
+import { CalendarDays, Dumbbell, History, Music, PlayCircle } from 'lucide-react';
 import { AppTab } from '../types/gym';
 import { formatRestDuration } from '../lib/dateUtils';
 
@@ -18,9 +18,9 @@ export function MobileBottomNav({
   const tabs: { id: AppTab; label: string; Icon: typeof PlayCircle }[] = [
     { id: 'today', label: 'Hari Ini', Icon: PlayCircle },
     { id: 'schedule', label: 'Jadwal', Icon: CalendarDays },
+    { id: 'history', label: 'Riwayat', Icon: History },
     { id: 'exercises', label: 'Gerakan', Icon: Dumbbell },
     { id: 'ringtones', label: 'Ringtone', Icon: Music },
-    { id: 'about', label: 'About', Icon: Info },
   ];
 
   return (

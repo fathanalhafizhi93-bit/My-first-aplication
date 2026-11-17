@@ -5,8 +5,12 @@ import {
   ChevronUp,
   Clock,
   Dumbbell,
+  HelpCircle,
   Minus,
+  Pause,
+  Play,
   Plus,
+  RotateCcw,
   Timer,
 } from 'lucide-react';
 import {
@@ -15,12 +19,17 @@ import {
   DaySchedule,
   WorkoutLogEntry,
 } from '../types/gym';
-import { formatIndonesianDate } from '../lib/dateUtils';
+import { formatIndonesianDate, formatRestDuration } from '../lib/dateUtils';
 
 interface TodayWorkoutViewProps {
   todayDayKey: DayKey;
   schedules: Record<DayKey, DaySchedule>;
   todayEntries: WorkoutLogEntry[];
+  restRemaining: number;
+  restRunning: boolean;
+  restExerciseLabel: string | null;
+  onToggleRestPause: () => void;
+  onResetRest: () => void;
   onToggleSetComplete: (exerciseId: string, setNumber: number) => Promise<void>;
   onUpdateSetMetrics: (
     exerciseId: string,
@@ -33,12 +42,18 @@ interface TodayWorkoutViewProps {
   onStartRestTimer: (seconds: number, exerciseName: string) => void;
   onOpenExerciseManager: (dayKey: DayKey) => void;
   onOpenScheduleManager: () => void;
+  onOpenTutorial: () => void;
 }
 
 export function TodayWorkoutView({
   todayDayKey,
   schedules,
   todayEntries,
+  restRemaining,
+  restRunning,
+  restExerciseLabel,
+  onToggleRestPause,
+  onResetRest,
   onToggleSetComplete,
   onUpdateSetMetrics,
   onAddSet,
@@ -46,14 +61,13 @@ export function TodayWorkoutView({
   onStartRestTimer,
   onOpenExerciseManager,
   onOpenScheduleManager,
+  onOpenTutorial,
 }: TodayWorkoutViewProps) {
-  const [inspectDayKey, setInspectDayKey] = useState<DayKey>(todayDayKey);
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
   const [imgFailed, setImgFailed] = useState(false);
 
-  const isViewingToday = inspectDayKey === todayDayKey;
-  const activeSchedule = schedules[inspectDayKey];
-  const dayMeta = DAY_LIST.find((d) => d.key === inspectDayKey)!;
+  const activeSchedule = schedules[todayDayKey];
+  const dayMeta = DAY_LIST.find((d) => d.key === todayDayKey)!;
 
   const totalSets = todayEntries.reduce((acc, e) => acc + e.sets.length, 0);
   const completedSets = todayEntries.reduce(
@@ -77,41 +91,7 @@ export function TodayWorkoutView({
 
   return (
     <div className="space-y-6">
-      {/* Horizontal Day Strip */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {DAY_LIST.map((day) => {
-          const sched = schedules[day.key];
-          const isSelected = inspectDayKey === day.key;
-          const isToday = day.key === todayDayKey;
-          return (
-            <button
-              key={day.key}
-              type="button"
-              onClick={() => setInspectDayKey(day.key)}
-              className={`flex min-h-[44px] min-w-[68px] flex-1 flex-col items-center justify-center rounded-xl border px-3 py-2 text-xs transition-colors whitespace-nowrap shrink-0 ${
-                isSelected
-                  ? 'border-[#C8FF2E] bg-[#C8FF2E] text-[#0A0B0E] font-bold'
-                  : 'border-white/10 bg-[#13161C] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
-              }`}
-            >
-              <span className="tracking-wider">{day.shortLabel}</span>
-              <span
-                className={`mt-0.5 text-[11px] ${
-                  isSelected
-                    ? 'text-[#0A0B0E]/80 font-semibold'
-                    : sched?.isGymDay
-                    ? 'text-[#E5E7EB]'
-                    : 'text-[#6B7280]'
-                }`}
-              >
-                {isToday ? 'Hari Ini' : sched?.isGymDay ? sched.alarmTime : 'Istirahat'}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Hero Banner */}
+      {/* Focused Hero Banner for Today Only */}
       <section className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#13161C]">
         {!imgFailed ? (
           <img
@@ -130,7 +110,7 @@ export function TodayWorkoutView({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-[#9CA3AF]">
               <span className="font-semibold text-[#C8FF2E]">
-                {isViewingToday ? formatIndonesianDate() : `Pratinjau Jadwal ${dayMeta.label}`}
+                {formatIndonesianDate()}
               </span>
               <span aria-hidden="true">·</span>
               <span>
@@ -142,25 +122,24 @@ export function TodayWorkoutView({
               </span>
             </div>
 
-            {!isViewingToday && (
-              <button
-                type="button"
-                onClick={() => setInspectDayKey(todayDayKey)}
-                className="min-h-[36px] rounded-lg border border-white/15 bg-[#1A1E26] px-3 py-1.5 text-xs font-semibold text-[#F4F5F7] hover:bg-[#222834] whitespace-nowrap"
-              >
-                Kembali ke Hari Ini
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onOpenTutorial}
+              className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-white/15 bg-[#13161C]/80 px-3 py-1.5 text-xs font-semibold text-[#D1D5DB] hover:border-[#C8FF2E]/40 hover:text-[#C8FF2E] whitespace-nowrap"
+            >
+              <HelpCircle className="h-3.5 w-3.5 text-[#C8FF2E]" />
+              Panduan
+            </button>
           </div>
 
           <h1
             className="mt-3 font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7] sm:text-4xl"
             style={{ textWrap: 'balance' }}
           >
-            {activeSchedule.focusTitle}
+            {activeSchedule.isGymDay ? activeSchedule.focusTitle : `${dayMeta.label} — Istirahat`}
           </h1>
 
-          {isViewingToday && activeSchedule.isGymDay && (
+          {activeSchedule.isGymDay && activeSchedule.exercises.length > 0 && (
             <div className="mt-5 space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-4 text-xs sm:text-sm">
                 <div className="flex items-center gap-4 text-[#D1D5DB]">
@@ -186,25 +165,48 @@ export function TodayWorkoutView({
               </div>
             </div>
           )}
-
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={() => onOpenExerciseManager(inspectDayKey)}
-              className="min-h-[40px] rounded-lg border border-white/15 bg-[#1A1E26] px-4 py-2 text-xs font-semibold text-[#F4F5F7] transition-colors hover:bg-[#242A35] whitespace-nowrap"
-            >
-              Atur Gerakan ({activeSchedule.exercises.length})
-            </button>
-            <button
-              type="button"
-              onClick={onOpenScheduleManager}
-              className="min-h-[40px] rounded-lg border border-white/15 bg-transparent px-4 py-2 text-xs font-semibold text-[#D1D5DB] transition-colors hover:bg-white/5 whitespace-nowrap"
-            >
-              Ubah Jam &amp; Hari Gym
-            </button>
-          </div>
         </div>
       </section>
+
+      {/* Mobile Compact Active Rest Timer Strip (visible only on mobile when active) */}
+      {(restRunning || restRemaining === 0) && (
+        <section className="flex items-center justify-between gap-3 rounded-2xl border border-[#C8FF2E]/40 bg-[#13161C] px-4 py-3 lg:hidden">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#C8FF2E]">
+              {restRemaining === 0 ? 'Istirahat Selesai' : 'Timer Istirahat'}
+            </p>
+            <p className="truncate text-xs text-[#9CA3AF]">
+              {restExerciseLabel || 'Antar set'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="font-mono text-xl font-bold tabular-nums text-[#F4F5F7]">
+              {formatRestDuration(restRemaining)}
+            </span>
+            <button
+              type="button"
+              aria-label={restRunning ? 'Jeda timer' : 'Mulai timer'}
+              onClick={onToggleRestPause}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C8FF2E] text-[#0A0B0E]"
+            >
+              {restRunning ? (
+                <Pause className="h-4 w-4 fill-current" />
+              ) : (
+                <Play className="h-4 w-4 fill-current" />
+              )}
+            </button>
+            <button
+              type="button"
+              aria-label="Reset timer"
+              onClick={onResetRest}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-[#1A1E26] text-[#9CA3AF]"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Rest Day State */}
       {!activeSchedule.isGymDay && (
@@ -214,15 +216,15 @@ export function TodayWorkoutView({
             {dayMeta.label} Dijadwalkan Sebagai Hari Istirahat
           </h2>
           <p className="mx-auto mt-2 max-w-md text-sm text-[#9CA3AF]">
-            Pemulihan otot sama pentingnya dengan latihan beban. Jika ingin tetap berlatih di hari{' '}
-            {dayMeta.label}, ubah status hari ini menjadi Hari Gym di menu Jadwal Hari.
+            Pemulihan otot sama pentingnya dengan latihan beban. Jika ingin berlatih hari ini,
+            aktifkan hari {dayMeta.label} di tab Jadwal.
           </p>
           <button
             type="button"
             onClick={onOpenScheduleManager}
             className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
           >
-            Aktifkan Hari Gym
+            Buka Tab Jadwal
           </button>
         </div>
       )}
@@ -235,11 +237,11 @@ export function TodayWorkoutView({
             Belum Ada Gerakan untuk {dayMeta.label}
           </h2>
           <p className="mt-2 text-sm text-[#9CA3AF]">
-            Tambahkan gerakan dari pustaka latihan atau buat gerakan Anda sendiri.
+            Tambahkan gerakan untuk hari ini dari tab Gerakan.
           </p>
           <button
             type="button"
-            onClick={() => onOpenExerciseManager(inspectDayKey)}
+            onClick={() => onOpenExerciseManager(todayDayKey)}
             className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
           >
             + Tambah Gerakan Sekarang
@@ -248,7 +250,7 @@ export function TodayWorkoutView({
       )}
 
       {/* Today's Interactive Exercise Logger */}
-      {isViewingToday && activeSchedule.isGymDay && todayEntries.length > 0 && (
+      {activeSchedule.isGymDay && todayEntries.length > 0 && (
         <div className="space-y-4">
           {todayEntries.map((entry, index) => {
             const spec = activeSchedule.exercises.find((e) => e.id === entry.exerciseId);
@@ -448,33 +450,6 @@ export function TodayWorkoutView({
               </article>
             );
           })}
-        </div>
-      )}
-
-      {/* Preview Mode when viewing another day */}
-      {!isViewingToday && activeSchedule.isGymDay && activeSchedule.exercises.length > 0 && (
-        <div className="rounded-2xl border border-white/10 bg-[#13161C] divide-y divide-white/10">
-          {activeSchedule.exercises.map((ex, idx) => (
-            <div
-              key={ex.id}
-              className="flex items-center justify-between gap-4 px-5 py-4"
-            >
-              <div className="min-w-0">
-                <p className="font-semibold text-[#F4F5F7]">
-                  <span className="mr-2 font-mono text-xs text-[#C8FF2E]">
-                    {String(idx + 1).padStart(2, '0')}.
-                  </span>
-                  {ex.name}
-                </p>
-                <p className="mt-1 text-xs text-[#9CA3AF]">
-                  {ex.muscleGroup} · {ex.equipment} · Istirahat {ex.restSeconds}d
-                </p>
-              </div>
-              <span className="font-mono text-sm font-semibold tabular-nums text-[#E5E7EB] shrink-0">
-                {ex.targetSets} × {ex.targetReps}
-              </span>
-            </div>
-          ))}
         </div>
       )}
     </div>

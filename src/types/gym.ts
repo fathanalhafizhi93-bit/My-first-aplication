@@ -105,4 +105,4 @@ export interface UserProfile {
   autoStartRestTimer: boolean;
 }
 
-export type AppTab = 'today' | 'schedule' | 'exercises' | 'ringtones' | 'about';
+export type AppTab = 'today' | 'schedule' | 'history' | 'exercises' | 'ringtones' | 'about';

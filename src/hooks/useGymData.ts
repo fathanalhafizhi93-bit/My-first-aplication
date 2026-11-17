@@ -14,6 +14,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  limit,
   onSnapshot,
   query,
   serverTimestamp,
@@ -88,6 +89,8 @@ export function useGymData() {
   const [schedules, setSchedules] = useState<Record<DayKey, DaySchedule> | null>(null);
   const [customRingtones, setCustomRingtones] = useState<CustomRingtone[]>([]);
   const [todayLog, setTodayLog] = useState<WorkoutLog | null>(null);
+  const [workoutHistory, setWorkoutHistory] = useState<WorkoutLog[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   const todayDayKey = getTodayDayKey();
   const todayDateKey = formatLocalDateKey();
@@ -101,6 +104,8 @@ export function useGymData() {
         setSchedules(null);
         setCustomRingtones([]);
         setTodayLog(null);
+        setWorkoutHistory([]);
+        setHistoryLoading(false);
         setDataLoading(false);
       }
     });
@@ -116,8 +121,10 @@ export function useGymData() {
     let unsubSchedules: (() => void) | undefined;
     let unsubRingtones: (() => void) | undefined;
     let unsubTodayLog: (() => void) | undefined;
+    let unsubHistory: (() => void) | undefined;
 
     setDataLoading(true);
+    setHistoryLoading(true);
 
     async function initUserSync() {
       if (!user) return;
@@ -231,6 +238,25 @@ export function useGymData() {
         (err) =>
           handleFirestoreError(err, OperationType.GET, `users/${uid}/workoutLogs/${todayDateKey}`)
       );
+
+      unsubHistory = onSnapshot(
+        query(
+          collection(db, 'users', uid, 'workoutLogs'),
+          where('userId', '==', uid),
+          limit(120)
+        ),
+        (snap) => {
+          const logs = snap.docs
+            .map((d) => d.data() as WorkoutLog)
+            .sort((a, b) => b.dateKey.localeCompare(a.dateKey));
+          setWorkoutHistory(logs);
+          setHistoryLoading(false);
+        },
+        (err) => {
+          setHistoryLoading(false);
+          handleFirestoreError(err, OperationType.LIST, `users/${uid}/workoutLogs`);
+        }
+      );
     }
 
     void initUserSync();
@@ -241,6 +267,7 @@ export function useGymData() {
       unsubSchedules?.();
       unsubRingtones?.();
       unsubTodayLog?.();
+      unsubHistory?.();
     };
   }, [authReady, user, todayDateKey]);
 
@@ -625,6 +652,8 @@ export function useGymData() {
     todayDayKey,
     todayDateKey,
     todayLog,
+    workoutHistory,
+    historyLoading,
     effectiveTodayEntries,
     signInWithGoogle,
     signOutUser,

@@ -1,14 +1,27 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Bell,
+  BellRing,
   Check,
   Play,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Smartphone,
   Square,
   Trash2,
   Upload,
   Volume2,
 } from 'lucide-react';
 import { audioEngine, BUILTIN_RINGTONES } from '../lib/audioEngine';
+import {
+  AndroidAlarmDiagnostics,
+  getAndroidAlarmDiagnostics,
+  isNativeAndroid,
+  openAndroidExactAlarmSettings,
+  requestAndroidNotificationPermission,
+  scheduleAndroidTestNotification,
+} from '../lib/nativeAlarmBridge';
 import { CustomRingtone, UserProfile } from '../types/gym';
 
 interface RingtoneManagerViewProps {
@@ -44,6 +57,22 @@ export function RingtoneManagerView({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+
+  const [androidDiag, setAndroidDiag] = useState<AndroidAlarmDiagnostics | null>(null);
+  const [testNotifStatus, setTestNotifStatus] = useState<string | null>(null);
+  const [schedulingTest, setSchedulingTest] = useState(false);
+
+  const runningNativeAndroid = isNativeAndroid();
+
+  const refreshAndroidDiagnostics = useCallback(async () => {
+    if (!runningNativeAndroid) return;
+    const diag = await getAndroidAlarmDiagnostics();
+    setAndroidDiag(diag);
+  }, [runningNativeAndroid]);
+
+  useEffect(() => {
+    void refreshAndroidDiagnostics();
+  }, [refreshAndroidDiagnostics]);
 
   const notifPermission =
     typeof window !== 'undefined' && 'Notification' in window
@@ -91,9 +120,44 @@ export function RingtoneManagerView({
   };
 
   const handleRequestNotifications = async () => {
+    if (runningNativeAndroid) {
+      const res = await requestAndroidNotificationPermission();
+      await onUpdateProfile({ notificationsEnabled: res === 'granted' });
+      await refreshAndroidDiagnostics();
+      return;
+    }
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     const perm = await Notification.requestPermission();
     await onUpdateProfile({ notificationsEnabled: perm === 'granted' });
+  };
+
+  const handleOpenExactSettings = async () => {
+    await openAndroidExactAlarmSettings();
+    await refreshAndroidDiagnostics();
+  };
+
+  const handleScheduleTestNotification = async () => {
+    setSchedulingTest(true);
+    setTestNotifStatus(null);
+    try {
+      const res = await scheduleAndroidTestNotification(5);
+      if (!res.granted) {
+        setTestNotifStatus('Izin notifikasi Android belum diberikan. Aktifkan izin terlebih dahulu.');
+      } else {
+        setTestNotifStatus(
+          res.exact
+            ? 'Tes alarm dijadwalkan 5 detik lagi (mode Exact Alarm aktif). Anda bisa keluar aplikasi atau kunci layar sekarang.'
+            : 'Tes notifikasi dijadwalkan 5 detik lagi. Aktifkan izin Exact Alarm agar waktu pemicuan selalu tepat saat layar mati.'
+        );
+      }
+      await refreshAndroidDiagnostics();
+    } catch (err) {
+      setTestNotifStatus(
+        err instanceof Error ? err.message : 'Gagal menjadwalkan tes notifikasi Android.'
+      );
+    } finally {
+      setSchedulingTest(false);
+    }
   };
 
   return (
@@ -107,6 +171,108 @@ export function RingtoneManagerView({
           gym dan penanda selesai istirahat.
         </p>
       </div>
+
+      {/* Android APK Native Background Alarm Diagnostics */}
+      {runningNativeAndroid && (
+        <section className="rounded-2xl border border-[#C8FF2E]/30 bg-[#13161C] p-5 space-y-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-[#C8FF2E]" />
+              <div>
+                <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+                  Status Alarm Background Android
+                </h2>
+                <p className="mt-0.5 text-xs text-[#9CA3AF]">
+                  Pastikan izin notifikasi dan Exact Alarm aktif agar pengingat gym berbunyi tepat
+                  waktu saat aplikasi ditutup atau layar HP terkunci.
+                </p>
+              </div>
+            </div>
+
+            {androidDiag && (
+              <span className="font-mono text-xs font-semibold tabular-nums text-[#C8FF2E]">
+                {androidDiag.pendingCount} Jadwal Terdaftar
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {/* Notification Permission */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {androidDiag?.notificationPermission === 'granted' ? (
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-[#4ADE80]" />
+                ) : (
+                  <ShieldAlert className="h-4 w-4 shrink-0 text-[#FBBF24]" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[#F4F5F7]">Izin Notifikasi</p>
+                  <p className="text-xs text-[#9CA3AF]">
+                    {androidDiag?.notificationPermission === 'granted'
+                      ? 'Aktif & siap tampil'
+                      : 'Belum diizinkan'}
+                  </p>
+                </div>
+              </div>
+              {androidDiag?.notificationPermission !== 'granted' && (
+                <button
+                  type="button"
+                  onClick={handleRequestNotifications}
+                  className="min-h-[40px] shrink-0 rounded-lg bg-[#C8FF2E] px-3 text-xs font-bold text-[#0A0B0E]"
+                >
+                  Izinkan
+                </button>
+              )}
+            </div>
+
+            {/* Exact Alarm Permission */}
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                {androidDiag?.exactAlarmPermission === 'granted' ? (
+                  <ShieldCheck className="h-4 w-4 shrink-0 text-[#4ADE80]" />
+                ) : (
+                  <ShieldAlert className="h-4 w-4 shrink-0 text-[#FBBF24]" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[#F4F5F7]">Exact Alarm</p>
+                  <p className="text-xs text-[#9CA3AF]">
+                    {androidDiag?.exactAlarmPermission === 'granted'
+                      ? 'Presisi tepat waktu'
+                      : 'Perlu diaktifkan di sistem'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenExactSettings}
+                className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg border border-white/15 bg-[#1A1E26] px-3 text-xs font-semibold text-[#F4F5F7] hover:bg-[#252B36]"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Atur
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-[#9CA3AF]">
+              Channel notifikasi Android menggunakan audio alarm bawaan IronPulse berprioritas tinggi.
+            </p>
+            <button
+              type="button"
+              disabled={schedulingTest}
+              onClick={handleScheduleTestNotification}
+              className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105 disabled:opacity-60"
+            >
+              <BellRing className="h-4 w-4" />
+              {schedulingTest ? 'Menjadwalkan...' : 'Uji Notifikasi 5 Detik'}
+            </button>
+          </div>
+
+          {testNotifStatus && (
+            <p className="text-xs font-medium text-[#C8FF2E]">{testNotifStatus}</p>
+          )}
+        </section>
+      )}
 
       {/* Master Audio & Behavior Controls */}
       <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-5">
@@ -188,10 +354,14 @@ export function RingtoneManagerView({
 
           <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
             <div>
-              <p className="text-sm font-semibold text-[#F4F5F7]">Notifikasi Desktop</p>
+              <p className="text-sm font-semibold text-[#F4F5F7]">
+                {runningNativeAndroid ? 'Notifikasi Perangkat' : 'Notifikasi Desktop'}
+              </p>
               <p className="text-xs text-[#9CA3AF]">
-                {notifPermission === 'granted'
-                  ? 'Izin notifikasi browser sudah aktif.'
+                {(runningNativeAndroid
+                  ? androidDiag?.notificationPermission === 'granted'
+                  : notifPermission === 'granted')
+                  ? 'Izin notifikasi sudah aktif.'
                   : 'Tampilkan popup pengingat saat jam tiba.'}
               </p>
             </div>
@@ -199,13 +369,19 @@ export function RingtoneManagerView({
               type="button"
               onClick={handleRequestNotifications}
               className={`inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold whitespace-nowrap ${
-                notifPermission === 'granted'
+                (runningNativeAndroid
+                  ? androidDiag?.notificationPermission === 'granted'
+                  : notifPermission === 'granted')
                   ? 'border border-[#16A34A]/50 bg-[#16A34A]/20 text-[#4ADE80]'
                   : 'bg-[#1A1E26] border border-white/15 text-[#F4F5F7] hover:bg-[#252C38]'
               }`}
             >
               <Bell className="h-3.5 w-3.5" />
-              {notifPermission === 'granted' ? 'Diizinkan' : 'Izinkan'}
+              {(runningNativeAndroid
+                ? androidDiag?.notificationPermission === 'granted'
+                : notifPermission === 'granted')
+                ? 'Diizinkan'
+                : 'Izinkan'}
             </button>
           </div>
         </div>

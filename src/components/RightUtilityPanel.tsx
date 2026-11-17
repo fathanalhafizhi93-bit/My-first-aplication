@@ -1,4 +1,4 @@
-import { LogOut, Pause, Play, RotateCcw, Volume2 } from 'lucide-react';
+import { HelpCircle, Info, LogOut, Pause, Play, RotateCcw, Volume2 } from 'lucide-react';
 import {
   formatHHMMSS,
   formatRestDuration,
@@ -22,6 +22,9 @@ interface RightUtilityPanelProps {
   onAdjustRest: (deltaSeconds: number) => void;
   profile: UserProfile;
   onSignOut: () => Promise<void>;
+  onOpenAbout: () => void;
+  onOpenTutorial: () => void;
+  isAboutActive: boolean;
 }
 
 export function RightUtilityPanel({
@@ -39,6 +42,9 @@ export function RightUtilityPanel({
   onAdjustRest,
   profile,
   onSignOut,
+  onOpenAbout,
+  onOpenTutorial,
+  isAboutActive,
 }: RightUtilityPanelProps) {
   const progressRatio =
     restTotalSeconds > 0
@@ -52,8 +58,17 @@ export function RightUtilityPanel({
       {/* Live Clock & Next Alarm Card */}
       <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
         <div className="flex items-center justify-between text-xs text-[#9CA3AF]">
-          <span className="font-semibold uppercase tracking-wider">Jam &amp; Alarm Gym</span>
-          <span>{audioUnlocked ? 'Audio Siap' : 'Perlu Aktivasi Audio'}</span>
+          <span className="font-semibold uppercase tracking-wider">Jam &amp; Alarm Berikutnya</span>
+          {!audioUnlocked && (
+            <button
+              type="button"
+              onClick={onUnlockAudio}
+              className="inline-flex items-center gap-1 font-semibold text-[#C8FF2E] hover:underline"
+            >
+              <Volume2 className="h-3.5 w-3.5" />
+              Aktifkan Audio
+            </button>
+          )}
         </div>
 
         <p className="mt-2 font-mono text-4xl font-bold tracking-tight tabular-nums text-[#F4F5F7]">
@@ -62,8 +77,7 @@ export function RightUtilityPanel({
 
         {nextAlarm ? (
           <div className="mt-4 border-t border-white/10 pt-4">
-            <p className="text-xs text-[#9CA3AF]">Pengingat Berikutnya</p>
-            <div className="mt-1 flex items-baseline justify-between gap-2">
+            <div className="flex items-baseline justify-between gap-2">
               <p className="font-semibold text-[#F4F5F7]">
                 {nextAlarm.dayLabel} ·{' '}
                 <span className="font-mono tabular-nums text-[#C8FF2E]">
@@ -78,19 +92,8 @@ export function RightUtilityPanel({
           </div>
         ) : (
           <div className="mt-4 border-t border-white/10 pt-4 text-xs text-[#9CA3AF]">
-            Belum ada alarm aktif. Aktifkan minimal satu hari pada menu Jadwal Hari.
+            Belum ada alarm aktif. Aktifkan di tab Jadwal.
           </div>
-        )}
-
-        {!audioUnlocked && (
-          <button
-            type="button"
-            onClick={onUnlockAudio}
-            className="mt-4 flex min-h-[40px] w-full items-center justify-center gap-2 rounded-xl border border-[#C8FF2E]/40 bg-[#C8FF2E]/10 px-4 py-2 text-xs font-bold text-[#C8FF2E] hover:bg-[#C8FF2E]/20"
-          >
-            <Volume2 className="h-4 w-4" />
-            Aktifkan Suara Alarm Browser
-          </button>
         )}
       </section>
 
@@ -98,7 +101,7 @@ export function RightUtilityPanel({
       <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-bold tracking-tight text-[#F4F5F7]">
-            Timer Istirahat Antar Set
+            Timer Istirahat
           </h2>
           {restExerciseLabel && (
             <span className="max-w-[140px] truncate text-xs text-[#9CA3AF]">
@@ -199,8 +202,8 @@ export function RightUtilityPanel({
         </div>
       </section>
 
-      {/* Account Sync Card */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+      {/* Account Sync, Tutorial & About Card */}
+      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-[#F4F5F7]">
@@ -215,6 +218,36 @@ export function RightUtilityPanel({
           >
             <LogOut className="h-3.5 w-3.5" />
             Keluar
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 border-t border-white/10 pt-3">
+          <button
+            type="button"
+            onClick={onOpenTutorial}
+            className="flex min-h-[42px] w-full items-center justify-between rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 py-2 text-xs font-semibold text-[#D1D5DB] transition-colors hover:border-[#C8FF2E]/40 hover:text-[#C8FF2E]"
+          >
+            <span className="inline-flex items-center gap-2">
+              <HelpCircle className="h-4 w-4 text-[#C8FF2E]" />
+              Panduan Fitur (5 Langkah)
+            </span>
+            <span className="font-mono text-[11px] text-[#9CA3AF]">Tutorial</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenAbout}
+            className={`flex min-h-[42px] w-full items-center justify-between rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors ${
+              isAboutActive
+                ? 'border-[#C8FF2E] bg-[#C8FF2E]/12 text-[#C8FF2E]'
+                : 'border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/25 hover:text-[#F4F5F7]'
+            }`}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Info className="h-4 w-4 text-[#C8FF2E]" />
+              Tentang IronPulse &amp; Fitur Upcoming
+            </span>
+            <span className="font-mono text-[11px] text-[#9CA3AF]">Roadmap</span>
           </button>
         </div>
       </section>

@@ -11,6 +11,7 @@ const config: CapacitorConfig = {
   plugins: {
     LocalNotifications: {
       iconColor: '#C8FF2E',
+      sound: 'ironpulse_alarm.wav',
     },
     FirebaseAuthentication: {
       skipNativeAuth: true,

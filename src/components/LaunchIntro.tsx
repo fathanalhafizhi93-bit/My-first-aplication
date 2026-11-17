@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
+import splashEmblem from '../assets/images/ironpulse_splash_emblem_1794926961620.jpg';
 
 interface LaunchIntroProps {
   onComplete: () => void;
@@ -18,7 +19,7 @@ export function LaunchIntro({ onComplete }: LaunchIntroProps) {
 
     const timer = window.setTimeout(() => {
       onComplete();
-    }, 1250);
+    }, 1150);
 
     return () => window.clearTimeout(timer);
   }, [onComplete]);
@@ -27,69 +28,58 @@ export function LaunchIntro({ onComplete }: LaunchIntroProps) {
     <motion.div
       key="launch-intro"
       initial={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.03 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      exit={{ opacity: 0, scale: 1.02 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       onClick={onComplete}
       role="presentation"
-      className="fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center bg-[#0A0B0E] px-6 select-none"
+      className="fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center overflow-hidden bg-[#0A0B0E] px-6 select-none"
     >
-      <div className="flex flex-col items-center">
-        {/* Animated Barbell & Pulse SVG */}
-        <motion.svg
-          viewBox="0 0 220 110"
-          className="h-24 w-48"
-          fill="none"
-          aria-hidden="true"
+      {/* Subtle radial electric accent */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute h-80 w-80 rounded-full bg-[#C8FF2E]/10 blur-3xl"
+      />
+
+      <div className="relative flex flex-col items-center text-center">
+        {/* Custom Generated IronPulse Emblem */}
+        <motion.div
+          initial={{ scale: 0.88, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+          className="relative flex h-36 w-36 items-center justify-center sm:h-44 sm:w-44"
         >
-          {/* Left Weight Plates */}
-          <motion.g
-            initial={{ x: -24, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <rect x="18" y="31" width="14" height="48" rx="4" fill="#C8FF2E" />
-            <rect x="37" y="19" width="18" height="72" rx="5" fill="#C8FF2E" />
-          </motion.g>
-
-          {/* Right Weight Plates */}
-          <motion.g
-            initial={{ x: 24, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <rect x="188" y="31" width="14" height="48" rx="4" fill="#C8FF2E" />
-            <rect x="165" y="19" width="18" height="72" rx="5" fill="#C8FF2E" />
-          </motion.g>
-
-          {/* Center Bar + ECG Pulse */}
-          <motion.path
-            d="M55 55H84L96 32L112 78L124 55H165"
-            stroke="#F4F5F7"
-            strokeWidth="7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={{ pathLength: 1, opacity: 1 }}
-            transition={{ duration: 0.65, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          <img
+            src={splashEmblem}
+            alt="IronPulse Emblem"
+            className="h-full w-full rounded-3xl object-contain mix-blend-lighten"
           />
-        </motion.svg>
+        </motion.div>
 
         {/* Wordmark */}
         <motion.h1
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-2 font-display text-5xl font-extrabold tracking-tight text-[#F4F5F7]"
+          transition={{ duration: 0.38, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-2 font-display text-5xl font-extrabold tracking-tight text-[#F4F5F7] sm:text-6xl"
         >
           IronPulse
         </motion.h1>
 
-        {/* Horizontal Kinetic Accent Line (compositor transform only) */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.35, delay: 0.24 }}
+          className="mt-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.26em] text-[#9CA3AF]"
+        >
+          Gym Alarm &amp; Strength Tracker
+        </motion.p>
+
+        {/* Horizontal Kinetic Accent Line */}
         <motion.div
           initial={{ scaleX: 0, opacity: 0 }}
           animate={{ scaleX: 1, opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-4 h-0.5 w-32 origin-center rounded-full bg-[#C8FF2E]"
+          transition={{ duration: 0.55, delay: 0.28, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-5 h-0.5 w-36 origin-center rounded-full bg-[#C8FF2E]"
         />
       </div>
     </motion.div>
