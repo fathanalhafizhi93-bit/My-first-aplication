@@ -283,7 +283,7 @@ export function useGymData() {
       const raw = err instanceof Error ? err.message : 'Gagal masuk dengan akun Google.';
       if (/10:|DEVELOPER_ERROR|developer error/i.test(raw)) {
         setAuthError(
-          'SHA-1 Android belum terdaftar di Firebase Console (Error 10). Tambahkan SHA-1 di Firebase Project Settings.'
+          `SHA-1 Android belum cocok di Firebase Console (Error 10: ${raw}). Pastikan SHA-1 terbaru sudah ditambahkan di Firebase Project Settings.`
         );
       } else if (/cancel|dismiss|12501/i.test(raw)) {
         setAuthError('Login Google dibatalkan.');
