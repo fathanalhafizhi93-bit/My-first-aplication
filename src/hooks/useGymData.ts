@@ -43,10 +43,37 @@ import {
   DayKey,
   DaySchedule,
   ExerciseItem,
+  resolveExerciseTrackingMode,
+  resolveExerciseUsesWeight,
+  resolveTargetDurationSeconds,
   UserProfile,
   WorkoutLog,
   WorkoutLogEntry,
 } from '../types/gym';
+
+function sanitizeExerciseItem(ex: ExerciseItem): ExerciseItem {
+  const trackingMode = resolveExerciseTrackingMode(ex);
+  const usesWeight = resolveExerciseUsesWeight(ex);
+  const timerDirection = ex.timerDirection === 'countup' ? 'countup' : 'countdown';
+  const targetDurationSeconds = resolveTargetDurationSeconds(ex);
+  return {
+    id: ex.id,
+    name: ex.name.trim().slice(0, 60),
+    muscleGroup: ex.muscleGroup,
+    equipment: ex.equipment.trim().slice(0, 40) || (usesWeight ? 'Bebas' : 'Tanpa Alat'),
+    targetSets: Math.max(1, Math.min(12, Number(ex.targetSets) || 3)),
+    targetReps: ex.targetReps.trim().slice(0, 20) || '10',
+    targetWeightKg: usesWeight
+      ? Math.max(0, Math.min(999, Number(ex.targetWeightKg) || 0))
+      : 0,
+    restSeconds: Math.max(15, Math.min(600, Number(ex.restSeconds) || 60)),
+    notes: (ex.notes || '').trim().slice(0, 200),
+    trackingMode,
+    usesWeight,
+    timerDirection,
+    targetDurationSeconds,
+  };
+}
 
 function buildEntriesFromSchedule(
   exercises: ExerciseItem[],
@@ -54,12 +81,30 @@ function buildEntriesFromSchedule(
 ): WorkoutLogEntry[] {
   const existingMap = new Map(existingEntries.map((e) => [e.exerciseId, e]));
   return exercises.slice(0, 30).map((ex) => {
+    const trackingMode = resolveExerciseTrackingMode(ex);
+    const usesWeight = resolveExerciseUsesWeight(ex);
+    const timerDirection = ex.timerDirection === 'countup' ? 'countup' : 'countdown';
+    const targetDurationSeconds = resolveTargetDurationSeconds(ex);
     const prev = existingMap.get(ex.id);
     if (prev && prev.sets.length > 0) {
       return {
         ...prev,
         name: ex.name,
         muscleGroup: ex.muscleGroup,
+        trackingMode,
+        usesWeight,
+        timerDirection,
+        targetDurationSeconds,
+        sets: prev.sets.map((s) => ({
+          ...s,
+          weightKg: usesWeight ? s.weightKg : 0,
+          durationSeconds:
+            typeof s.durationSeconds === 'number' && Number.isFinite(s.durationSeconds)
+              ? s.durationSeconds
+              : trackingMode === 'timer'
+                ? targetDurationSeconds
+                : 0,
+        })),
       };
     }
     const setsCount = Math.max(1, Math.min(12, ex.targetSets || 3));
@@ -69,10 +114,15 @@ function buildEntriesFromSchedule(
       exerciseId: ex.id,
       name: ex.name,
       muscleGroup: ex.muscleGroup,
+      trackingMode,
+      usesWeight,
+      timerDirection,
+      targetDurationSeconds,
       sets: Array.from({ length: setsCount }, (_, idx) => ({
         setNumber: idx + 1,
-        weightKg: ex.targetWeightKg || 0,
-        reps: defaultReps,
+        weightKg: usesWeight ? ex.targetWeightKg || 0 : 0,
+        reps: trackingMode === 'timer' ? 1 : defaultReps,
+        durationSeconds: trackingMode === 'timer' ? targetDurationSeconds : 0,
         completed: false,
       })),
     };
@@ -406,10 +456,10 @@ export function useGymData() {
       if (current.exercises.length >= 30) {
         throw new Error('Maksimal 30 gerakan per hari latihan.');
       }
-      const newEx: ExerciseItem = {
+      const newEx = sanitizeExerciseItem({
         ...exercise,
         id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      };
+      });
       await updateSchedule(dayKey, {
         exercises: [...current.exercises, newEx],
       });
@@ -423,7 +473,7 @@ export function useGymData() {
       const current = schedules[dayKey];
       if (!current) return;
       const updated = current.exercises.map((ex) =>
-        ex.id === exerciseId ? { ...ex, ...patch } : ex
+        ex.id === exerciseId ? sanitizeExerciseItem({ ...ex, ...patch }) : ex
       );
       await updateSchedule(dayKey, { exercises: updated });
     },
@@ -543,20 +593,71 @@ export function useGymData() {
     [effectiveTodayEntries, persistTodayEntries]
   );
 
+  const updateSetDuration = useCallback(
+    async (exerciseId: string, setNumber: number, durationSeconds: number) => {
+      const safeDuration = Math.max(
+        1,
+        Math.min(10800, Number.isFinite(durationSeconds) ? Math.round(durationSeconds) : 0)
+      );
+      const next = effectiveTodayEntries.map((entry) => {
+        if (entry.exerciseId !== exerciseId) return entry;
+        return {
+          ...entry,
+          sets: entry.sets.map((s) =>
+            s.setNumber === setNumber ? { ...s, durationSeconds: safeDuration } : s
+          ),
+        };
+      });
+      await persistTodayEntries(next);
+    },
+    [effectiveTodayEntries, persistTodayEntries]
+  );
+
+  const completeTimerSet = useCallback(
+    async (exerciseId: string, setNumber: number, durationSeconds: number): Promise<boolean> => {
+      const safeDuration = Math.max(
+        1,
+        Math.min(10800, Number.isFinite(durationSeconds) ? Math.round(durationSeconds) : 1)
+      );
+      let becameCompleted = false;
+      const next = effectiveTodayEntries.map((entry) => {
+        if (entry.exerciseId !== exerciseId) return entry;
+        return {
+          ...entry,
+          sets: entry.sets.map((s) => {
+            if (s.setNumber !== setNumber) return s;
+            if (!s.completed) becameCompleted = true;
+            return {
+              ...s,
+              durationSeconds: safeDuration,
+              completed: true,
+            };
+          }),
+        };
+      });
+      await persistTodayEntries(next);
+      return becameCompleted;
+    },
+    [effectiveTodayEntries, persistTodayEntries]
+  );
+
   const addSetToExercise = useCallback(
     async (exerciseId: string) => {
       const next = effectiveTodayEntries.map((entry) => {
         if (entry.exerciseId !== exerciseId) return entry;
         if (entry.sets.length >= 12) return entry;
         const last = entry.sets[entry.sets.length - 1];
+        const fallbackDuration =
+          entry.trackingMode === 'timer' ? entry.targetDurationSeconds || 60 : 0;
         return {
           ...entry,
           sets: [
             ...entry.sets,
             {
               setNumber: entry.sets.length + 1,
-              weightKg: last ? last.weightKg : 0,
+              weightKg: entry.usesWeight === false ? 0 : last ? last.weightKg : 0,
               reps: last ? last.reps : 10,
+              durationSeconds: last?.durationSeconds ?? fallbackDuration,
               completed: false,
             },
           ],
@@ -671,6 +772,8 @@ export function useGymData() {
     moveExerciseInDay,
     toggleSetComplete,
     updateSetMetrics,
+    updateSetDuration,
+    completeTimerSet,
     addSetToExercise,
     removeSetFromExercise,
     addCustomRingtone,

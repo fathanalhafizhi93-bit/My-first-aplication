@@ -33,6 +33,18 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     notes: 'Tahan kontraksi 1 detik di titik tengah dada.',
   },
   {
+    name: 'Push-Up',
+    muscleGroup: 'Dada',
+    equipment: 'Tanpa Alat',
+    targetSets: 3,
+    targetReps: '12-20',
+    targetWeightKg: 0,
+    restSeconds: 60,
+    notes: 'Jaga garis tubuh lurus dari bahu ke tumit, turunkan dada mendekati lantai.',
+    trackingMode: 'reps',
+    usesWeight: false,
+  },
+  {
     name: 'Weighted Dips',
     muscleGroup: 'Dada',
     equipment: 'Dip Bar',
@@ -83,6 +95,8 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     targetWeightKg: 0,
     restSeconds: 120,
     notes: 'Rentang gerak penuh dari gantung lurus hingga dagu melewati palang.',
+    trackingMode: 'reps',
+    usesWeight: false,
   },
 
   // Bahu
@@ -168,6 +182,20 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     restSeconds: 45,
     notes: 'Jeda 1 detik di posisi bawah dan puncak kontraksi betis.',
   },
+  {
+    name: 'Wall Sit',
+    muscleGroup: 'Kaki',
+    equipment: 'Tanpa Alat',
+    targetSets: 3,
+    targetReps: '45 detik',
+    targetWeightKg: 0,
+    restSeconds: 60,
+    notes: 'Sandarkan punggung rata ke dinding dengan lutut membentuk sudut 90 derajat.',
+    trackingMode: 'timer',
+    usesWeight: false,
+    timerDirection: 'countdown',
+    targetDurationSeconds: 45,
+  },
 
   // Lengan
   {
@@ -221,6 +249,8 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     targetWeightKg: 0,
     restSeconds: 60,
     notes: 'Gulung panggul ke atas saat mengangkat kaki agar perut bawah bekerja.',
+    trackingMode: 'reps',
+    usesWeight: false,
   },
   {
     name: 'Cable Woodchopper',
@@ -233,6 +263,20 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     notes: 'Putar torso dengan kontrol untuk melatih otot oblique.',
   },
   {
+    name: 'Plank',
+    muscleGroup: 'Core',
+    equipment: 'Tanpa Alat',
+    targetSets: 3,
+    targetReps: '60 detik',
+    targetWeightKg: 0,
+    restSeconds: 45,
+    notes: 'Kencangkan perut dan glutes, jaga garis tubuh lurus dari kepala hingga tumit.',
+    trackingMode: 'timer',
+    usesWeight: false,
+    timerDirection: 'countdown',
+    targetDurationSeconds: 60,
+  },
+  {
     name: 'Weighted Plank',
     muscleGroup: 'Core',
     equipment: 'Pelat Beban',
@@ -241,6 +285,10 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     targetWeightKg: 10,
     restSeconds: 45,
     notes: 'Jaga garis lurus dari bahu hingga tumit.',
+    trackingMode: 'timer',
+    usesWeight: true,
+    timerDirection: 'countdown',
+    targetDurationSeconds: 45,
   },
 
   // Kardio
@@ -253,6 +301,24 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     targetWeightKg: 0,
     restSeconds: 60,
     notes: 'Incline 10%, kecepatan 5.0–5.5 km/jam untuk pembakaran lemak stabil.',
+    trackingMode: 'timer',
+    usesWeight: false,
+    timerDirection: 'countdown',
+    targetDurationSeconds: 1200,
+  },
+  {
+    name: 'Jogging / Run',
+    muscleGroup: 'Kardio',
+    equipment: 'Tanpa Alat',
+    targetSets: 1,
+    targetReps: '30 menit',
+    targetWeightKg: 0,
+    restSeconds: 60,
+    notes: 'Jaga ritme napas stabil sepanjang sesi lari atau jogging.',
+    trackingMode: 'timer',
+    usesWeight: false,
+    timerDirection: 'countup',
+    targetDurationSeconds: 1800,
   },
   {
     name: 'Assault Bike HIIT',
@@ -263,6 +329,10 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     targetWeightKg: 0,
     restSeconds: 40,
     notes: 'Kayuh maksimal 20 detik, istirahat santai 40 detik.',
+    trackingMode: 'timer',
+    usesWeight: false,
+    timerDirection: 'countdown',
+    targetDurationSeconds: 20,
   },
   {
     name: 'Rowing Ergometer',
@@ -273,14 +343,17 @@ export const EXERCISE_LIBRARY: Omit<ExerciseItem, 'id'>[] = [
     targetWeightKg: 0,
     restSeconds: 90,
     notes: 'Dorong dengan kaki lebih dulu sebelum menarik pegangan ke dada.',
+    trackingMode: 'reps',
+    usesWeight: false,
   },
 ];
 
-function makeEx(index: number, prefix: string): ExerciseItem {
-  const item = EXERCISE_LIBRARY[index];
+function makeEx(exerciseName: string, prefix: string, orderIdx: number): ExerciseItem {
+  const item =
+    EXERCISE_LIBRARY.find((ex) => ex.name === exerciseName) || EXERCISE_LIBRARY[0];
   return {
     ...item,
-    id: `${prefix}_${index}`,
+    id: `${prefix}_${orderIdx}`,
   };
 }
 
@@ -295,11 +368,11 @@ export function createDefaultSchedules(userId: string): Record<DayKey, DaySchedu
       focusTitle: 'Push — Dada, Bahu & Trisep',
       ringtoneId: 'default',
       exercises: [
-        makeEx(0, 'mon'),
-        makeEx(1, 'mon'),
-        makeEx(8, 'mon'),
-        makeEx(9, 'mon'),
-        makeEx(18, 'mon'),
+        makeEx('Barbell Bench Press', 'mon', 0),
+        makeEx('Incline Dumbbell Press', 'mon', 1),
+        makeEx('Overhead Barbell Press', 'mon', 2),
+        makeEx('Dumbbell Lateral Raise', 'mon', 3),
+        makeEx('Tricep Rope Pushdown', 'mon', 4),
       ],
     },
     tue: {
@@ -311,11 +384,11 @@ export function createDefaultSchedules(userId: string): Record<DayKey, DaySchedu
       focusTitle: 'Pull — Punggung & Bisep',
       ringtoneId: 'default',
       exercises: [
-        makeEx(4, 'tue'),
-        makeEx(5, 'tue'),
-        makeEx(6, 'tue'),
-        makeEx(10, 'tue'),
-        makeEx(16, 'tue'),
+        makeEx('Lat Pulldown', 'tue', 0),
+        makeEx('Barbell Bent-Over Row', 'tue', 1),
+        makeEx('Seated Cable Row', 'tue', 2),
+        makeEx('Face Pull', 'tue', 3),
+        makeEx('EZ-Bar Bicep Curl', 'tue', 4),
       ],
     },
     wed: {
@@ -326,7 +399,10 @@ export function createDefaultSchedules(userId: string): Record<DayKey, DaySchedu
       alarmTime: '07:00',
       focusTitle: 'Rest Day & Pemulihan Aktif',
       ringtoneId: 'default',
-      exercises: [makeEx(22, 'wed'), makeEx(23, 'wed')],
+      exercises: [
+        makeEx('Plank', 'wed', 0),
+        makeEx('Incline Treadmill Walk', 'wed', 1),
+      ],
     },
     thu: {
       userId,
@@ -337,11 +413,11 @@ export function createDefaultSchedules(userId: string): Record<DayKey, DaySchedu
       focusTitle: 'Legs — Kaki & Glutes',
       ringtoneId: 'default',
       exercises: [
-        makeEx(11, 'thu'),
-        makeEx(12, 'thu'),
-        makeEx(13, 'thu'),
-        makeEx(14, 'thu'),
-        makeEx(15, 'thu'),
+        makeEx('Barbell Back Squat', 'thu', 0),
+        makeEx('Romanian Deadlift (RDL)', 'thu', 1),
+        makeEx('Leg Press', 'thu', 2),
+        makeEx('Walking Lunges', 'thu', 3),
+        makeEx('Standing Calf Raise', 'thu', 4),
       ],
     },
     fri: {
@@ -353,11 +429,11 @@ export function createDefaultSchedules(userId: string): Record<DayKey, DaySchedu
       focusTitle: 'Upper Body & Core',
       ringtoneId: 'default',
       exercises: [
-        makeEx(2, 'fri'),
-        makeEx(7, 'fri'),
-        makeEx(9, 'fri'),
-        makeEx(17, 'fri'),
-        makeEx(20, 'fri'),
+        makeEx('Cable Chest Fly', 'fri', 0),
+        makeEx('Pull-Up', 'fri', 1),
+        makeEx('Dumbbell Lateral Raise', 'fri', 2),
+        makeEx('Hammer Curl', 'fri', 3),
+        makeEx('Hanging Leg Raise', 'fri', 4),
       ],
     },
     sat: {
@@ -369,10 +445,10 @@ export function createDefaultSchedules(userId: string): Record<DayKey, DaySchedu
       focusTitle: 'Conditioning & Kardio HIIT',
       ringtoneId: 'default',
       exercises: [
-        makeEx(24, 'sat'),
-        makeEx(25, 'sat'),
-        makeEx(21, 'sat'),
-        makeEx(22, 'sat'),
+        makeEx('Assault Bike HIIT', 'sat', 0),
+        makeEx('Rowing Ergometer', 'sat', 1),
+        makeEx('Cable Woodchopper', 'sat', 2),
+        makeEx('Weighted Plank', 'sat', 3),
       ],
     },
     sun: {

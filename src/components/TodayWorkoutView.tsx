@@ -18,8 +18,10 @@ import {
 import {
   formatAlarmTime,
   formatClockTime,
+  formatCompactDuration,
   formatIndonesianDate,
   formatRestDuration,
+  formatTimerClock,
 } from '../lib/dateUtils';
 import {
   DAY_LABELS,
@@ -27,7 +29,15 @@ import {
   resolveDayTimePhase,
   useI18n,
 } from '../lib/i18n';
-import { DayKey, DaySchedule, WorkoutLogEntry } from '../types/gym';
+import {
+  DayKey,
+  DaySchedule,
+  resolveExerciseTrackingMode,
+  resolveExerciseUsesWeight,
+  resolveTargetDurationSeconds,
+  TimerDirection,
+  WorkoutLogEntry,
+} from '../types/gym';
 import { CooldownAlertModal } from './CooldownAlertModal';
 import { MascotMood, TodayMascot } from './TodayMascot';
 
@@ -35,6 +45,14 @@ interface CooldownTarget {
   exerciseId: string;
   setNumber: number;
   exerciseName: string;
+}
+
+export interface ExerciseTimerState {
+  direction: TimerDirection;
+  targetSeconds: number;
+  elapsedSeconds: number;
+  running: boolean;
+  activeSetNumber: number;
 }
 
 interface TodayWorkoutViewProps {
@@ -52,6 +70,7 @@ interface TodayWorkoutViewProps {
   dayJustChanged: boolean;
   userName: string;
   isOpeningGreeting: boolean;
+  exerciseTimers: Record<string, ExerciseTimerState>;
   onToggleRestPause: () => void;
   onResetRest: () => void;
   onAdjustRest: (deltaSeconds: number) => void;
@@ -68,6 +87,16 @@ interface TodayWorkoutViewProps {
     weightKg: number,
     reps: number
   ) => Promise<void>;
+  onUpdateSetDuration: (
+    exerciseId: string,
+    setNumber: number,
+    durationSeconds: number
+  ) => Promise<void>;
+  onToggleExerciseTimer: (entry: WorkoutLogEntry) => void;
+  onResetExerciseTimer: (entry: WorkoutLogEntry) => void;
+  onChangeExerciseTimerDirection: (entry: WorkoutLogEntry, direction: TimerDirection) => void;
+  onSelectExerciseTimerSet: (entry: WorkoutLogEntry, setNumber: number) => void;
+  onSaveExerciseTimerSet: (entry: WorkoutLogEntry) => Promise<void>;
   onAddSet: (exerciseId: string) => Promise<void>;
   onRemoveSet: (exerciseId: string) => Promise<void>;
   onStartRestTimer: (seconds: number, exerciseName?: string) => void;
@@ -114,6 +143,7 @@ export function TodayWorkoutView({
   dayJustChanged,
   userName,
   isOpeningGreeting,
+  exerciseTimers,
   onToggleRestPause,
   onResetRest,
   onAdjustRest,
@@ -121,6 +151,12 @@ export function TodayWorkoutView({
   onBypassCooldownAndComplete,
   onDismissCooldownAlert,
   onUpdateSetMetrics,
+  onUpdateSetDuration,
+  onToggleExerciseTimer,
+  onResetExerciseTimer,
+  onChangeExerciseTimerDirection,
+  onSelectExerciseTimerSet,
+  onSaveExerciseTimerSet,
   onAddSet,
   onRemoveSet,
   onStartRestTimer,
@@ -146,14 +182,25 @@ export function TodayWorkoutView({
   );
   const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
 
-  const totalVolumeKg = todayEntries.reduce(
-    (acc, e) =>
+  const totalVolumeKg = todayEntries.reduce((acc, e) => {
+    if (resolveExerciseTrackingMode(e) === 'timer') return acc;
+    return (
       acc +
       e.sets
         .filter((s) => s.completed)
-        .reduce((sAcc, s) => sAcc + s.weightKg * s.reps, 0),
-    0
-  );
+        .reduce((sAcc, s) => sAcc + s.weightKg * s.reps, 0)
+    );
+  }, 0);
+
+  const totalTimedSeconds = todayEntries.reduce((acc, e) => {
+    if (resolveExerciseTrackingMode(e) !== 'timer') return acc;
+    return (
+      acc +
+      e.sets
+        .filter((s) => s.completed)
+        .reduce((sAcc, s) => sAcc + (s.durationSeconds || 0), 0)
+    );
+  }, 0);
 
   // Determine circular mascot animation mood dynamically
   let mascotMood: MascotMood = 'ready';
@@ -192,7 +239,7 @@ export function TodayWorkoutView({
 
   return (
     <div className="space-y-6">
-      {/* Focused Hero Banner: Enlarged Time Emblem + Live Clock -> Clear Date -> Dominant Schedule Title */}
+      {/* Focused Hero Banner */}
       <section
         className={`relative overflow-hidden rounded-2xl border bg-[#13161C] transition-colors duration-300 ${phaseStyle.border}`}
       >
@@ -278,7 +325,7 @@ export function TodayWorkoutView({
           {activeSchedule.isGymDay && activeSchedule.exercises.length > 0 && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-4 text-xs sm:text-sm">
-                <div className="flex items-center gap-4 text-[#D1D5DB]">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[#D1D5DB]">
                   <span className="font-mono tabular-nums">
                     {completedSets}/{totalSets} {t('Set Selesai', 'Sets Done')}
                   </span>
@@ -288,6 +335,16 @@ export function TodayWorkoutView({
                   <span className="font-mono tabular-nums">
                     {t('Volume', 'Volume')}: {totalVolumeKg.toLocaleString(lang === 'en' ? 'en-US' : 'id-ID')} kg
                   </span>
+                  {totalTimedSeconds > 0 && (
+                    <>
+                      <span aria-hidden="true" className="text-[#6B7280]">
+                        ·
+                      </span>
+                      <span className="font-mono tabular-nums text-[#38BDF8]">
+                        {t('Durasi', 'Duration')}: {formatCompactDuration(totalTimedSeconds, lang)}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <span className="font-mono text-sm font-bold tabular-nums text-[#C8FF2E]">
                   {progressPct}%
@@ -304,7 +361,7 @@ export function TodayWorkoutView({
         </div>
       </section>
 
-      {/* Centered Anti-Misclick Cooldown Popup when user taps too early */}
+      {/* Centered Anti-Misclick Cooldown Popup */}
       <CooldownAlertModal
         open={Boolean(cooldownAlertTarget && cooldownRemaining > 0)}
         cooldownRemaining={cooldownRemaining}
@@ -314,7 +371,7 @@ export function TodayWorkoutView({
         onDismiss={onDismissCooldownAlert}
       />
 
-      {/* Dedicated Rest Timer Directly Below Hero (Desktop & Mobile) */}
+      {/* Dedicated Rest Timer Directly Below Hero */}
       <section
         className={`rounded-2xl border bg-[#13161C] p-4 sm:p-5 transition-colors ${
           restRunning
@@ -325,7 +382,6 @@ export function TodayWorkoutView({
         }`}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {/* Left: Ring + Title & Status */}
           <div className="flex items-center gap-4">
             <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
               <svg className="h-24 w-24 -rotate-90" viewBox="0 0 96 96" aria-hidden="true">
@@ -380,7 +436,6 @@ export function TodayWorkoutView({
             </div>
           </div>
 
-          {/* Right: Quick Presets & Controls */}
           <div className="flex flex-col gap-2.5 sm:items-end">
             <div className="grid grid-cols-4 gap-2 w-full sm:w-auto">
               {[45, 60, 90, 120].map((sec) => (
@@ -498,16 +553,62 @@ export function TodayWorkoutView({
         <div className="space-y-4">
           {todayEntries.map((entry, index) => {
             const spec = activeSchedule.exercises.find((e) => e.id === entry.exerciseId);
+            const mode = resolveExerciseTrackingMode(spec || entry);
+            const usesWeight = resolveExerciseUsesWeight({
+              usesWeight: entry.usesWeight ?? spec?.usesWeight,
+              trackingMode: mode,
+              targetWeightKg: spec?.targetWeightKg ?? entry.sets[0]?.weightKg ?? 0,
+              equipment: spec?.equipment,
+            });
+            const defaultTargetDuration = resolveTargetDurationSeconds(spec || entry);
+
             const doneCount = entry.sets.filter((s) => s.completed).length;
             const allDone = entry.sets.length > 0 && doneCount === entry.sets.length;
             const isExpanded = Boolean(expandedNotes[entry.exerciseId]);
             const muscleLabel = MUSCLE_LABELS[lang][entry.muscleGroup] || entry.muscleGroup;
 
+            // Active Exercise Timer state (for mode === 'timer')
+            const firstIncompleteSet =
+              entry.sets.find((s) => !s.completed)?.setNumber || entry.sets[0]?.setNumber || 1;
+            const rawTimer = exerciseTimers[entry.exerciseId];
+            const timerDirection: TimerDirection =
+              rawTimer?.direction ||
+              spec?.timerDirection ||
+              entry.timerDirection ||
+              'countdown';
+            const activeSetNumber =
+              rawTimer?.activeSetNumber &&
+              entry.sets.some((s) => s.setNumber === rawTimer.activeSetNumber)
+                ? rawTimer.activeSetNumber
+                : firstIncompleteSet;
+            const activeSetObj = entry.sets.find((s) => s.setNumber === activeSetNumber);
+            const activeTargetSeconds =
+              (activeSetObj?.durationSeconds && activeSetObj.durationSeconds > 0
+                ? activeSetObj.durationSeconds
+                : defaultTargetDuration) || 60;
+            const elapsedSeconds = rawTimer?.elapsedSeconds || 0;
+            const timerRunning = Boolean(rawTimer?.running);
+
+            const displayClockSeconds =
+              timerDirection === 'countdown'
+                ? Math.max(0, activeTargetSeconds - elapsedSeconds)
+                : elapsedSeconds;
+            const timerProgressPct =
+              timerDirection === 'countdown' && activeTargetSeconds > 0
+                ? Math.min(100, Math.round((elapsedSeconds / activeTargetSeconds) * 100))
+                : activeTargetSeconds > 0
+                  ? Math.min(100, Math.round((elapsedSeconds / activeTargetSeconds) * 100))
+                  : 0;
+
             return (
               <article
                 key={entry.exerciseId}
                 className={`rounded-2xl border bg-[#13161C] p-4 sm:p-6 transition-colors ${
-                  allDone ? 'border-[#16A34A]/50' : 'border-white/10'
+                  allDone
+                    ? 'border-[#16A34A]/50'
+                    : timerRunning
+                      ? 'border-[#38BDF8]/60'
+                      : 'border-white/10'
                 }`}
               >
                 {/* Card Header */}
@@ -535,12 +636,23 @@ export function TodayWorkoutView({
                         <>
                           <span aria-hidden="true"> · </span>
                           <span className="font-mono tabular-nums">
-                            {t('Target', 'Target')} {spec.targetSets}×{spec.targetReps}
+                            {mode === 'timer'
+                              ? `${t('Timer', 'Timer')} ${spec.targetSets}×${formatCompactDuration(
+                                  defaultTargetDuration,
+                                  lang
+                                )}`
+                              : `${t('Target', 'Target')} ${spec.targetSets}×${spec.targetReps}`}
                           </span>
+                          {!usesWeight && (
+                            <>
+                              <span aria-hidden="true"> · </span>
+                              <span>{t('Tanpa Beban', 'Bodyweight')}</span>
+                            </>
+                          )}
                           <span aria-hidden="true"> · </span>
                           <span className="font-mono tabular-nums">
                             {t('Istirahat', 'Rest')} {spec.restSeconds}
-                            {t('d', 's')}
+                            {secUnit}
                           </span>
                         </>
                       )}
@@ -564,7 +676,7 @@ export function TodayWorkoutView({
                       >
                         <Timer className="h-3.5 w-3.5 text-[#C8FF2E]" />
                         {t('Istirahat', 'Rest')} {spec.restSeconds}
-                        {t('d', 's')}
+                        {secUnit}
                       </button>
                     )}
 
@@ -591,66 +703,266 @@ export function TodayWorkoutView({
                   </p>
                 )}
 
+                {/* Dedicated Interactive Timer Panel for Timer Exercises */}
+                {mode === 'timer' && (
+                  <div className="mt-4 rounded-xl border border-white/10 bg-[#0A0B0E]/80 p-4 space-y-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-[#38BDF8]">
+                          {t('Timer Gerakan', 'Exercise Timer')} · #{activeSetNumber}
+                        </span>
+                        {entry.sets.length > 1 && (
+                          <div className="flex items-center gap-1">
+                            {entry.sets.map((s) => (
+                              <button
+                                key={s.setNumber}
+                                type="button"
+                                onClick={() => onSelectExerciseTimerSet(entry, s.setNumber)}
+                                className={`min-h-[28px] rounded-md px-2 font-mono text-[11px] font-bold tabular-nums transition-colors ${
+                                  s.setNumber === activeSetNumber
+                                    ? 'bg-[#38BDF8] text-[#0A0B0E]'
+                                    : s.completed
+                                      ? 'bg-[#16A34A]/20 text-[#86EFAC]'
+                                      : 'bg-white/5 text-[#9CA3AF] hover:text-[#F4F5F7]'
+                                }`}
+                              >
+                                S{s.setNumber}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Countdown vs Count-Up Direction Toggle */}
+                      <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-[#13161C] p-1">
+                        <button
+                          type="button"
+                          onClick={() => onChangeExerciseTimerDirection(entry, 'countdown')}
+                          className={`min-h-[32px] rounded-md px-2.5 text-[11px] font-bold transition-colors whitespace-nowrap ${
+                            timerDirection === 'countdown'
+                              ? 'bg-[#38BDF8] text-[#0A0B0E]'
+                              : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+                          }`}
+                        >
+                          {t('Hitung Mundur', 'Countdown')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onChangeExerciseTimerDirection(entry, 'countup')}
+                          className={`min-h-[32px] rounded-md px-2.5 text-[11px] font-bold transition-colors whitespace-nowrap ${
+                            timerDirection === 'countup'
+                              ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                              : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+                          }`}
+                        >
+                          {t('Hitung Maju', 'Count-Up')}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="font-mono text-3xl sm:text-4xl font-extrabold leading-none tracking-tight tabular-nums text-[#F4F5F7]">
+                          {formatTimerClock(displayClockSeconds)}
+                        </div>
+                        <p className="mt-1.5 text-xs text-[#9CA3AF] font-mono tabular-nums">
+                          {timerDirection === 'countdown'
+                            ? `${t('Target durasi', 'Target duration')}: ${formatCompactDuration(
+                                activeTargetSeconds,
+                                lang
+                              )}`
+                            : `${t('Stopwatch dari 00:00 · Target', 'Stopwatch from 00:00 · Target')} ${formatCompactDuration(
+                                activeTargetSeconds,
+                                lang
+                              )}`}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onToggleExerciseTimer(entry)}
+                          className={`inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-4 text-xs font-bold transition-colors whitespace-nowrap ${
+                            timerRunning
+                              ? 'bg-[#F59E0B] text-[#0A0B0E]'
+                              : timerDirection === 'countdown'
+                                ? 'bg-[#38BDF8] text-[#0A0B0E]'
+                                : 'bg-[#C8FF2E] text-[#0A0B0E]'
+                          }`}
+                        >
+                          {timerRunning ? (
+                            <>
+                              <Pause className="h-4 w-4 fill-current" />
+                              {t('Jeda', 'Pause')}
+                            </>
+                          ) : (
+                            <>
+                              <Play className="h-4 w-4 fill-current" />
+                              {elapsedSeconds > 0 ? t('Lanjut', 'Resume') : t('Mulai Timer', 'Start Timer')}
+                            </>
+                          )}
+                        </button>
+
+                        {elapsedSeconds > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => onSaveExerciseTimerSet(entry)}
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-[#16A34A] px-4 text-xs font-bold text-white hover:brightness-110 whitespace-nowrap"
+                          >
+                            <Check className="h-4 w-4" strokeWidth={2.5} />
+                            {t('Selesai & Simpan', 'Done & Save')}
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          aria-label={t('Reset timer gerakan', 'Reset exercise timer')}
+                          onClick={() => onResetExerciseTimer(entry)}
+                          className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          timerDirection === 'countdown' ? 'bg-[#38BDF8]' : 'bg-[#C8FF2E]'
+                        }`}
+                        style={{ width: `${timerProgressPct}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Sets Table */}
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="border-b border-white/10 text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]">
                         <th className="py-2 pr-2 w-14">{t('Set', 'Set')}</th>
-                        <th className="py-2 px-2">{t('Beban (kg)', 'Weight (kg)')}</th>
-                        <th className="py-2 px-2">{t('Reps', 'Reps')}</th>
+                        {usesWeight && <th className="py-2 px-2">{t('Beban (kg)', 'Weight (kg)')}</th>}
+                        <th className="py-2 px-2">
+                          {mode === 'timer'
+                            ? t('Durasi (Mnt : Dtk)', 'Duration (Min : Sec)')
+                            : t('Reps', 'Reps')}
+                        </th>
                         <th className="py-2 pl-2 text-right w-20">{t('Selesai', 'Done')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
                       {entry.sets.map((setRow) => {
                         const isBlockedByCooldown = !setRow.completed && cooldownRemaining > 0;
+                        const rowDur = setRow.durationSeconds ?? defaultTargetDuration;
+                        const rowMins = Math.floor(rowDur / 60);
+                        const rowSecs = rowDur % 60;
+                        const isFocusedTimerSet =
+                          mode === 'timer' && setRow.setNumber === activeSetNumber;
+
                         return (
                           <tr
                             key={setRow.setNumber}
-                            className={setRow.completed ? 'bg-[#16A34A]/10' : ''}
+                            className={
+                              setRow.completed
+                                ? 'bg-[#16A34A]/10'
+                                : isFocusedTimerSet
+                                  ? 'bg-[#38BDF8]/5'
+                                  : ''
+                            }
                           >
                             <td className="py-2.5 pr-2 font-mono text-xs font-bold tabular-nums text-[#9CA3AF]">
                               #{setRow.setNumber}
                             </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                min={0}
-                                max={999}
-                                step="0.5"
-                                aria-label={`${t('Beban set', 'Weight set')} ${setRow.setNumber} ${entry.name}`}
-                                value={setRow.weightKg}
-                                onChange={(e) =>
-                                  onUpdateSetMetrics(
-                                    entry.exerciseId,
-                                    setRow.setNumber,
-                                    parseFloat(e.target.value) || 0,
-                                    setRow.reps
-                                  )
-                                }
-                                className="h-11 w-24 rounded-lg border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
-                              />
-                            </td>
-                            <td className="py-2 px-2">
-                              <input
-                                type="number"
-                                min={0}
-                                max={999}
-                                step="1"
-                                aria-label={`${t('Repetisi set', 'Reps set')} ${setRow.setNumber} ${entry.name}`}
-                                value={setRow.reps}
-                                onChange={(e) =>
-                                  onUpdateSetMetrics(
-                                    entry.exerciseId,
-                                    setRow.setNumber,
-                                    setRow.weightKg,
-                                    parseInt(e.target.value, 10) || 0
-                                  )
-                                }
-                                className="h-11 w-20 rounded-lg border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
-                              />
-                            </td>
+
+                            {usesWeight && (
+                              <td className="py-2 px-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={999}
+                                  step="0.5"
+                                  aria-label={`${t('Beban set', 'Weight set')} ${setRow.setNumber} ${entry.name}`}
+                                  value={setRow.weightKg}
+                                  onChange={(e) =>
+                                    onUpdateSetMetrics(
+                                      entry.exerciseId,
+                                      setRow.setNumber,
+                                      parseFloat(e.target.value) || 0,
+                                      setRow.reps
+                                    )
+                                  }
+                                  className="h-11 w-24 rounded-lg border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                                />
+                              </td>
+                            )}
+
+                            {mode === 'timer' ? (
+                              <td className="py-2 px-2">
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={180}
+                                    aria-label={`${t('Menit set', 'Minutes set')} ${setRow.setNumber} ${entry.name}`}
+                                    value={rowMins}
+                                    onChange={(e) => {
+                                      const m = Math.max(
+                                        0,
+                                        Math.min(180, parseInt(e.target.value, 10) || 0)
+                                      );
+                                      void onUpdateSetDuration(
+                                        entry.exerciseId,
+                                        setRow.setNumber,
+                                        Math.max(1, m * 60 + rowSecs)
+                                      );
+                                    }}
+                                    className="h-11 w-16 rounded-lg border border-white/10 bg-[#0A0B0E] px-2.5 text-center font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
+                                  />
+                                  <span className="font-mono text-sm font-bold text-[#6B7280]">:</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={59}
+                                    aria-label={`${t('Detik set', 'Seconds set')} ${setRow.setNumber} ${entry.name}`}
+                                    value={String(rowSecs).padStart(2, '0')}
+                                    onChange={(e) => {
+                                      const s = Math.max(
+                                        0,
+                                        Math.min(59, parseInt(e.target.value, 10) || 0)
+                                      );
+                                      void onUpdateSetDuration(
+                                        entry.exerciseId,
+                                        setRow.setNumber,
+                                        Math.max(1, rowMins * 60 + s)
+                                      );
+                                    }}
+                                    className="h-11 w-16 rounded-lg border border-white/10 bg-[#0A0B0E] px-2.5 text-center font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
+                                  />
+                                </div>
+                              </td>
+                            ) : (
+                              <td className="py-2 px-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={999}
+                                  step="1"
+                                  aria-label={`${t('Repetisi set', 'Reps set')} ${setRow.setNumber} ${entry.name}`}
+                                  value={setRow.reps}
+                                  onChange={(e) =>
+                                    onUpdateSetMetrics(
+                                      entry.exerciseId,
+                                      setRow.setNumber,
+                                      setRow.weightKg,
+                                      parseInt(e.target.value, 10) || 0
+                                    )
+                                  }
+                                  className="h-11 w-20 rounded-lg border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                                />
+                              </td>
+                            )}
+
                             <td className="py-2 pl-2 text-right">
                               <button
                                 type="button"
@@ -675,7 +987,7 @@ export function TodayWorkoutView({
                                 ) : isBlockedByCooldown ? (
                                   <span>
                                     {cooldownRemaining}
-                                    {t('d', 's')}
+                                    {secUnit}
                                   </span>
                                 ) : (
                                   <Check className="h-5 w-5" strokeWidth={2.5} />

@@ -91,6 +91,27 @@ export function formatRestDuration(totalSeconds: number): string {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
+export function formatTimerClock(totalSeconds: number): string {
+  const clamped = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(clamped / 3600);
+  const mins = Math.floor((clamped % 3600) / 60);
+  const secs = clamped % 60;
+  if (hours > 0) {
+    return `${hours}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+export function formatCompactDuration(totalSeconds: number, lang: AppLanguage = 'id'): string {
+  const clamped = Math.max(0, Math.round(totalSeconds));
+  const secUnit = lang === 'en' ? 's' : 'd';
+  const mins = Math.floor(clamped / 60);
+  const secs = clamped % 60;
+  if (mins === 0) return `${secs}${secUnit}`;
+  if (secs === 0) return `${mins}m`;
+  return `${mins}m ${String(secs).padStart(2, '0')}${secUnit}`;
+}
+
 export interface NextAlarmInfo {
   dayKey: DayKey;
   dayLabel: string;

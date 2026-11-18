@@ -36,6 +36,9 @@ export const MUSCLE_GROUPS: MuscleGroup[] = [
   'Kardio',
 ];
 
+export type ExerciseTrackingMode = 'reps' | 'timer';
+export type TimerDirection = 'countdown' | 'countup';
+
 export interface ExerciseItem {
   id: string;
   name: string;
@@ -46,6 +49,10 @@ export interface ExerciseItem {
   targetWeightKg: number;
   restSeconds: number;
   notes: string;
+  trackingMode?: ExerciseTrackingMode;
+  usesWeight?: boolean;
+  timerDirection?: TimerDirection;
+  targetDurationSeconds?: number;
 }
 
 export interface DaySchedule {
@@ -63,6 +70,7 @@ export interface WorkoutSetLog {
   setNumber: number;
   weightKg: number;
   reps: number;
+  durationSeconds?: number;
   completed: boolean;
 }
 
@@ -70,6 +78,10 @@ export interface WorkoutLogEntry {
   exerciseId: string;
   name: string;
   muscleGroup: MuscleGroup;
+  trackingMode?: ExerciseTrackingMode;
+  usesWeight?: boolean;
+  timerDirection?: TimerDirection;
+  targetDurationSeconds?: number;
   sets: WorkoutSetLog[];
 }
 
@@ -80,6 +92,64 @@ export interface WorkoutLog {
   focusTitle: string;
   entries: WorkoutLogEntry[];
   completed: boolean;
+}
+
+export function resolveExerciseTrackingMode(
+  item?: { trackingMode?: ExerciseTrackingMode } | null
+): ExerciseTrackingMode {
+  return item?.trackingMode === 'timer' ? 'timer' : 'reps';
+}
+
+export function resolveExerciseUsesWeight(
+  item?: {
+    usesWeight?: boolean;
+    trackingMode?: ExerciseTrackingMode;
+    targetWeightKg?: number;
+    equipment?: string;
+  } | null
+): boolean {
+  if (!item) return true;
+  if (typeof item.usesWeight === 'boolean') return item.usesWeight;
+  if ((item.targetWeightKg ?? 0) > 0) return true;
+  if (item.trackingMode === 'timer') return false;
+  const eq = (item.equipment || '').toLowerCase();
+  if (
+    eq.includes('tanpa alat') ||
+    eq.includes('bodyweight') ||
+    eq.includes('no equipment')
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function resolveTargetDurationSeconds(
+  item?: { targetDurationSeconds?: number; targetReps?: string } | null
+): number {
+  if (
+    typeof item?.targetDurationSeconds === 'number' &&
+    Number.isFinite(item.targetDurationSeconds) &&
+    item.targetDurationSeconds > 0
+  ) {
+    return Math.max(5, Math.min(10800, Math.round(item.targetDurationSeconds)));
+  }
+  const raw = (item?.targetReps || '').trim().toLowerCase();
+  if (raw) {
+    const mmssMatch = raw.match(/^(\d{1,3}):(\d{1,2})$/);
+    if (mmssMatch) {
+      const m = Number(mmssMatch[1]) || 0;
+      const s = Number(mmssMatch[2]) || 0;
+      if (m * 60 + s > 0) return Math.min(10800, m * 60 + s);
+    }
+    const num = parseInt(raw, 10);
+    if (Number.isFinite(num) && num > 0) {
+      if (raw.includes('menit') || raw.includes('min') || /\bm\b/.test(raw)) {
+        return Math.min(10800, num * 60);
+      }
+      return Math.min(10800, num);
+    }
+  }
+  return 60;
 }
 
 export interface CustomRingtone {

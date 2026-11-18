@@ -18,7 +18,7 @@ import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner'
 import { RightUtilityPanel } from './components/RightUtilityPanel';
 import { RingtoneManagerView } from './components/RingtoneManagerView';
 import { SettingsView } from './components/SettingsView';
-import { TodayWorkoutView } from './components/TodayWorkoutView';
+import { ExerciseTimerState, TodayWorkoutView } from './components/TodayWorkoutView';
 import { TopBar } from './components/TopBar';
 import { WeeklyScheduleView } from './components/WeeklyScheduleView';
 import { useGymData } from './hooks/useGymData';
@@ -31,7 +31,14 @@ import {
 } from './lib/dateUtils';
 import { LanguageProvider, useI18n } from './lib/i18n';
 import { syncNativeWeeklyAlarms } from './lib/nativeAlarmBridge';
-import { AppTab, DayKey, DaySchedule } from './types/gym';
+import {
+  AppTab,
+  DayKey,
+  DaySchedule,
+  resolveTargetDurationSeconds,
+  TimerDirection,
+  WorkoutLogEntry,
+} from './types/gym';
 
 interface TriggeredAlarmState {
   schedule: DaySchedule;
@@ -69,6 +76,8 @@ function AppContent() {
     moveExerciseInDay,
     toggleSetComplete,
     updateSetMetrics,
+    updateSetDuration,
+    completeTimerSet,
     addSetToExercise,
     removeSetFromExercise,
     addCustomRingtone,
@@ -106,6 +115,19 @@ function AppContent() {
   const [restRunning, setRestRunning] = useState(false);
   const [restExerciseLabel, setRestExerciseLabel] = useState<string | null>(null);
   const [restFinishedBanner, setRestFinishedBanner] = useState(false);
+
+  // Per-exercise timer state (Countdown & Count-Up for timed movements like Plank / Incline Walk)
+  const [exerciseTimers, setExerciseTimers] = useState<Record<string, ExerciseTimerState>>({});
+  const exerciseTimersRef = useRef<Record<string, ExerciseTimerState>>({});
+  const effectiveTodayEntriesRef = useRef<WorkoutLogEntry[]>(effectiveTodayEntries);
+
+  useEffect(() => {
+    exerciseTimersRef.current = exerciseTimers;
+  }, [exerciseTimers]);
+
+  useEffect(() => {
+    effectiveTodayEntriesRef.current = effectiveTodayEntries;
+  }, [effectiveTodayEntries]);
 
   const resolveRingtoneMeta = useCallback(
     (dayRingtoneId: string) => {
@@ -293,6 +315,253 @@ function AppContent() {
     setRestExerciseLabel(label || null);
     setRestRunning(true);
   }, []);
+
+  const handleFinishExerciseTimerSet = useCallback(
+    async (
+      exerciseId: string,
+      setNumber: number,
+      durationSeconds: number,
+      playCompletionChime: boolean
+    ) => {
+      const safeDuration = Math.max(1, Math.min(10800, Math.round(durationSeconds)));
+      const becameCompleted = await completeTimerSet(exerciseId, setNumber, safeDuration);
+
+      // Advance active set selector to next incomplete set if available
+      const entry = effectiveTodayEntriesRef.current.find((e) => e.exerciseId === exerciseId);
+      const nextIncomplete = entry?.sets.find(
+        (s) => s.setNumber !== setNumber && !s.completed
+      );
+
+      setExerciseTimers((prev) => {
+        const cur = prev[exerciseId];
+        if (!cur) return prev;
+        return {
+          ...prev,
+          [exerciseId]: {
+            ...cur,
+            elapsedSeconds: 0,
+            running: false,
+            activeSetNumber: nextIncomplete ? nextIncomplete.setNumber : setNumber,
+          },
+        };
+      });
+
+      if (playCompletionChime) {
+        const toneId = profile?.restRingtoneId || 'builtin_kettlebell_chime';
+        void audioEngine.play(toneId, {
+          volume: profile?.volume ?? 0.85,
+          loop: false,
+          customRingtones,
+        });
+      }
+
+      if (becameCompleted) {
+        setDayJustChanged(false);
+        setIsOpeningGreeting(false);
+        triggerClapBurst();
+
+        if (profile?.autoStartRestTimer && schedules && nextIncomplete) {
+          const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
+          if (spec) {
+            startRestTimer(spec.restSeconds, spec.name);
+          }
+        }
+      }
+    },
+    [
+      completeTimerSet,
+      profile,
+      customRingtones,
+      triggerClapBurst,
+      schedules,
+      todayDayKey,
+      startRestTimer,
+    ]
+  );
+
+  // Per-exercise timer 1-second tick loop
+  const hasRunningExerciseTimer = useMemo(
+    () => Object.values(exerciseTimers).some((tState) => tState.running),
+    [exerciseTimers]
+  );
+
+  useEffect(() => {
+    if (!hasRunningExerciseTimer) return;
+    const timer = window.setInterval(() => {
+      const current = exerciseTimersRef.current;
+      const runningIds = Object.keys(current).filter((id) => current[id]?.running);
+      if (runningIds.length === 0) return;
+
+      const nextMap: Record<string, ExerciseTimerState> = { ...current };
+      const finished: Array<{
+        exerciseId: string;
+        setNumber: number;
+        durationSeconds: number;
+      }> = [];
+
+      for (const id of runningIds) {
+        const state = nextMap[id];
+        if (!state) continue;
+        const nextElapsed = state.elapsedSeconds + 1;
+        if (state.direction === 'countdown' && nextElapsed >= state.targetSeconds) {
+          nextMap[id] = {
+            ...state,
+            elapsedSeconds: 0,
+            running: false,
+          };
+          finished.push({
+            exerciseId: id,
+            setNumber: state.activeSetNumber,
+            durationSeconds: state.targetSeconds,
+          });
+        } else {
+          nextMap[id] = {
+            ...state,
+            elapsedSeconds: nextElapsed,
+          };
+        }
+      }
+
+      exerciseTimersRef.current = nextMap;
+      setExerciseTimers(nextMap);
+
+      for (const item of finished) {
+        void handleFinishExerciseTimerSet(
+          item.exerciseId,
+          item.setNumber,
+          item.durationSeconds,
+          true
+        );
+      }
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [hasRunningExerciseTimer, handleFinishExerciseTimerSet]);
+
+  const buildInitialExerciseTimer = useCallback(
+    (entry: WorkoutLogEntry): ExerciseTimerState => {
+      const spec = schedules?.[todayDayKey]?.exercises.find((e) => e.id === entry.exerciseId);
+      const firstIncomplete =
+        entry.sets.find((s) => !s.completed)?.setNumber || entry.sets[0]?.setNumber || 1;
+      const activeSet = entry.sets.find((s) => s.setNumber === firstIncomplete);
+      const targetSeconds =
+        (activeSet?.durationSeconds && activeSet.durationSeconds > 0
+          ? activeSet.durationSeconds
+          : resolveTargetDurationSeconds(spec || entry)) || 60;
+      return {
+        direction: spec?.timerDirection || entry.timerDirection || 'countdown',
+        targetSeconds,
+        elapsedSeconds: 0,
+        running: false,
+        activeSetNumber: firstIncomplete,
+      };
+    },
+    [schedules, todayDayKey]
+  );
+
+  const handleToggleExerciseTimer = useCallback(
+    (entry: WorkoutLogEntry) => {
+      void handleUnlockAudio();
+      setExerciseTimers((prev) => {
+        const cur = prev[entry.exerciseId] || buildInitialExerciseTimer(entry);
+        const setObj = entry.sets.find((s) => s.setNumber === cur.activeSetNumber);
+        const targetSec =
+          (setObj?.durationSeconds && setObj.durationSeconds > 0
+            ? setObj.durationSeconds
+            : cur.targetSeconds) || 60;
+        const nextState: ExerciseTimerState = {
+          ...cur,
+          targetSeconds: targetSec,
+          running: !cur.running,
+        };
+        const updated = { ...prev, [entry.exerciseId]: nextState };
+        exerciseTimersRef.current = updated;
+        return updated;
+      });
+    },
+    [handleUnlockAudio, buildInitialExerciseTimer]
+  );
+
+  const handleResetExerciseTimer = useCallback(
+    (entry: WorkoutLogEntry) => {
+      setExerciseTimers((prev) => {
+        const cur = prev[entry.exerciseId] || buildInitialExerciseTimer(entry);
+        const updated = {
+          ...prev,
+          [entry.exerciseId]: {
+            ...cur,
+            elapsedSeconds: 0,
+            running: false,
+          },
+        };
+        exerciseTimersRef.current = updated;
+        return updated;
+      });
+    },
+    [buildInitialExerciseTimer]
+  );
+
+  const handleChangeExerciseTimerDirection = useCallback(
+    (entry: WorkoutLogEntry, direction: TimerDirection) => {
+      setExerciseTimers((prev) => {
+        const cur = prev[entry.exerciseId] || buildInitialExerciseTimer(entry);
+        const updated = {
+          ...prev,
+          [entry.exerciseId]: {
+            ...cur,
+            direction,
+            elapsedSeconds: 0,
+            running: false,
+          },
+        };
+        exerciseTimersRef.current = updated;
+        return updated;
+      });
+    },
+    [buildInitialExerciseTimer]
+  );
+
+  const handleSelectExerciseTimerSet = useCallback(
+    (entry: WorkoutLogEntry, setNumber: number) => {
+      const setObj = entry.sets.find((s) => s.setNumber === setNumber);
+      const spec = schedules?.[todayDayKey]?.exercises.find((e) => e.id === entry.exerciseId);
+      const targetSec =
+        (setObj?.durationSeconds && setObj.durationSeconds > 0
+          ? setObj.durationSeconds
+          : resolveTargetDurationSeconds(spec || entry)) || 60;
+
+      setExerciseTimers((prev) => {
+        const cur = prev[entry.exerciseId] || buildInitialExerciseTimer(entry);
+        const updated = {
+          ...prev,
+          [entry.exerciseId]: {
+            ...cur,
+            activeSetNumber: setNumber,
+            targetSeconds: targetSec,
+            elapsedSeconds: 0,
+            running: false,
+          },
+        };
+        exerciseTimersRef.current = updated;
+        return updated;
+      });
+    },
+    [schedules, todayDayKey, buildInitialExerciseTimer]
+  );
+
+  const handleSaveExerciseTimerSet = useCallback(
+    async (entry: WorkoutLogEntry) => {
+      const cur = exerciseTimersRef.current[entry.exerciseId] || buildInitialExerciseTimer(entry);
+      const recordedSeconds = Math.max(1, cur.elapsedSeconds);
+      await handleFinishExerciseTimerSet(
+        entry.exerciseId,
+        cur.activeSetNumber,
+        recordedSeconds,
+        false
+      );
+    },
+    [buildInitialExerciseTimer, handleFinishExerciseTimerSet]
+  );
 
   const handleToggleRestPause = useCallback(() => {
     if (restRemaining === 0) {
@@ -575,6 +844,7 @@ function AppContent() {
                       dayJustChanged={dayJustChanged}
                       userName={profile.displayName}
                       isOpeningGreeting={isOpeningGreeting}
+                      exerciseTimers={exerciseTimers}
                       onToggleRestPause={handleToggleRestPause}
                       onResetRest={handleResetRest}
                       onAdjustRest={handleAdjustRest}
@@ -582,6 +852,12 @@ function AppContent() {
                       onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
                       onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
                       onUpdateSetMetrics={updateSetMetrics}
+                      onUpdateSetDuration={updateSetDuration}
+                      onToggleExerciseTimer={handleToggleExerciseTimer}
+                      onResetExerciseTimer={handleResetExerciseTimer}
+                      onChangeExerciseTimerDirection={handleChangeExerciseTimerDirection}
+                      onSelectExerciseTimerSet={handleSelectExerciseTimerSet}
+                      onSaveExerciseTimerSet={handleSaveExerciseTimerSet}
                       onAddSet={addSetToExercise}
                       onRemoveSet={removeSetFromExercise}
                       onStartRestTimer={startRestTimer}

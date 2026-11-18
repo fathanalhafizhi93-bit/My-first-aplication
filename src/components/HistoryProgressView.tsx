@@ -6,9 +6,14 @@ import {
   Dumbbell,
   Flame,
 } from 'lucide-react';
-import { formatLocalDateKey } from '../lib/dateUtils';
+import { formatCompactDuration, formatLocalDateKey } from '../lib/dateUtils';
 import { DAY_LABELS, MUSCLE_LABELS, useI18n } from '../lib/i18n';
-import { DAY_LIST, WorkoutLog } from '../types/gym';
+import {
+  DAY_LIST,
+  resolveExerciseTrackingMode,
+  resolveExerciseUsesWeight,
+  WorkoutLog,
+} from '../types/gym';
 
 interface HistoryProgressViewProps {
   workoutHistory: WorkoutLog[];
@@ -34,13 +39,19 @@ function getLogStats(log: WorkoutLog) {
   let totalSets = 0;
   let completedSets = 0;
   let totalVolume = 0;
+  let totalTimedSeconds = 0;
 
   for (const entry of log.entries) {
+    const mode = resolveExerciseTrackingMode(entry);
     for (const set of entry.sets) {
       totalSets += 1;
       if (set.completed) {
         completedSets += 1;
-        totalVolume += Math.max(0, set.weightKg) * Math.max(0, set.reps);
+        if (mode === 'timer') {
+          totalTimedSeconds += Math.max(0, set.durationSeconds || 0);
+        } else {
+          totalVolume += Math.max(0, set.weightKg) * Math.max(0, set.reps);
+        }
       }
     }
   }
@@ -49,6 +60,7 @@ function getLogStats(log: WorkoutLog) {
     totalSets,
     completedSets,
     totalVolume: Math.round(totalVolume),
+    totalTimedSeconds,
     isFull: log.completed || (totalSets > 0 && completedSets === totalSets),
     isPartial: completedSets > 0 && completedSets < totalSets && !log.completed,
   };
@@ -388,6 +400,13 @@ export function HistoryProgressView({
               </p>
               <p className="text-[#9CA3AF]">
                 {t('Volume', 'Volume')} {selectedLogStats.totalVolume.toLocaleString(locale)} kg
+                {selectedLogStats.totalTimedSeconds > 0 && (
+                  <>
+                    {' · '}
+                    {t('Durasi', 'Duration')}{' '}
+                    {formatCompactDuration(selectedLogStats.totalTimedSeconds, lang)}
+                  </>
+                )}
               </p>
             </div>
           )}
@@ -404,6 +423,13 @@ export function HistoryProgressView({
               {selectedLog.entries.map((entry) => {
                 const doneSets = entry.sets.filter((s) => s.completed);
                 const muscleLabel = MUSCLE_LABELS[lang][entry.muscleGroup] || entry.muscleGroup;
+                const mode = resolveExerciseTrackingMode(entry);
+                const usesWeight = resolveExerciseUsesWeight({
+                  usesWeight: entry.usesWeight,
+                  trackingMode: mode,
+                  targetWeightKg: entry.sets[0]?.weightKg ?? 0,
+                });
+
                 return (
                   <li key={entry.exerciseId} className="py-3 first:pt-1 last:pb-0">
                     <div className="flex items-baseline justify-between gap-3">
@@ -414,18 +440,34 @@ export function HistoryProgressView({
                     </div>
 
                     <div className="mt-2 flex flex-wrap gap-2">
-                      {entry.sets.map((set) => (
-                        <span
-                          key={set.setNumber}
-                          className={`rounded-lg border px-2.5 py-1 font-mono text-xs tabular-nums ${
-                            set.completed
-                              ? 'border-[#C8FF2E]/35 bg-[#C8FF2E]/10 text-[#F4F5F7]'
-                              : 'border-white/10 bg-[#0A0B0E] text-[#6B7280]'
-                          }`}
-                        >
-                          S{set.setNumber}: {set.weightKg}kg × {set.reps}
-                        </span>
-                      ))}
+                      {entry.sets.map((set) => {
+                        let summaryText = `S${set.setNumber}: ${set.weightKg}kg × ${set.reps}`;
+                        if (mode === 'timer') {
+                          const durText = formatCompactDuration(
+                            set.durationSeconds ?? entry.targetDurationSeconds ?? 60,
+                            lang
+                          );
+                          summaryText =
+                            usesWeight && set.weightKg > 0
+                              ? `S${set.setNumber}: ${set.weightKg}kg · ${durText}`
+                              : `S${set.setNumber}: ${durText}`;
+                        } else if (!usesWeight) {
+                          summaryText = `S${set.setNumber}: ${set.reps} reps`;
+                        }
+
+                        return (
+                          <span
+                            key={set.setNumber}
+                            className={`rounded-lg border px-2.5 py-1 font-mono text-xs tabular-nums ${
+                              set.completed
+                                ? 'border-[#C8FF2E]/35 bg-[#C8FF2E]/10 text-[#F4F5F7]'
+                                : 'border-white/10 bg-[#0A0B0E] text-[#6B7280]'
+                            }`}
+                          >
+                            {summaryText}
+                          </span>
+                        );
+                      })}
                     </div>
                   </li>
                 );

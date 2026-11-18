@@ -2,21 +2,31 @@ import { useMemo, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  Clock,
+  Dumbbell,
   Edit3,
   Plus,
+  Repeat,
   Search,
+  Timer,
   Trash2,
   X,
 } from 'lucide-react';
 import { EXERCISE_LIBRARY } from '../data/presets';
+import { formatCompactDuration } from '../lib/dateUtils';
 import { DAY_LABELS, MUSCLE_LABELS, useI18n } from '../lib/i18n';
 import {
   DAY_LIST,
   DayKey,
   DaySchedule,
   ExerciseItem,
+  ExerciseTrackingMode,
   MUSCLE_GROUPS,
   MuscleGroup,
+  resolveExerciseTrackingMode,
+  resolveExerciseUsesWeight,
+  resolveTargetDurationSeconds,
+  TimerDirection,
 } from '../types/gym';
 
 interface ExerciseManagerViewProps {
@@ -37,13 +47,34 @@ interface ExerciseManagerViewProps {
   ) => Promise<void>;
 }
 
-const EMPTY_FORM: Omit<ExerciseItem, 'id'> = {
+interface ExerciseFormState {
+  name: string;
+  muscleGroup: MuscleGroup;
+  equipment: string;
+  trackingMode: ExerciseTrackingMode;
+  usesWeight: boolean;
+  timerDirection: TimerDirection;
+  targetSets: number;
+  targetReps: string;
+  targetWeightKg: number;
+  durationMinutes: number;
+  durationSeconds: number;
+  restSeconds: number;
+  notes: string;
+}
+
+const EMPTY_FORM: ExerciseFormState = {
   name: '',
   muscleGroup: 'Dada',
   equipment: 'Barbel',
+  trackingMode: 'reps',
+  usesWeight: true,
+  timerDirection: 'countdown',
   targetSets: 3,
   targetReps: '10-12',
   targetWeightKg: 20,
+  durationMinutes: 1,
+  durationSeconds: 0,
   restSeconds: 90,
   notes: '',
 };
@@ -62,7 +93,7 @@ export function ExerciseManagerView({
   const [muscleFilter, setMuscleFilter] = useState<'Semua' | MuscleGroup>('Semua');
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formState, setFormState] = useState<Omit<ExerciseItem, 'id'>>(EMPTY_FORM);
+  const [formState, setFormState] = useState<ExerciseFormState>(EMPTY_FORM);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   const schedule = schedules[selectedDayKey];
@@ -96,33 +127,106 @@ export function ExerciseManagerView({
   };
 
   const handleOpenEditForm = (ex: ExerciseItem) => {
+    const mode = resolveExerciseTrackingMode(ex);
+    const usesWeight = resolveExerciseUsesWeight(ex);
+    const totalDur = resolveTargetDurationSeconds(ex);
     setEditingId(ex.id);
     setFormState({
       name: ex.name,
       muscleGroup: ex.muscleGroup,
       equipment: ex.equipment,
+      trackingMode: mode,
+      usesWeight,
+      timerDirection: ex.timerDirection === 'countup' ? 'countup' : 'countdown',
       targetSets: ex.targetSets,
       targetReps: ex.targetReps,
       targetWeightKg: ex.targetWeightKg,
+      durationMinutes: Math.floor(totalDur / 60),
+      durationSeconds: totalDur % 60,
       restSeconds: ex.restSeconds,
       notes: ex.notes,
     });
     setShowCustomForm(true);
   };
 
+  const handleSwitchTrackingMode = (mode: ExerciseTrackingMode) => {
+    setFormState((prev) => {
+      if (mode === prev.trackingMode) return prev;
+      if (mode === 'timer') {
+        const defaultEquipment =
+          prev.equipment === 'Barbel' || !prev.equipment.trim() ? 'Tanpa Alat' : prev.equipment;
+        return {
+          ...prev,
+          trackingMode: 'timer',
+          usesWeight: false,
+          equipment: defaultEquipment,
+          targetWeightKg: 0,
+          targetSets: prev.targetSets === 3 ? 1 : prev.targetSets,
+        };
+      }
+      return {
+        ...prev,
+        trackingMode: 'reps',
+        targetReps: prev.targetReps || '10-12',
+      };
+    });
+  };
+
+  const handleToggleUsesWeight = (nextUsesWeight: boolean) => {
+    setFormState((prev) => {
+      let nextEquipment = prev.equipment;
+      if (!nextUsesWeight && (prev.equipment === 'Barbel' || !prev.equipment.trim())) {
+        nextEquipment = 'Tanpa Alat';
+      } else if (
+        nextUsesWeight &&
+        (prev.equipment === 'Tanpa Alat' || prev.equipment === 'Bodyweight')
+      ) {
+        nextEquipment = 'Barbel';
+      }
+      return {
+        ...prev,
+        usesWeight: nextUsesWeight,
+        equipment: nextEquipment,
+        targetWeightKg: nextUsesWeight ? prev.targetWeightKg || 10 : 0,
+      };
+    });
+  };
+
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.name.trim()) return;
 
+    const totalDur = Math.max(
+      5,
+      Math.min(
+        10800,
+        (Math.max(0, Number(formState.durationMinutes) || 0) * 60) +
+          Math.max(0, Math.min(59, Number(formState.durationSeconds) || 0))
+      )
+    );
+
+    const formattedTargetText =
+      formState.trackingMode === 'timer'
+        ? formatCompactDuration(totalDur, lang)
+        : formState.targetReps.trim().slice(0, 20) || '10';
+
     const cleanPayload: Omit<ExerciseItem, 'id'> = {
       name: formState.name.trim().slice(0, 60),
       muscleGroup: formState.muscleGroup,
-      equipment: formState.equipment.trim().slice(0, 40) || t('Bebas', 'Free Weights'),
-      targetSets: Math.max(1, Math.min(12, Number(formState.targetSets) || 3)),
-      targetReps: formState.targetReps.trim().slice(0, 20) || '10',
-      targetWeightKg: Math.max(0, Math.min(999, Number(formState.targetWeightKg) || 0)),
+      equipment:
+        formState.equipment.trim().slice(0, 40) ||
+        (formState.usesWeight ? t('Bebas', 'Free Weights') : t('Tanpa Alat', 'No Equipment')),
+      targetSets: Math.max(1, Math.min(12, Number(formState.targetSets) || 1)),
+      targetReps: formattedTargetText,
+      targetWeightKg: formState.usesWeight
+        ? Math.max(0, Math.min(999, Number(formState.targetWeightKg) || 0))
+        : 0,
       restSeconds: Math.max(15, Math.min(600, Number(formState.restSeconds) || 60)),
       notes: formState.notes.trim().slice(0, 200),
+      trackingMode: formState.trackingMode,
+      usesWeight: formState.usesWeight,
+      timerDirection: formState.timerDirection,
+      targetDurationSeconds: totalDur,
     };
 
     if (editingId) {
@@ -167,8 +271,8 @@ export function ExerciseManagerView({
           </h1>
           <p className="mt-1 text-sm text-[#9CA3AF]">
             {t(
-              'Susun variasi gerakan, target set, repetisi, beban awal, dan waktu istirahat untuk setiap hari latihan.',
-              'Configure exercises, target sets, reps, starting weight, and rest duration for each training day.'
+              'Susun gerakan berbasis repetisi beban, gerakan tanpa alat, maupun gerakan timer seperti Plank dan Incline Walk.',
+              'Configure rep-based lifting, bodyweight movements, or timed exercises like Plank and Incline Walk.'
             )}
           </p>
         </div>
@@ -215,7 +319,7 @@ export function ExerciseManagerView({
       {showCustomForm && (
         <form
           onSubmit={handleSubmitForm}
-          className="rounded-2xl border border-[#C8FF2E]/40 bg-[#13161C] p-5 space-y-4"
+          className="rounded-2xl border border-[#C8FF2E]/40 bg-[#13161C] p-5 space-y-5"
         >
           <div className="flex items-center justify-between">
             <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
@@ -232,6 +336,62 @@ export function ExerciseManagerView({
             </button>
           </div>
 
+          {/* Tracking Mode Selector */}
+          <div className="space-y-2">
+            <label className="block text-xs font-medium text-[#9CA3AF]">
+              {t('Mode Pelacakan Gerakan', 'Exercise Tracking Mode')}
+            </label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => handleSwitchTrackingMode('reps')}
+                className={`flex min-h-[52px] items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                  formState.trackingMode === 'reps'
+                    ? 'border-[#C8FF2E] bg-[#C8FF2E]/12 text-[#F4F5F7]'
+                    : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                }`}
+              >
+                <Repeat
+                  className={`h-4 w-4 shrink-0 ${
+                    formState.trackingMode === 'reps' ? 'text-[#C8FF2E]' : 'text-[#6B7280]'
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#F4F5F7]">
+                    {t('Set & Repetisi', 'Sets & Reps')}
+                  </p>
+                  <p className="text-[11px] text-[#9CA3AF]">
+                    {t('Angkat beban, Push-Up, Pull-Up, dll.', 'Weightlifting, Push-Ups, Pull-Ups, etc.')}
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSwitchTrackingMode('timer')}
+                className={`flex min-h-[52px] items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                  formState.trackingMode === 'timer'
+                    ? 'border-[#38BDF8] bg-[#38BDF8]/12 text-[#F4F5F7]'
+                    : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                }`}
+              >
+                <Timer
+                  className={`h-4 w-4 shrink-0 ${
+                    formState.trackingMode === 'timer' ? 'text-[#38BDF8]' : 'text-[#6B7280]'
+                  }`}
+                />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-[#F4F5F7]">
+                    {t('Timer Durasi', 'Duration Timer')}
+                  </p>
+                  <p className="text-[11px] text-[#9CA3AF]">
+                    {t('Plank, Incline Walk, Lari, Wall Sit, dll.', 'Plank, Incline Walk, Running, Wall Sit, etc.')}
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
@@ -243,7 +403,11 @@ export function ExerciseManagerView({
                 maxLength={60}
                 value={formState.name}
                 onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                placeholder={t('Misal: Incline Dumbbell Press', 'e.g. Incline Dumbbell Press')}
+                placeholder={
+                  formState.trackingMode === 'timer'
+                    ? t('Misal: Plank / Incline Walk', 'e.g. Plank / Incline Walk')
+                    : t('Misal: Push-Up / Bench Press', 'e.g. Push-Up / Bench Press')
+                }
                 className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
               />
             </div>
@@ -267,6 +431,41 @@ export function ExerciseManagerView({
               </select>
             </div>
 
+            {/* No-Weight / Bodyweight Toggle */}
+            <div className="sm:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] px-4 py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Dumbbell className="h-4 w-4 shrink-0 text-[#9CA3AF]" />
+                  <div>
+                    <p className="text-xs font-bold text-[#F4F5F7]">
+                      {t('Tanpa Beban / Alat (Bodyweight)', 'No Weight / Bodyweight')}
+                    </p>
+                    <p className="text-[11px] text-[#9CA3AF]">
+                      {t(
+                        'Aktifkan untuk menyembunyikan kolom beban (kg) saat berlatih.',
+                        'Enable to hide the Weight (kg) column while logging.'
+                      )}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={!formState.usesWeight}
+                  onClick={() => handleToggleUsesWeight(!formState.usesWeight)}
+                  className={`min-h-[38px] rounded-lg px-3.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
+                    !formState.usesWeight
+                      ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                      : 'border border-white/15 bg-[#1A1E26] text-[#D1D5DB] hover:border-white/30'
+                  }`}
+                >
+                  {!formState.usesWeight
+                    ? t('Tanpa Beban: Aktif', 'No Weight: On')
+                    : t('Pakai Beban (kg)', 'Uses Weight (kg)')}
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
                 {t('Alat / Peralatan', 'Equipment')}
@@ -277,60 +476,152 @@ export function ExerciseManagerView({
                 value={formState.equipment}
                 onChange={(e) => setFormState({ ...formState, equipment: e.target.value })}
                 placeholder={t(
-                  'Barbel, Dumbbell, Mesin, Bodyweight',
-                  'Barbell, Dumbbell, Machine, Bodyweight'
+                  'Tanpa Alat, Treadmill, Barbel, Dumbbell',
+                  'No Equipment, Treadmill, Barbell, Dumbbell'
                 )}
                 className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {formState.trackingMode === 'reps' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
+                    {t('Target Set', 'Target Sets')}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={formState.targetSets}
+                    onChange={(e) =>
+                      setFormState({ ...formState, targetSets: Number(e.target.value) })
+                    }
+                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
+                    {t('Target Reps', 'Target Reps')}
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={20}
+                    value={formState.targetReps}
+                    onChange={(e) => setFormState({ ...formState, targetReps: e.target.value })}
+                    placeholder="8-12"
+                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2.5">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
+                    {t('Set', 'Sets')}
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={12}
+                    value={formState.targetSets}
+                    onChange={(e) =>
+                      setFormState({ ...formState, targetSets: Number(e.target.value) })
+                    }
+                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
+                    {t('Menit', 'Minutes')}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={180}
+                    value={formState.durationMinutes}
+                    onChange={(e) =>
+                      setFormState({
+                        ...formState,
+                        durationMinutes: Math.max(0, Math.min(180, Number(e.target.value) || 0)),
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
+                    {t('Detik', 'Seconds')}
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={59}
+                    value={formState.durationSeconds}
+                    onChange={(e) =>
+                      setFormState({
+                        ...formState,
+                        durationSeconds: Math.max(0, Math.min(59, Number(e.target.value) || 0)),
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {formState.trackingMode === 'timer' && (
+              <div className="sm:col-span-2">
+                <label className="mb-1.5 block text-xs font-medium text-[#9CA3AF]">
+                  {t('Arah Timer Bawaan', 'Default Timer Mode')}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormState({ ...formState, timerDirection: 'countdown' })}
+                    className={`flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold transition-colors ${
+                      formState.timerDirection === 'countdown'
+                        ? 'border-[#38BDF8] bg-[#38BDF8]/15 text-[#F4F5F7]'
+                        : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:text-[#F4F5F7]'
+                    }`}
+                  >
+                    <Timer className="h-3.5 w-3.5 text-[#38BDF8]" />
+                    {t('Hitung Mundur', 'Countdown')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormState({ ...formState, timerDirection: 'countup' })}
+                    className={`flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold transition-colors ${
+                      formState.timerDirection === 'countup'
+                        ? 'border-[#C8FF2E] bg-[#C8FF2E]/15 text-[#F4F5F7]'
+                        : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:text-[#F4F5F7]'
+                    }`}
+                  >
+                    <Clock className="h-3.5 w-3.5 text-[#C8FF2E]" />
+                    {t('Hitung Maju (Stopwatch)', 'Count-Up (Stopwatch)')}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {formState.usesWeight && (
               <div>
                 <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
-                  {t('Target Set', 'Target Sets')}
+                  {t('Beban Awal (kg)', 'Starting Weight (kg)')}
                 </label>
                 <input
                   type="number"
-                  min={1}
-                  max={12}
-                  value={formState.targetSets}
+                  min={0}
+                  max={999}
+                  step="0.5"
+                  value={formState.targetWeightKg}
                   onChange={(e) =>
-                    setFormState({ ...formState, targetSets: Number(e.target.value) })
+                    setFormState({ ...formState, targetWeightKg: Number(e.target.value) })
                   }
                   className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
-                  {t('Target Reps', 'Target Reps')}
-                </label>
-                <input
-                  type="text"
-                  maxLength={20}
-                  value={formState.targetReps}
-                  onChange={(e) => setFormState({ ...formState, targetReps: e.target.value })}
-                  placeholder="8-12"
-                  className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
-                {t('Beban Awal (kg)', 'Starting Weight (kg)')}
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={999}
-                step="0.5"
-                value={formState.targetWeightKg}
-                onChange={(e) =>
-                  setFormState({ ...formState, targetWeightKg: Number(e.target.value) })
-                }
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
-              />
-            </div>
+            )}
 
             <div>
               <label className="mb-1 block text-xs font-medium text-[#9CA3AF]">
@@ -360,8 +651,8 @@ export function ExerciseManagerView({
               value={formState.notes}
               onChange={(e) => setFormState({ ...formState, notes: e.target.value })}
               placeholder={t(
-                'Misal: Turunkan beban 3 detik, tahan sebentar di bawah.',
-                'e.g. Control the eccentric for 3s, pause at the bottom.'
+                'Misal: Tahan posisi lurus, atau incline 10% kecepatan 5 km/jam.',
+                'e.g. Keep a straight line, or 10% incline at 5 km/h.'
               )}
               className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
             />
@@ -405,67 +696,85 @@ export function ExerciseManagerView({
           </div>
         ) : (
           <div className="divide-y divide-white/10 rounded-2xl border border-white/10 bg-[#13161C]">
-            {schedule.exercises.map((ex, idx) => (
-              <div
-                key={ex.id}
-                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold text-[#F4F5F7]">
-                    <span className="mr-2 font-mono text-xs text-[#C8FF2E]">
-                      {String(idx + 1).padStart(2, '0')}.
-                    </span>
-                    {ex.name}
-                  </p>
-                  <p className="mt-1 text-xs text-[#9CA3AF]">
-                    {MUSCLE_LABELS[lang][ex.muscleGroup]} · {ex.equipment} ·{' '}
-                    <span className="font-mono tabular-nums">
-                      {ex.targetSets}×{ex.targetReps}
-                    </span>{' '}
-                    · <span className="font-mono tabular-nums">{ex.targetWeightKg} kg</span> ·{' '}
-                    {t('Istirahat', 'Rest')} {ex.restSeconds}
-                    {secUnit}
-                  </p>
-                </div>
+            {schedule.exercises.map((ex, idx) => {
+              const mode = resolveExerciseTrackingMode(ex);
+              const usesWeight = resolveExerciseUsesWeight(ex);
+              const targetDur = resolveTargetDurationSeconds(ex);
+              return (
+                <div
+                  key={ex.id}
+                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="font-semibold text-[#F4F5F7]">
+                      <span className="mr-2 font-mono text-xs text-[#C8FF2E]">
+                        {String(idx + 1).padStart(2, '0')}.
+                      </span>
+                      {ex.name}
+                    </p>
+                    <p className="mt-1 text-xs text-[#9CA3AF]">
+                      {MUSCLE_LABELS[lang][ex.muscleGroup]} · {ex.equipment} ·{' '}
+                      {mode === 'timer' ? (
+                        <span className="font-mono tabular-nums text-[#38BDF8]">
+                          {t('Timer', 'Timer')} {ex.targetSets}×{formatCompactDuration(targetDur, lang)}
+                        </span>
+                      ) : (
+                        <span className="font-mono tabular-nums">
+                          {ex.targetSets}×{ex.targetReps}
+                        </span>
+                      )}
+                      {usesWeight ? (
+                        <>
+                          {' '}
+                          · <span className="font-mono tabular-nums">{ex.targetWeightKg} kg</span>
+                        </>
+                      ) : (
+                        <> · {t('Tanpa Beban', 'Bodyweight')}</>
+                      )}{' '}
+                      · {t('Istirahat', 'Rest')} {ex.restSeconds}
+                      {secUnit}
+                    </p>
+                  </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    disabled={idx === 0}
-                    aria-label={`${t('Geser ke atas', 'Move up')}: ${ex.name}`}
-                    onClick={() => onMoveExercise(selectedDayKey, ex.id, 'up')}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7] disabled:opacity-30"
-                  >
-                    <ArrowUp className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={idx === schedule.exercises.length - 1}
-                    aria-label={`${t('Geser ke bawah', 'Move down')}: ${ex.name}`}
-                    onClick={() => onMoveExercise(selectedDayKey, ex.id, 'down')}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7] disabled:opacity-30"
-                  >
-                    <ArrowDown className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Edit ${ex.name}`}
-                    onClick={() => handleOpenEditForm(ex)}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#D1D5DB] hover:border-[#C8FF2E]"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`${t('Hapus', 'Delete')} ${ex.name}`}
-                    onClick={() => onRemoveExercise(selectedDayKey, ex.id)}
-                    className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:border-[#DC2626]/60 hover:text-[#FCA5A5]"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      aria-label={`${t('Geser ke atas', 'Move up')}: ${ex.name}`}
+                      onClick={() => onMoveExercise(selectedDayKey, ex.id, 'up')}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7] disabled:opacity-30"
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === schedule.exercises.length - 1}
+                      aria-label={`${t('Geser ke bawah', 'Move down')}: ${ex.name}`}
+                      onClick={() => onMoveExercise(selectedDayKey, ex.id, 'down')}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7] disabled:opacity-30"
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Edit ${ex.name}`}
+                      onClick={() => handleOpenEditForm(ex)}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#D1D5DB] hover:border-[#C8FF2E]"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`${t('Hapus', 'Delete')} ${ex.name}`}
+                      onClick={() => onRemoveExercise(selectedDayKey, ex.id)}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:border-[#DC2626]/60 hover:text-[#FCA5A5]"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -513,30 +822,42 @@ export function ExerciseManagerView({
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {filteredLibrary.map((preset) => (
-            <div
-              key={preset.name}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#13161C] p-4"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-[#F4F5F7]">{preset.name}</p>
-                <p className="mt-1 text-xs text-[#9CA3AF]">
-                  {MUSCLE_LABELS[lang][preset.muscleGroup]} · {preset.equipment} ·{' '}
-                  <span className="font-mono tabular-nums">
-                    {preset.targetSets}×{preset.targetReps}
-                  </span>
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleQuickAddPreset(preset)}
-                className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[#C8FF2E]/40 bg-[#C8FF2E]/10 px-3 py-2 text-xs font-bold text-[#C8FF2E] hover:bg-[#C8FF2E] hover:text-[#0A0B0E] whitespace-nowrap shrink-0"
+          {filteredLibrary.map((preset) => {
+            const mode = resolveExerciseTrackingMode(preset);
+            return (
+              <div
+                key={preset.name}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#13161C] p-4"
               >
-                <Plus className="h-3.5 w-3.5" />
-                {t('Tambah', 'Add')}
-              </button>
-            </div>
-          ))}
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-[#F4F5F7]">{preset.name}</p>
+                  <p className="mt-1 text-xs text-[#9CA3AF]">
+                    {MUSCLE_LABELS[lang][preset.muscleGroup]} · {preset.equipment} ·{' '}
+                    <span
+                      className={`font-mono tabular-nums ${
+                        mode === 'timer' ? 'text-[#38BDF8]' : ''
+                      }`}
+                    >
+                      {mode === 'timer'
+                        ? `${t('Timer', 'Timer')} ${preset.targetSets}×${formatCompactDuration(
+                            resolveTargetDurationSeconds(preset),
+                            lang
+                          )}`
+                        : `${preset.targetSets}×${preset.targetReps}`}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleQuickAddPreset(preset)}
+                  className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[#C8FF2E]/40 bg-[#C8FF2E]/10 px-3 py-2 text-xs font-bold text-[#C8FF2E] hover:bg-[#C8FF2E] hover:text-[#0A0B0E] whitespace-nowrap shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {t('Tambah', 'Add')}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>
