@@ -4,12 +4,13 @@ import {
   formatClockTime,
   NextAlarmInfo,
 } from '../lib/dateUtils';
-import { useI18n } from '../lib/i18n';
+import { DayTimePhase, PHASE_THEME_TOKENS, useI18n } from '../lib/i18n';
 import { UserProfile } from '../types/gym';
 import { PWAInstallCard } from './PWAInstallBanner';
 
 interface RightUtilityPanelProps {
   now: Date;
+  timePhase: DayTimePhase;
   nextAlarm: NextAlarmInfo | null;
   audioUnlocked: boolean;
   onUnlockAudio: () => Promise<void>;
@@ -24,6 +25,7 @@ interface RightUtilityPanelProps {
 
 export function RightUtilityPanel({
   now,
+  timePhase,
   nextAlarm,
   audioUnlocked,
   onUnlockAudio,
@@ -37,14 +39,24 @@ export function RightUtilityPanel({
 }: RightUtilityPanelProps) {
   const { lang, setLang, clockFormat, t } = useI18n();
   const formattedClock = formatClockTime(now, clockFormat, true);
+  const phaseToken = PHASE_THEME_TOKENS[timePhase];
+  const phaseLabel =
+    timePhase === 'morning'
+      ? t('Pagi', 'Morning')
+      : timePhase === 'afternoon'
+        ? t('Siang', 'Afternoon')
+        : t('Malam', 'Night');
 
   return (
     <aside className="space-y-5">
       {/* Live Clock & Next Alarm Card */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+      <section
+        className={`glass-surface rounded-2xl border p-5 transition-colors duration-500 ${phaseToken.subtleBorder}`}
+      >
         <div className="flex items-center justify-between text-xs text-[#9CA3AF]">
           <span className="font-semibold uppercase tracking-wider">
-            {t('Jam & Alarm Berikutnya', 'Clock & Next Alarm')}
+            {t('Jam & Alarm Berikutnya', 'Clock & Next Alarm')} ·{' '}
+            <span className={phaseToken.labelClass}>{phaseLabel}</span>
           </span>
           {!audioUnlocked && (
             <button
@@ -93,7 +105,7 @@ export function RightUtilityPanel({
       </section>
 
       {/* Account Sync, Language, Tutorial & About Card */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-3">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-[#F4F5F7]">
@@ -151,7 +163,7 @@ export function RightUtilityPanel({
           <button
             type="button"
             onClick={onOpenTutorial}
-            className="flex min-h-[42px] w-full items-center justify-between rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 py-2 text-xs font-semibold text-[#D1D5DB] transition-colors hover:border-[#C8FF2E]/40 hover:text-[#C8FF2E]"
+            className="flex min-h-[42px] w-full items-center justify-between rounded-xl border border-white/10 bg-[#0A0B0E]/60 px-3.5 py-2 text-xs font-semibold text-[#D1D5DB] transition-all duration-150 hover:border-[#C8FF2E]/40 hover:text-[#C8FF2E] active:scale-[0.98]"
           >
             <span className="inline-flex items-center gap-2">
               <HelpCircle className="h-4 w-4 text-[#C8FF2E]" />
@@ -165,10 +177,10 @@ export function RightUtilityPanel({
           <button
             type="button"
             onClick={onOpenSettings}
-            className={`flex min-h-[42px] w-full items-center justify-between rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors ${
+            className={`flex min-h-[42px] w-full items-center justify-between rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all duration-150 active:scale-[0.98] ${
               isSettingsActive
-                ? 'border-[#C8FF2E] bg-[#C8FF2E]/12 text-[#C8FF2E]'
-                : 'border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/25 hover:text-[#F4F5F7]'
+                ? 'border-[#C8FF2E] bg-[#C8FF2E]/15 text-[#C8FF2E]'
+                : 'border-white/10 bg-[#0A0B0E]/60 text-[#D1D5DB] hover:border-white/25 hover:text-[#F4F5F7]'
             }`}
           >
             <span className="inline-flex items-center gap-2">
@@ -183,10 +195,10 @@ export function RightUtilityPanel({
           <button
             type="button"
             onClick={onOpenAbout}
-            className={`flex min-h-[42px] w-full items-center justify-between rounded-xl border px-3.5 py-2 text-xs font-semibold transition-colors ${
+            className={`flex min-h-[42px] w-full items-center justify-between rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all duration-150 active:scale-[0.98] ${
               isAboutActive
-                ? 'border-[#C8FF2E] bg-[#C8FF2E]/12 text-[#C8FF2E]'
-                : 'border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/25 hover:text-[#F4F5F7]'
+                ? 'border-[#C8FF2E] bg-[#C8FF2E]/15 text-[#C8FF2E]'
+                : 'border-white/10 bg-[#0A0B0E]/60 text-[#D1D5DB] hover:border-white/25 hover:text-[#F4F5F7]'
             }`}
           >
             <span className="inline-flex items-center gap-2">

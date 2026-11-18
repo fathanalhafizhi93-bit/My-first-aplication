@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { AboutView } from './components/AboutView';
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
@@ -29,7 +29,12 @@ import {
   formatLocalDateKey,
   getTodayDayKey,
 } from './lib/dateUtils';
-import { LanguageProvider, useI18n } from './lib/i18n';
+import {
+  LanguageProvider,
+  PHASE_THEME_TOKENS,
+  resolveDayTimePhase,
+  useI18n,
+} from './lib/i18n';
 import { syncNativeWeeklyAlarms } from './lib/nativeAlarmBridge';
 import {
   AppTab,
@@ -53,7 +58,7 @@ interface CooldownAlertTarget {
 }
 
 function AppContent() {
-  const { lang, t } = useI18n();
+  const { lang, t, todayThemeMode } = useI18n();
   const {
     user,
     authReady,
@@ -93,6 +98,8 @@ function AppContent() {
   const [exerciseDayKey, setExerciseDayKey] = useState<DayKey>(todayDayKey);
   const [now, setNow] = useState<Date>(() => new Date());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const timePhase = resolveDayTimePhase(todayThemeMode, now);
+  const phaseToken = PHASE_THEME_TOKENS[timePhase];
 
   // Midnight day-change detection + mascot reaction state
   const lastDateKeyRef = useRef<string>(formatLocalDateKey());
@@ -772,6 +779,7 @@ function AppContent() {
         <div className="min-h-screen bg-[#0A0B0E] text-[#F4F5F7]">
           <TopBar
             activeTab={activeTab}
+            timePhase={timePhase}
             onSelectTab={setActiveTab}
             onTestAlarm={() => {}}
           />
@@ -793,19 +801,44 @@ function AppContent() {
 
     return (
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className="min-h-screen bg-[#0A0B0E] text-[#F4F5F7]"
+        initial={{ opacity: 0, scale: 0.985 }}
+        animate={{
+          opacity: showIntro ? 0.72 : 1,
+          scale: showIntro ? 0.978 : 1,
+        }}
+        transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
+        className="relative min-h-screen bg-[#0A0B0E] text-[#F4F5F7]"
       >
+        {/* Lightweight Fixed Atmospheric Time-of-Day Ambient Glow & Glass Refraction Orbs */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[440px] transition-opacity duration-500"
+          style={{ background: phaseToken.ambientGlow }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed -left-24 top-28 z-0 h-80 w-80 rounded-full opacity-25 transition-colors duration-500"
+          style={{
+            background: `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed -right-24 top-44 z-0 h-96 w-96 rounded-full opacity-20 transition-colors duration-500"
+          style={{
+            background: `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
+          }}
+        />
+
         <TopBar
           activeTab={activeTab}
+          timePhase={timePhase}
           onSelectTab={setActiveTab}
           onTestAlarm={handleTestAlarm}
         />
 
         {restFinishedBanner && (
-          <div className="border-b border-[#16A34A]/40 bg-[#16A34A]/15 px-4 py-2.5 text-center text-xs font-semibold text-[#86EFAC]">
+          <div className="relative z-10 border-b border-[#16A34A]/40 bg-[#16A34A]/15 px-4 py-2.5 text-center text-xs font-semibold text-[#86EFAC]">
             {t(
               'Waktu istirahat selesai — lanjutkan set berikutnya.',
               'Rest time finished — start your next set.'
@@ -813,7 +846,7 @@ function AppContent() {
           </div>
         )}
 
-        <main className="mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-12 lg:px-8">
+        <main className="relative z-10 mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-12 lg:px-8">
           <div className="mb-5 lg:hidden">
             <PWAInstallCard />
           </div>
@@ -823,10 +856,10 @@ function AppContent() {
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
+                  initial={{ opacity: 0, y: 6, scale: 0.992 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.995 }}
+                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
                 >
                   {activeTab === 'today' && (
                     <TodayWorkoutView
@@ -932,6 +965,7 @@ function AppContent() {
             <div className="lg:col-span-4 lg:sticky lg:top-24">
               <RightUtilityPanel
                 now={now}
+                timePhase={timePhase}
                 nextAlarm={nextAlarm}
                 audioUnlocked={audioUnlocked}
                 onUnlockAudio={handleUnlockAudio}
@@ -949,6 +983,7 @@ function AppContent() {
 
         <MobileBottomNav
           activeTab={activeTab}
+          timePhase={timePhase}
           onSelectTab={setActiveTab}
           restRemaining={restRemaining}
           restRunning={restRunning}
@@ -987,7 +1022,12 @@ function AppContent() {
   return (
     <>
       <AnimatePresence>
-        {showIntro && <LaunchIntro onComplete={() => setShowIntro(false)} />}
+        {showIntro && (
+          <LaunchIntro
+            timePhase={timePhase}
+            onComplete={() => setShowIntro(false)}
+          />
+        )}
       </AnimatePresence>
       {renderBody()}
     </>
@@ -996,8 +1036,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
+    <MotionConfig reducedMotion="user">
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </MotionConfig>
   );
 }

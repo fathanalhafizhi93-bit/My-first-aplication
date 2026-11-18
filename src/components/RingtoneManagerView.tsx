@@ -200,7 +200,7 @@ export function RingtoneManagerView({
 
       {/* Android APK Native Background Alarm Diagnostics */}
       {runningNativeAndroid && (
-        <section className="rounded-2xl border border-[#C8FF2E]/30 bg-[#13161C] p-5 space-y-4">
+        <section className="glass-surface rounded-2xl border border-[#C8FF2E]/30 p-5 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
               <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-[#C8FF2E]" />
@@ -310,7 +310,7 @@ export function RingtoneManagerView({
       )}
 
       {/* Master Audio & Behavior Controls */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-5">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
         <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
           {t('Preferensi Suara & Notifikasi', 'Sound & Notification Preferences')}
         </h2>
@@ -431,7 +431,7 @@ export function RingtoneManagerView({
       </section>
 
       {/* Upload Custom Ringtone */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-4">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">
         <div>
           <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
             {t('Unggah Ringtone Sendiri', 'Upload Custom Ringtone')}
@@ -574,7 +574,7 @@ export function RingtoneManagerView({
           {t('Nada Alarm Bawaan IronPulse', 'Built-in IronPulse Alarm Tones')}
         </h2>
 
-        <div className="divide-y divide-white/10 rounded-2xl border border-white/10 bg-[#13161C]">
+        <div className="glass-surface divide-y divide-white/10 rounded-2xl border border-white/12">
           {BUILTIN_RINGTONES.map((rt) => {
             const isPlaying = playingId === rt.id;
             const isMain = profile.defaultRingtoneId === rt.id;

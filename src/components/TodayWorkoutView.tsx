@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   Check,
   ChevronDown,
@@ -25,7 +26,9 @@ import {
 } from '../lib/dateUtils';
 import {
   DAY_LABELS,
+  DayTimePhase,
   MUSCLE_LABELS,
+  PHASE_THEME_TOKENS,
   resolveDayTimePhase,
   useI18n,
 } from '../lib/i18n';
@@ -104,29 +107,11 @@ interface TodayWorkoutViewProps {
   onOpenScheduleManager: () => void;
 }
 
-const PHASE_HERO_STYLES = {
-  morning: {
-    gradient: 'from-[#2D1F0D]/90 via-[#15120D]/90 to-[#0A0B0E]/95',
-    border: 'border-[#F59E0B]/25',
-    emblemBox: 'border-[#F59E0B]/40 bg-[#F59E0B]/15 text-[#FBBF24]',
-    badgeText: 'text-[#FBBF24]',
-    Icon: Sunrise,
-  },
-  afternoon: {
-    gradient: 'from-[#0D2136]/90 via-[#101824]/90 to-[#0A0B0E]/95',
-    border: 'border-[#38BDF8]/25',
-    emblemBox: 'border-[#38BDF8]/40 bg-[#38BDF8]/15 text-[#38BDF8]',
-    badgeText: 'text-[#38BDF8]',
-    Icon: Sun,
-  },
-  night: {
-    gradient: 'from-[#161433]/90 via-[#111320]/90 to-[#0A0B0E]/95',
-    border: 'border-[#818CF8]/25',
-    emblemBox: 'border-[#818CF8]/40 bg-[#818CF8]/15 text-[#A5B4FC]',
-    badgeText: 'text-[#A5B4FC]',
-    Icon: Moon,
-  },
-} as const;
+const PHASE_ICONS: Record<DayTimePhase, typeof Sunrise> = {
+  morning: Sunrise,
+  afternoon: Sun,
+  night: Moon,
+};
 
 export function TodayWorkoutView({
   now,
@@ -170,8 +155,8 @@ export function TodayWorkoutView({
   const activeSchedule = schedules[todayDayKey];
   const dayLabel = DAY_LABELS[lang][todayDayKey].label;
   const timePhase = resolveDayTimePhase(todayThemeMode, now);
-  const phaseStyle = PHASE_HERO_STYLES[timePhase];
-  const PhaseIcon = phaseStyle.Icon;
+  const phaseToken = PHASE_THEME_TOKENS[timePhase];
+  const PhaseIcon = PHASE_ICONS[timePhase];
   const formattedClock = formatClockTime(now, clockFormat, true);
   const formattedAlarm = formatAlarmTime(activeSchedule.alarmTime, clockFormat);
 
@@ -181,6 +166,9 @@ export function TodayWorkoutView({
     0
   );
   const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
+
+  const activeTimerEntry = todayEntries.find((e) => exerciseTimers[e.exerciseId]?.running);
+  const hasAnyTimerRunning = Boolean(activeTimerEntry);
 
   const totalVolumeKg = todayEntries.reduce((acc, e) => {
     if (resolveExerciseTrackingMode(e) === 'timer') return acc;
@@ -202,20 +190,32 @@ export function TodayWorkoutView({
     );
   }, 0);
 
-  // Determine circular mascot animation mood dynamically
+  // Determine character avatar reaction mood dynamically
   let mascotMood: MascotMood = 'ready';
   if (justClapped) {
-    mascotMood = totalSets > 0 && completedSets === totalSets ? 'celebrate' : 'clap';
-  } else if (dayJustChanged || isOpeningGreeting) {
-    mascotMood = 'welcome';
+    if (totalSets > 0 && completedSets === totalSets) {
+      mascotMood = 'celebrate';
+    } else if (progressPct >= 50) {
+      mascotMood = 'milestone';
+    } else {
+      mascotMood = 'clap';
+    }
   } else if (!activeSchedule.isGymDay) {
     mascotMood = 'restday';
   } else if (totalSets > 0 && completedSets === totalSets) {
     mascotMood = 'celebrate';
+  } else if (hasAnyTimerRunning) {
+    mascotMood = 'timerActive';
   } else if (restRunning) {
     mascotMood = 'rest';
+  } else if (dayJustChanged || isOpeningGreeting) {
+    mascotMood = 'welcome';
   } else if (completedSets === 0) {
     mascotMood = 'welcome';
+  } else if (progressPct >= 50) {
+    mascotMood = 'milestone';
+  } else if (completedSets > 0) {
+    mascotMood = 'starting';
   }
 
   const restProgressRatio =
@@ -239,9 +239,9 @@ export function TodayWorkoutView({
 
   return (
     <div className="space-y-6">
-      {/* Focused Hero Banner */}
+      {/* Focused Hero Banner with Frosted Dark Glass & Time-of-Day Atmosphere */}
       <section
-        className={`relative overflow-hidden rounded-2xl border bg-[#13161C] transition-colors duration-300 ${phaseStyle.border}`}
+        className={`glass-surface relative overflow-hidden rounded-2xl border transition-colors duration-300 ${phaseToken.heroBorder}`}
       >
         {!imgFailed ? (
           <img
@@ -249,18 +249,29 @@ export function TodayWorkoutView({
             alt={t('Suasana ruang latihan gym', 'Gym training arena backdrop')}
             referrerPolicy="no-referrer"
             onError={() => setImgFailed(true)}
-            className="absolute inset-0 h-full w-full object-cover opacity-20"
+            className="absolute inset-0 h-full w-full object-cover opacity-15"
           />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-[#1A1E26] to-[#0A0B0E]" />
         )}
-        <div className={`absolute inset-0 bg-gradient-to-br ${phaseStyle.gradient}`} />
+        <div className={`absolute inset-0 bg-gradient-to-br ${phaseToken.heroGradient}`} />
+
+        {/* Lightweight Decorative Horizon Arc */}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 400 120"
+          className="pointer-events-none absolute -right-10 -top-6 h-36 w-72 opacity-20"
+          fill="none"
+        >
+          <circle cx="280" cy="40" r="110" stroke={phaseToken.accent} strokeWidth="1.5" strokeDasharray="5 6" />
+          <circle cx="280" cy="40" r="74" stroke={phaseToken.accentBright} strokeWidth="1" />
+        </svg>
 
         <div className="relative z-10 p-5 sm:p-7 space-y-5">
           {/* Row 1: Enlarged Time-of-Day Emblem + Live Real Clock */}
           <div className="flex items-center gap-3.5 sm:gap-4">
             <div
-              className={`flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl border ${phaseStyle.emblemBox}`}
+              className={`flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl border transition-colors duration-300 ${phaseToken.emblemClass}`}
             >
               <PhaseIcon className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={2.2} />
             </div>
@@ -278,7 +289,7 @@ export function TodayWorkoutView({
               </div>
 
               <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className={`text-sm sm:text-base font-bold tracking-tight ${phaseStyle.badgeText}`}>
+                <span className={`text-sm sm:text-base font-bold tracking-tight ${phaseToken.labelClass}`}>
                   {phaseLabel}
                 </span>
                 <span aria-hidden="true" className="text-[#6B7280]">
@@ -311,11 +322,15 @@ export function TodayWorkoutView({
             </h1>
           </div>
 
-          {/* Circular Animated Companion Mascot */}
+          {/* Interactive Modern Coach Avatar */}
           <TodayMascot
             mood={mascotMood}
             timePhase={timePhase}
             restRemainingFormatted={restRunning ? formatRestDuration(restRemaining) : undefined}
+            activeTimerExerciseName={activeTimerEntry?.name}
+            progressPct={progressPct}
+            completedSets={completedSets}
+            totalSets={totalSets}
             dayLabel={dayLabel}
             userName={userName}
             dayJustChanged={dayJustChanged}
@@ -352,8 +367,8 @@ export function TodayWorkoutView({
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full rounded-full bg-[#C8FF2E] transition-all duration-200"
-                  style={{ width: `${progressPct}%` }}
+                  className="h-full w-full origin-left rounded-full bg-[#C8FF2E] transition-transform duration-300 ease-out"
+                  style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressPct / 100))})` }}
                 />
               </div>
             </div>
@@ -373,12 +388,12 @@ export function TodayWorkoutView({
 
       {/* Dedicated Rest Timer Directly Below Hero */}
       <section
-        className={`rounded-2xl border bg-[#13161C] p-4 sm:p-5 transition-colors ${
+        className={`glass-surface rounded-2xl border p-4 sm:p-5 transition-colors ${
           restRunning
             ? 'border-[#C8FF2E]/50'
             : restRemaining === 0
               ? 'border-[#16A34A]/50'
-              : 'border-white/10'
+              : 'border-white/12'
         }`}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -463,7 +478,7 @@ export function TodayWorkoutView({
               <button
                 type="button"
                 onClick={onToggleRestPause}
-                className="flex min-h-[42px] flex-1 sm:flex-initial sm:min-w-[116px] items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 text-xs font-bold text-[#0A0B0E] hover:brightness-105 whitespace-nowrap"
+                className="flex min-h-[42px] flex-1 sm:flex-initial sm:min-w-[116px] items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
               >
                 {restRunning ? (
                   <>
@@ -501,7 +516,7 @@ export function TodayWorkoutView({
 
       {/* Rest Day State */}
       {!activeSchedule.isGymDay && (
-        <div className="rounded-2xl border border-white/10 bg-[#13161C] p-6 text-center sm:p-8">
+        <div className="glass-surface rounded-2xl border border-white/12 p-6 text-center sm:p-8">
           <Clock className="mx-auto h-9 w-9 text-[#9CA3AF]" />
           <h2 className="mt-3 font-display text-2xl font-bold text-[#F4F5F7]">
             {t(
@@ -518,7 +533,7 @@ export function TodayWorkoutView({
           <button
             type="button"
             onClick={onOpenScheduleManager}
-            className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+            className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
           >
             {t('Buka Tab Jadwal', 'Open Schedule Tab')}
           </button>
@@ -527,7 +542,7 @@ export function TodayWorkoutView({
 
       {/* Empty Exercise List for Active Gym Day */}
       {activeSchedule.isGymDay && activeSchedule.exercises.length === 0 && (
-        <div className="rounded-2xl border border-white/10 bg-[#13161C] p-8 text-center">
+        <div className="glass-surface rounded-2xl border border-white/12 p-8 text-center">
           <Dumbbell className="mx-auto h-9 w-9 text-[#9CA3AF]" />
           <h2 className="mt-3 font-display text-2xl font-bold text-[#F4F5F7]">
             {t(`Belum Ada Gerakan untuk ${dayLabel}`, `No Exercises Yet for ${dayLabel}`)}
@@ -541,7 +556,7 @@ export function TodayWorkoutView({
           <button
             type="button"
             onClick={() => onOpenExerciseManager(todayDayKey)}
-            className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+            className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
           >
             {t('+ Tambah Gerakan Sekarang', '+ Add Exercise Now')}
           </button>
@@ -603,12 +618,12 @@ export function TodayWorkoutView({
             return (
               <article
                 key={entry.exerciseId}
-                className={`rounded-2xl border bg-[#13161C] p-4 sm:p-6 transition-colors ${
+                className={`glass-surface rounded-2xl border p-4 sm:p-6 transition-colors ${
                   allDone
                     ? 'border-[#16A34A]/50'
                     : timerRunning
                       ? 'border-[#38BDF8]/60'
-                      : 'border-white/10'
+                      : 'border-white/12'
                 }`}
               >
                 {/* Card Header */}
@@ -697,15 +712,23 @@ export function TodayWorkoutView({
                   </div>
                 </div>
 
-                {isExpanded && spec?.notes && (
-                  <p className="mt-3 rounded-xl bg-[#0A0B0E]/70 px-3.5 py-2.5 text-xs leading-relaxed text-[#D1D5DB]">
-                    {spec.notes}
-                  </p>
-                )}
+                <AnimatePresence initial={false}>
+                  {isExpanded && spec?.notes && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                      className="mt-3 rounded-xl border border-white/10 bg-[#0A0B0E]/60 px-3.5 py-2.5 text-xs leading-relaxed text-[#D1D5DB]"
+                    >
+                      {spec.notes}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
 
                 {/* Dedicated Interactive Timer Panel for Timer Exercises */}
                 {mode === 'timer' && (
-                  <div className="mt-4 rounded-xl border border-white/10 bg-[#0A0B0E]/80 p-4 space-y-3.5">
+                  <div className="glass-surface-subtle mt-4 rounded-xl border border-white/12 p-4 space-y-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-bold text-[#38BDF8]">
@@ -827,10 +850,10 @@ export function TodayWorkoutView({
 
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                       <div
-                        className={`h-full rounded-full transition-all duration-300 ${
+                        className={`h-full w-full origin-left rounded-full transition-transform duration-300 ease-out ${
                           timerDirection === 'countdown' ? 'bg-[#38BDF8]' : 'bg-[#C8FF2E]'
                         }`}
-                        style={{ width: `${timerProgressPct}%` }}
+                        style={{ transform: `scaleX(${Math.max(0, Math.min(1, timerProgressPct / 100))})` }}
                       />
                     </div>
                   </div>

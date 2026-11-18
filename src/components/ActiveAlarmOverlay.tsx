@@ -31,7 +31,7 @@ export function ActiveAlarmOverlay({
       aria-labelledby="alarm-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
     >
-      <div className="w-full max-w-lg rounded-2xl border border-[#C8FF2E]/40 bg-[#13161C] p-6 sm:p-8">
+      <div className="glass-surface w-full max-w-lg rounded-2xl border border-[#C8FF2E]/40 p-6 sm:p-8">
         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-[#C8FF2E]">
           <span>
             {isTest

@@ -57,7 +57,7 @@ export function CooldownAlertModal({
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md rounded-2xl border border-[#F59E0B]/45 bg-[#13161C] p-6 sm:p-7"
+            className="glass-surface relative w-full max-w-md rounded-2xl border border-[#F59E0B]/45 p-6 sm:p-7"
           >
             <button
               type="button"

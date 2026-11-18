@@ -294,7 +294,7 @@ export function ExerciseManagerView({
       )}
 
       {/* Day Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto rounded-xl border border-white/10 bg-[#13161C] p-1.5">
+      <div className="glass-surface-subtle flex items-center gap-1.5 overflow-x-auto rounded-xl border border-white/12 p-1.5">
         {DAY_LIST.map((day) => {
           const active = selectedDayKey === day.key;
           const count = schedules[day.key]?.exercises.length || 0;
@@ -319,7 +319,7 @@ export function ExerciseManagerView({
       {showCustomForm && (
         <form
           onSubmit={handleSubmitForm}
-          className="rounded-2xl border border-[#C8FF2E]/40 bg-[#13161C] p-5 space-y-5"
+          className="glass-surface rounded-2xl border border-[#C8FF2E]/40 p-5 space-y-5"
         >
           <div className="flex items-center justify-between">
             <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
@@ -688,14 +688,14 @@ export function ExerciseManagerView({
         </div>
 
         {schedule.exercises.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-[#13161C] p-6 text-center text-sm text-[#9CA3AF]">
+          <div className="glass-surface rounded-2xl border border-white/12 p-6 text-center text-sm text-[#9CA3AF]">
             {t(
               `Belum ada gerakan pada hari ${dayLabel}. Pilih gerakan dari pustaka di bawah atau buat gerakan baru.`,
               `No exercises scheduled for ${dayLabel}. Pick movements from the library below or create a custom one.`
             )}
           </div>
         ) : (
-          <div className="divide-y divide-white/10 rounded-2xl border border-white/10 bg-[#13161C]">
+          <div className="glass-surface divide-y divide-white/10 rounded-2xl border border-white/12">
             {schedule.exercises.map((ex, idx) => {
               const mode = resolveExerciseTrackingMode(ex);
               const usesWeight = resolveExerciseUsesWeight(ex);
@@ -827,7 +827,7 @@ export function ExerciseManagerView({
             return (
               <div
                 key={preset.name}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#13161C] p-4"
+                className="glass-surface flex items-center justify-between gap-3 rounded-2xl border border-white/12 p-4"
               >
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-[#F4F5F7]">{preset.name}</p>

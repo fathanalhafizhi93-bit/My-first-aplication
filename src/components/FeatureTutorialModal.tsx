@@ -210,7 +210,7 @@ export function FeatureTutorialModal({
         initial={{ opacity: 0, scale: 0.96, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-lg rounded-2xl border border-white/15 bg-[#13161C] p-6 shadow-2xl"
+        className="glass-surface w-full max-w-lg rounded-2xl border border-white/15 p-6 shadow-2xl"
       >
         {confirmSkip ? (
           /* Gentle Skip Warning Confirmation */

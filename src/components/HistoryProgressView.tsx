@@ -219,7 +219,7 @@ export function HistoryProgressView({
 
       {/* Top Consistency & Volume Summary Strip */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+        <section className="glass-surface rounded-2xl border border-white/12 p-5">
           <div className="flex items-center justify-between text-xs text-[#9CA3AF]">
             <span className="font-semibold uppercase tracking-wider">
               {t('Sesi Selesai', 'Completed Sessions')}
@@ -234,7 +234,7 @@ export function HistoryProgressView({
           </p>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+        <section className="glass-surface rounded-2xl border border-white/12 p-5">
           <div className="flex items-center justify-between text-xs text-[#9CA3AF]">
             <span className="font-semibold uppercase tracking-wider">
               {t('Streak Mingguan', 'Weekly Streak')}
@@ -249,7 +249,7 @@ export function HistoryProgressView({
           </p>
         </section>
 
-        <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+        <section className="glass-surface rounded-2xl border border-white/12 p-5">
           <div className="flex items-center justify-between text-xs text-[#9CA3AF]">
             <span className="font-semibold uppercase tracking-wider">
               {t('Volume Bulan Ini', 'Month Volume')}
@@ -267,7 +267,7 @@ export function HistoryProgressView({
       </div>
 
       {/* Monthly Interactive Calendar */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
           <h2 className="font-display text-xl font-bold capitalize text-[#F4F5F7]">
             {monthFormatter.format(viewMonthDate)}
@@ -381,7 +381,7 @@ export function HistoryProgressView({
       </section>
 
       {/* Selected Date Session Details */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-[#C8FF2E]">

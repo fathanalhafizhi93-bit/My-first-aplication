@@ -72,8 +72,8 @@ export function WeeklyScheduleView({
               key={day.key}
               className={`rounded-2xl border p-4 sm:p-5 transition-colors ${
                 sched.isGymDay
-                  ? 'border-white/12 bg-[#13161C]'
-                  : 'border-white/5 bg-[#13161C]/50'
+                  ? 'glass-surface border-white/15'
+                  : 'glass-surface-subtle border-white/8 opacity-80'
               }`}
             >
               {/* Row 1: Day Header + Toggle + Exercise Link */}

@@ -249,7 +249,7 @@ export function SettingsView({
       </div>
 
       {/* 0. Mascot Call Name & Profile */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-4">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">
         <div>
           <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
             {t('Nama Panggilan & Sapaan Karakter', 'Nickname & Companion Greeting')}
@@ -309,7 +309,7 @@ export function SettingsView({
       </section>
 
       {/* 1. Language & Clock System */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-5">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
         <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
           {t('Bahasa & Sistem Jam', 'Language & Clock System')}
         </h2>
@@ -396,7 +396,7 @@ export function SettingsView({
       </section>
 
       {/* 2. Display Theme & Tutorial */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-4">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
@@ -466,7 +466,7 @@ export function SettingsView({
       </section>
 
       {/* 3. Alarm, Timer & Notification Preferences */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5 space-y-5">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
             {t('Preferensi Alarm, Timer & Notifikasi', 'Alarm, Timer & Notification Preferences')}
@@ -650,7 +650,7 @@ export function SettingsView({
       </section>
 
       {/* 4. Account & Cloud Session */}
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+      <section className="glass-surface rounded-2xl border border-white/12 p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">

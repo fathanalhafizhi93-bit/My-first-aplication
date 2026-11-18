@@ -14,7 +14,7 @@ export function PWAInstallCard() {
 
   if (isInstallable) {
     return (
-      <section className="rounded-2xl border border-[#C8FF2E]/35 bg-[#13161C] p-5">
+      <section className="glass-surface rounded-2xl border border-[#C8FF2E]/35 p-5">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C8FF2E]/15 text-[#C8FF2E]">
             <Smartphone className="h-5 w-5" />
@@ -46,7 +46,7 @@ export function PWAInstallCard() {
   if (isIOS) {
     return (
       <>
-        <section className="rounded-2xl border border-white/10 bg-[#13161C] p-5">
+        <section className="glass-surface rounded-2xl border border-white/12 p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h3 className="font-display text-lg font-bold text-[#F4F5F7]">
@@ -75,7 +75,7 @@ export function PWAInstallCard() {
             aria-modal="true"
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
           >
-            <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#13161C] p-6">
+            <div className="glass-surface w-full max-w-sm rounded-2xl border border-white/15 p-6">
               <div className="flex items-center justify-between">
                 <h3 className="font-display text-xl font-bold text-[#F4F5F7]">
                   {t('Pasang di iPhone / iPad', 'Install on iPhone / iPad')}

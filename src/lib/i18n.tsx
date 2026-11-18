@@ -56,6 +56,58 @@ export function resolveDayTimePhase(mode: DayTimeMode, now: Date = new Date()): 
   return 'night';
 }
 
+export const PHASE_THEME_TOKENS: Record<
+  DayTimePhase,
+  {
+    accent: string;
+    accentBright: string;
+    ambientGlow: string;
+    heroGradient: string;
+    heroBorder: string;
+    subtleBorder: string;
+    emblemClass: string;
+    labelClass: string;
+    headerTint: string;
+  }
+> = {
+  morning: {
+    accent: '#F59E0B',
+    accentBright: '#FBBF24',
+    ambientGlow:
+      'radial-gradient(ellipse 85% 58% at 50% -10%, rgba(245, 158, 11, 0.24), rgba(245, 158, 11, 0.06) 48%, transparent 78%)',
+    heroGradient: 'from-[#422709]/60 via-[#1D150C]/55 to-[#0C0E14]/65',
+    heroBorder: 'border-[#F59E0B]/35',
+    subtleBorder: 'border-[#F59E0B]/25',
+    emblemClass: 'border-[#F59E0B]/45 bg-[#F59E0B]/18 text-[#FBBF24]',
+    labelClass: 'text-[#FBBF24]',
+    headerTint: 'border-[#F59E0B]/20',
+  },
+  afternoon: {
+    accent: '#38BDF8',
+    accentBright: '#7DD3FC',
+    ambientGlow:
+      'radial-gradient(ellipse 85% 58% at 50% -10%, rgba(56, 189, 248, 0.22), rgba(14, 165, 233, 0.06) 48%, transparent 78%)',
+    heroGradient: 'from-[#0D2E4D]/60 via-[#101C2B]/55 to-[#0C0E14]/65',
+    heroBorder: 'border-[#38BDF8]/35',
+    subtleBorder: 'border-[#38BDF8]/25',
+    emblemClass: 'border-[#38BDF8]/45 bg-[#38BDF8]/18 text-[#7DD3FC]',
+    labelClass: 'text-[#7DD3FC]',
+    headerTint: 'border-[#38BDF8]/20',
+  },
+  night: {
+    accent: '#818CF8',
+    accentBright: '#A5B4FC',
+    ambientGlow:
+      'radial-gradient(ellipse 85% 58% at 50% -10%, rgba(129, 140, 248, 0.25), rgba(99, 102, 241, 0.07) 48%, transparent 78%)',
+    heroGradient: 'from-[#231C52]/62 via-[#14162A]/55 to-[#0C0E14]/65',
+    heroBorder: 'border-[#818CF8]/35',
+    subtleBorder: 'border-[#818CF8]/25',
+    emblemClass: 'border-[#818CF8]/45 bg-[#818CF8]/18 text-[#A5B4FC]',
+    labelClass: 'text-[#A5B4FC]',
+    headerTint: 'border-[#818CF8]/20',
+  },
+};
+
 export const DAY_LABELS: Record<AppLanguage, Record<DayKey, { label: string; shortLabel: string }>> = {
   id: {
     mon: { label: 'Senin', shortLabel: 'SEN' },

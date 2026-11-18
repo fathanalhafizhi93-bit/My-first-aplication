@@ -17,7 +17,7 @@ export function AboutView() {
         </p>
       </div>
 
-      <section className="rounded-2xl border border-[#C8FF2E]/30 bg-[#13161C] p-6 sm:p-8">
+      <section className="glass-surface rounded-2xl border border-[#C8FF2E]/30 p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C8FF2E]">
           {t('Kredit & Pembuat', 'Credits & Creators')}
         </p>
@@ -52,7 +52,7 @@ export function AboutView() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-[#13161C] p-6 space-y-4">
+      <section className="glass-surface rounded-2xl border border-white/12 p-6 space-y-4">
         <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
           {t('Tentang Aplikasi', 'About the App')}
         </h2>

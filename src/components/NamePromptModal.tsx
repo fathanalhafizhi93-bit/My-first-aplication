@@ -67,7 +67,7 @@ export function NamePromptModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-md rounded-2xl border border-[#C8FF2E]/35 bg-[#13161C] p-6 sm:p-7"
+            className="glass-surface w-full max-w-md rounded-2xl border border-[#C8FF2E]/35 p-6 sm:p-7"
           >
             {/* Friendly Circular Mascot Orb */}
             <div className="flex items-center gap-4">
