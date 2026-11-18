@@ -5,12 +5,23 @@ import { AppTab } from '../types/gym';
 
 interface TopBarProps {
   activeTab: AppTab;
+  activePopup: 'settings' | 'about' | null;
   timePhase: DayTimePhase;
   onSelectTab: (tab: AppTab) => void;
+  onOpenSettings: () => void;
+  onOpenAbout: () => void;
   onTestAlarm: () => void;
 }
 
-export function TopBar({ activeTab, timePhase, onSelectTab, onTestAlarm }: TopBarProps) {
+export function TopBar({
+  activeTab,
+  activePopup,
+  timePhase,
+  onSelectTab,
+  onOpenSettings,
+  onOpenAbout,
+  onTestAlarm,
+}: TopBarProps) {
   const { t } = useI18n();
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
 
@@ -20,9 +31,10 @@ export function TopBar({ activeTab, timePhase, onSelectTab, onTestAlarm }: TopBa
     { id: 'history', label: t('Riwayat', 'History') },
     { id: 'exercises', label: t('Gerakan', 'Exercises') },
     { id: 'ringtones', label: t('Ringtone', 'Ringtones') },
-    { id: 'settings', label: t('Setting', 'Settings') },
-    { id: 'about', label: 'About' },
   ];
+
+  const settingsActive = activePopup === 'settings';
+  const aboutActive = activePopup === 'about';
 
   return (
     <header
@@ -38,13 +50,13 @@ export function TopBar({ activeTab, timePhase, onSelectTab, onTestAlarm }: TopBa
           IronPulse
         </button>
 
-        {/* Zone 2: Single-line nav links with fluid GPU spring indicator */}
+        {/* Zone 2: 5 core single-line workspace nav links with fluid spring indicator */}
         <nav
-          className="hidden md:flex items-center gap-4 lg:gap-6"
+          className="hidden md:flex items-center gap-5 lg:gap-7"
           aria-label={t('Navigasi Utama', 'Primary Navigation')}
         >
           {navItems.map((item) => {
-            const isActive = activeTab === item.id;
+            const isActive = activeTab === item.id && activePopup === null;
             return (
               <button
                 key={item.id}
@@ -69,16 +81,16 @@ export function TopBar({ activeTab, timePhase, onSelectTab, onTestAlarm }: TopBa
           })}
         </nav>
 
-        {/* Zone 3: Mobile Setting + About shortcuts & primary CTA button */}
+        {/* Zone 3: Quick Settings & About pop-up triggers + Test Alarm CTA */}
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            aria-label={t('Pengaturan Aplikasi', 'App Settings')}
-            onClick={() => onSelectTab('settings')}
-            className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border transition-all duration-150 active:scale-95 md:hidden ${
-              activeTab === 'settings'
-                ? 'border-[#C8FF2E]/50 bg-[#C8FF2E]/15 text-[#C8FF2E]'
-                : 'border-white/10 bg-[#13161C] text-[#9CA3AF] hover:text-[#F4F5F7]'
+            aria-label={t('Buka pop-up pengaturan', 'Open settings popup')}
+            onClick={onOpenSettings}
+            className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border transition-all duration-150 active:scale-95 ${
+              settingsActive
+                ? 'border-[#C8FF2E]/60 bg-[#C8FF2E]/18 text-[#C8FF2E]'
+                : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
             }`}
           >
             <Settings className="h-4 w-4" />
@@ -86,12 +98,12 @@ export function TopBar({ activeTab, timePhase, onSelectTab, onTestAlarm }: TopBa
 
           <button
             type="button"
-            aria-label={t('Tentang IronPulse', 'About IronPulse')}
-            onClick={() => onSelectTab('about')}
-            className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border transition-all duration-150 active:scale-95 md:hidden ${
-              activeTab === 'about'
-                ? 'border-[#C8FF2E]/50 bg-[#C8FF2E]/15 text-[#C8FF2E]'
-                : 'border-white/10 bg-[#13161C] text-[#9CA3AF] hover:text-[#F4F5F7]'
+            aria-label={t('Buka pop-up Tentang IronPulse', 'Open About IronPulse popup')}
+            onClick={onOpenAbout}
+            className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border transition-all duration-150 active:scale-95 ${
+              aboutActive
+                ? 'border-[#C8FF2E]/60 bg-[#C8FF2E]/18 text-[#C8FF2E]'
+                : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
             }`}
           >
             <Info className="h-4 w-4" />

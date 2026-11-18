@@ -24,6 +24,7 @@ import {
   scheduleAndroidTestNotification,
 } from '../lib/nativeAlarmBridge';
 import { CustomRingtone, UserProfile } from '../types/gym';
+import { ConfirmDeleteModal } from './GlassModal';
 
 interface RingtoneManagerViewProps {
   profile: UserProfile;
@@ -59,6 +60,7 @@ export function RingtoneManagerView({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CustomRingtone | null>(null);
 
   const [androidDiag, setAndroidDiag] = useState<AndroidAlarmDiagnostics | null>(null);
   const [testNotifStatus, setTestNotifStatus] = useState<string | null>(null);
@@ -555,7 +557,7 @@ export function RingtoneManagerView({
                     <button
                       type="button"
                       aria-label={`${t('Hapus ringtone', 'Delete ringtone')} ${rt.name}`}
-                      onClick={() => onDeleteRingtone(rt.id)}
+                      onClick={() => setDeleteTarget(rt)}
                       className="flex h-[38px] w-[38px] items-center justify-center rounded-lg border border-white/10 bg-[#13161C] text-[#9CA3AF] hover:border-[#DC2626]/60 hover:text-[#FCA5A5]"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -642,6 +644,21 @@ export function RingtoneManagerView({
           })}
         </div>
       </section>
+
+      <ConfirmDeleteModal
+        open={Boolean(deleteTarget)}
+        title={t('Hapus Ringtone?', 'Delete Ringtone?')}
+        itemName={deleteTarget?.name || ''}
+        description={t(
+          'File audio ringtone kustom ini akan dihapus dari daftar Anda.',
+          'This custom audio ringtone will be removed from your list.'
+        )}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await onDeleteRingtone(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }

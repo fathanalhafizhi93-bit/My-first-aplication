@@ -1,21 +1,27 @@
 import { useI18n } from '../lib/i18n';
 
-export function AboutView() {
+interface AboutViewProps {
+  embeddedInModal?: boolean;
+}
+
+export function AboutView({ embeddedInModal = false }: AboutViewProps) {
   const { t } = useI18n();
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-white/10 pb-5">
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
-          About IronPulse
-        </h1>
-        <p className="mt-1 text-sm text-[#9CA3AF]">
-          {t(
-            'Informasi pengembang, konsep, rilis, dan ringkasan aplikasi.',
-            'Developer credits, concept notes, release info, and app overview.'
-          )}
-        </p>
-      </div>
+      {!embeddedInModal && (
+        <div className="border-b border-white/10 pb-5">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
+            About IronPulse
+          </h1>
+          <p className="mt-1 text-sm text-[#9CA3AF]">
+            {t(
+              'Informasi pengembang, konsep, rilis, dan ringkasan aplikasi.',
+              'Developer credits, concept notes, release info, and app overview.'
+            )}
+          </p>
+        </div>
+      )}
 
       <section className="glass-surface rounded-2xl border border-[#C8FF2E]/30 p-6 sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C8FF2E]">

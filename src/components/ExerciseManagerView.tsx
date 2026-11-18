@@ -10,11 +10,11 @@ import {
   Search,
   Timer,
   Trash2,
-  X,
 } from 'lucide-react';
 import { EXERCISE_LIBRARY } from '../data/presets';
 import { formatCompactDuration } from '../lib/dateUtils';
 import { DAY_LABELS, MUSCLE_LABELS, useI18n } from '../lib/i18n';
+import { ConfirmDeleteModal, GlassModal } from './GlassModal';
 import {
   DAY_LIST,
   DayKey,
@@ -94,6 +94,7 @@ export function ExerciseManagerView({
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formState, setFormState] = useState<ExerciseFormState>(EMPTY_FORM);
+  const [deleteTarget, setDeleteTarget] = useState<ExerciseItem | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
 
   const schedule = schedules[selectedDayKey];
@@ -124,6 +125,12 @@ export function ExerciseManagerView({
     setEditingId(null);
     setFormState(EMPTY_FORM);
     setShowCustomForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowCustomForm(false);
+    setEditingId(null);
+    setFormState(EMPTY_FORM);
   };
 
   const handleOpenEditForm = (ex: ExerciseItem) => {
@@ -315,26 +322,23 @@ export function ExerciseManagerView({
         })}
       </div>
 
-      {/* Add / Edit Custom Exercise Drawer */}
-      {showCustomForm && (
-        <form
-          onSubmit={handleSubmitForm}
-          className="glass-surface rounded-2xl border border-[#C8FF2E]/40 p-5 space-y-5"
-        >
-          <div className="flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-              {editingId
-                ? t('Edit Gerakan', 'Edit Exercise')
-                : `${t('Tambah Gerakan Baru', 'Add New Exercise')} — ${dayLabel}`}
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowCustomForm(false)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-white/5 hover:text-[#F4F5F7]"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+      {/* Add / Edit Custom Exercise Popup Modal */}
+      <GlassModal
+        open={showCustomForm}
+        onClose={handleCloseForm}
+        title={
+          editingId
+            ? t('Edit Gerakan', 'Edit Exercise')
+            : `${t('Tambah Gerakan Baru', 'Add New Exercise')} — ${dayLabel}`
+        }
+        subtitle={t(
+          'Pilih mode repetisi atau timer durasi, lalu atur detail target latihanmu.',
+          'Pick sets & reps or duration timer mode, then customize your workout targets.'
+        )}
+        maxWidthClass="max-w-2xl"
+        accentBorderClass="border-[#C8FF2E]/35"
+      >
+        <form onSubmit={handleSubmitForm} className="space-y-5">
 
           {/* Tracking Mode Selector */}
           <div className="space-y-2">
@@ -661,20 +665,20 @@ export function ExerciseManagerView({
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={() => setShowCustomForm(false)}
+              onClick={handleCloseForm}
               className="min-h-[44px] rounded-xl border border-white/15 px-4 py-2 text-xs font-semibold text-[#D1D5DB] hover:bg-white/5"
             >
               {t('Batal', 'Cancel')}
             </button>
             <button
               type="submit"
-              className="min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+              className="min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105 active:scale-[0.98]"
             >
               {editingId ? t('Simpan Perubahan', 'Save Changes') : t('Tambahkan Gerakan', 'Add Exercise')}
             </button>
           </div>
         </form>
-      )}
+      </GlassModal>
 
       {/* Scheduled Movements for Selected Day */}
       <section className="space-y-3">
@@ -766,7 +770,7 @@ export function ExerciseManagerView({
                     <button
                       type="button"
                       aria-label={`${t('Hapus', 'Delete')} ${ex.name}`}
-                      onClick={() => onRemoveExercise(selectedDayKey, ex.id)}
+                      onClick={() => setDeleteTarget(ex)}
                       className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:border-[#DC2626]/60 hover:text-[#FCA5A5]"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -860,6 +864,28 @@ export function ExerciseManagerView({
           })}
         </div>
       </section>
+
+      <ConfirmDeleteModal
+        open={Boolean(deleteTarget)}
+        title={t('Hapus Gerakan?', 'Delete Exercise?')}
+        itemName={deleteTarget?.name || ''}
+        description={t(
+          `Gerakan ini akan dihapus dari jadwal hari ${dayLabel}. Riwayat latihan yang sudah tersimpan sebelumnya tidak akan hilang.`,
+          `This exercise will be removed from ${dayLabel}'s schedule. Previously saved workout logs remain intact.`
+        )}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          const removedName = deleteTarget.name;
+          await onRemoveExercise(selectedDayKey, deleteTarget.id);
+          showToast(
+            t(
+              `Gerakan "${removedName}" dihapus dari ${dayLabel}.`,
+              `Exercise "${removedName}" removed from ${dayLabel}.`
+            )
+          );
+        }}
+      />
     </div>
   );
 }

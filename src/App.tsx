@@ -10,6 +10,7 @@ import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
 import { ExerciseManagerView } from './components/ExerciseManagerView';
 import { FeatureTutorialModal } from './components/FeatureTutorialModal';
+import { GlassModal } from './components/GlassModal';
 import { HistoryProgressView } from './components/HistoryProgressView';
 import { LaunchIntro } from './components/LaunchIntro';
 import { MobileBottomNav } from './components/MobileBottomNav';
@@ -90,6 +91,7 @@ function AppContent() {
   } = useGymData();
 
   const [activeTab, setActiveTab] = useState<AppTab>('today');
+  const [activePopup, setActivePopup] = useState<'settings' | 'about' | null>(null);
   const [showIntro, setShowIntro] = useState(true);
   const [nameConfirmed, setNameConfirmed] = useState<boolean>(true);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -761,6 +763,15 @@ function AppContent() {
     setTutorialOpen(false);
   }, [user]);
 
+  const handleSelectTab = useCallback((tab: AppTab) => {
+    if (tab === 'settings' || tab === 'about') {
+      setActivePopup(tab);
+      return;
+    }
+    setActivePopup(null);
+    setActiveTab(tab);
+  }, []);
+
   const renderBody = () => {
     if (!authReady) {
       return (
@@ -779,8 +790,15 @@ function AppContent() {
         <div className="min-h-screen bg-[#0A0B0E] text-[#F4F5F7]">
           <TopBar
             activeTab={activeTab}
+            activePopup={activePopup}
             timePhase={timePhase}
-            onSelectTab={setActiveTab}
+            onSelectTab={handleSelectTab}
+            onOpenSettings={() =>
+              setActivePopup((prev) => (prev === 'settings' ? null : 'settings'))
+            }
+            onOpenAbout={() =>
+              setActivePopup((prev) => (prev === 'about' ? null : 'about'))
+            }
             onTestAlarm={() => {}}
           />
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -832,8 +850,15 @@ function AppContent() {
 
         <TopBar
           activeTab={activeTab}
+          activePopup={activePopup}
           timePhase={timePhase}
-          onSelectTab={setActiveTab}
+          onSelectTab={handleSelectTab}
+          onOpenSettings={() =>
+            setActivePopup((prev) => (prev === 'settings' ? null : 'settings'))
+          }
+          onOpenAbout={() =>
+            setActivePopup((prev) => (prev === 'about' ? null : 'about'))
+          }
           onTestAlarm={handleTestAlarm}
         />
 
@@ -944,19 +969,6 @@ function AppContent() {
                       onDeleteRingtone={deleteCustomRingtone}
                     />
                   )}
-
-                  {activeTab === 'settings' && (
-                    <SettingsView
-                      now={now}
-                      profile={profile}
-                      onUpdateProfile={updateProfile}
-                      onOpenRingtones={() => setActiveTab('ringtones')}
-                      onOpenTutorial={handleOpenTutorialFromUi}
-                      onSignOut={signOutUser}
-                    />
-                  )}
-
-                  {activeTab === 'about' && <AboutView />}
                 </motion.div>
               </AnimatePresence>
             </div>
@@ -969,13 +981,6 @@ function AppContent() {
                 nextAlarm={nextAlarm}
                 audioUnlocked={audioUnlocked}
                 onUnlockAudio={handleUnlockAudio}
-                profile={profile}
-                onSignOut={signOutUser}
-                onOpenSettings={() => setActiveTab('settings')}
-                onOpenAbout={() => setActiveTab('about')}
-                onOpenTutorial={handleOpenTutorialFromUi}
-                isSettingsActive={activeTab === 'settings'}
-                isAboutActive={activeTab === 'about'}
               />
             </div>
           </div>
@@ -984,7 +989,7 @@ function AppContent() {
         <MobileBottomNav
           activeTab={activeTab}
           timePhase={timePhase}
-          onSelectTab={setActiveTab}
+          onSelectTab={handleSelectTab}
           restRemaining={restRemaining}
           restRunning={restRunning}
         />
@@ -1001,6 +1006,53 @@ function AppContent() {
           />
         )}
 
+        <GlassModal
+          open={activePopup === 'settings'}
+          onClose={() => setActivePopup(null)}
+          title={t('Pengaturan Aplikasi', 'App Settings')}
+          subtitle={t(
+            'Atur bahasa, format jam, tema tampilan, dan preferensi alarm.',
+            'Configure language, clock format, display theme, and alarm preferences.'
+          )}
+          maxWidthClass="max-w-2xl"
+          accentBorderClass="border-[#C8FF2E]/30"
+          closeAriaLabel={t('Tutup Pengaturan', 'Close Settings')}
+        >
+          <SettingsView
+            now={now}
+            profile={profile}
+            embeddedInModal
+            onUpdateProfile={updateProfile}
+            onOpenRingtones={() => {
+              setActivePopup(null);
+              setActiveTab('ringtones');
+            }}
+            onOpenTutorial={() => {
+              setActivePopup(null);
+              handleOpenTutorialFromUi();
+            }}
+            onSignOut={async () => {
+              setActivePopup(null);
+              await signOutUser();
+            }}
+          />
+        </GlassModal>
+
+        <GlassModal
+          open={activePopup === 'about'}
+          onClose={() => setActivePopup(null)}
+          title="About IronPulse"
+          subtitle={t(
+            'Informasi pengembang, konsep, rilis, dan ringkasan aplikasi.',
+            'Developer credits, concept notes, release info, and app overview.'
+          )}
+          maxWidthClass="max-w-xl"
+          accentBorderClass="border-[#C8FF2E]/30"
+          closeAriaLabel={t('Tutup Tentang Aplikasi', 'Close About')}
+        >
+          <AboutView embeddedInModal />
+        </GlassModal>
+
         <NamePromptModal
           open={!showIntro && !nameConfirmed}
           initialName={profile.displayName}
@@ -1011,7 +1063,7 @@ function AppContent() {
           open={tutorialOpen && nameConfirmed}
           startAtLanguageStep={tutorialStartWithLang}
           onComplete={handleCompleteTutorial}
-          onJumpToTab={(tab) => setActiveTab(tab)}
+          onJumpToTab={handleSelectTab}
         />
 
         <OfflineIndicator />

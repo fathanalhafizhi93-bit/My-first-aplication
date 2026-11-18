@@ -33,6 +33,7 @@ import { UserProfile } from '../types/gym';
 interface SettingsViewProps {
   now: Date;
   profile: UserProfile;
+  embeddedInModal?: boolean;
   onUpdateProfile: (
     patch: Partial<
       Pick<
@@ -53,6 +54,7 @@ interface SettingsViewProps {
 export function SettingsView({
   now,
   profile,
+  embeddedInModal = false,
   onUpdateProfile,
   onOpenRingtones,
   onOpenTutorial,
@@ -236,17 +238,19 @@ export function SettingsView({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="border-b border-white/10 pb-5">
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
-          {t('Pengaturan Aplikasi', 'App Settings')}
-        </h1>
-        <p className="mt-1 text-sm text-[#9CA3AF]">
-          {t(
-            'Atur bahasa aplikasi, sistem jam 12 atau 24 jam, tema tampilan Hari Ini, serta preferensi alarm dan istirahat.',
-            'Configure app language, 12-hour or 24-hour clock format, Today display theme, and alarm preferences.'
-          )}
-        </p>
-      </div>
+      {!embeddedInModal && (
+        <div className="border-b border-white/10 pb-5">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
+            {t('Pengaturan Aplikasi', 'App Settings')}
+          </h1>
+          <p className="mt-1 text-sm text-[#9CA3AF]">
+            {t(
+              'Atur bahasa aplikasi, sistem jam 12 atau 24 jam, tema tampilan Hari Ini, serta preferensi alarm dan istirahat.',
+              'Configure app language, 12-hour or 24-hour clock format, Today display theme, and alarm preferences.'
+            )}
+          </p>
+        </div>
+      )}
 
       {/* 0. Mascot Call Name & Profile */}
       <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">
