@@ -177,6 +177,7 @@ export interface UserProfile {
 
 export type AppTab =
   | 'today'
+  | 'workout'
   | 'schedule'
   | 'history'
   | 'exercises'

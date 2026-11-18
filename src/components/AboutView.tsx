@@ -40,7 +40,7 @@ export function AboutView({ embeddedInModal = false }: AboutViewProps) {
               {t('Pembuat Aplikasi', 'App Builder')}
             </p>
             <p className="mt-1 text-base font-semibold text-[#F4F5F7]">
-              Antigravity (Gemini)
+              Fathan and Gemini
             </p>
           </div>
           <div>
@@ -51,8 +51,8 @@ export function AboutView({ embeddedInModal = false }: AboutViewProps) {
           </div>
           <div>
             <p className="text-xs font-medium text-[#9CA3AF]">Scripter</p>
-            <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-[#C8FF2E]">
-              fathan (12%), some ai (88%)
+            <p className="mt-1 font-mono text-sm font-semibold text-[#C8FF2E]">
+              fathan, some ai
             </p>
           </div>
         </div>

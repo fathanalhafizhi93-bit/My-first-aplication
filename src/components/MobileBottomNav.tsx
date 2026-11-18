@@ -37,7 +37,7 @@ export function MobileBottomNav({
     >
       <div className="grid h-16 grid-cols-5 items-center">
         {tabs.map(({ id, label, Icon }) => {
-          const active = activeTab === id;
+          const active = activeTab === id || (id === 'today' && activeTab === 'workout');
           return (
             <button
               key={id}

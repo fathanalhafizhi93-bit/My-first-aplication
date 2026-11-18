@@ -56,7 +56,9 @@ export function TopBar({
           aria-label={t('Navigasi Utama', 'Primary Navigation')}
         >
           {navItems.map((item) => {
-            const isActive = activeTab === item.id && activePopup === null;
+            const isTabMatch =
+              activeTab === item.id || (item.id === 'today' && activeTab === 'workout');
+            const isActive = isTabMatch && activePopup === null;
             return (
               <button
                 key={item.id}

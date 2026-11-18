@@ -16,12 +16,12 @@ import { LaunchIntro } from './components/LaunchIntro';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { NamePromptModal } from './components/NamePromptModal';
 import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner';
-import { RightUtilityPanel } from './components/RightUtilityPanel';
 import { RingtoneManagerView } from './components/RingtoneManagerView';
 import { SettingsView } from './components/SettingsView';
 import { ExerciseTimerState, TodayWorkoutView } from './components/TodayWorkoutView';
 import { TopBar } from './components/TopBar';
 import { WeeklyScheduleView } from './components/WeeklyScheduleView';
+import { WorkoutSessionView } from './components/WorkoutSessionView';
 import { useGymData } from './hooks/useGymData';
 import { audioEngine, BUILTIN_RINGTONES } from './lib/audioEngine';
 import {
@@ -185,16 +185,49 @@ function AppContent() {
     };
   }, []);
 
-  const triggerClapBurst = useCallback(() => {
+  const clearClapBurst = useCallback(() => {
+    if (clapTimeoutRef.current !== null) {
+      window.clearTimeout(clapTimeoutRef.current);
+      clapTimeoutRef.current = null;
+    }
+    setJustClapped(false);
+  }, []);
+
+  const triggerClapBurst = useCallback((isWorkoutComplete = false) => {
     if (clapTimeoutRef.current !== null) {
       window.clearTimeout(clapTimeoutRef.current);
     }
     setJustClapped(true);
+    const durationMs = isWorkoutComplete ? 60_000 : 3_200;
     clapTimeoutRef.current = window.setTimeout(() => {
       setJustClapped(false);
       clapTimeoutRef.current = null;
-    }, 3200);
+    }, durationMs);
   }, []);
+
+  const willFinishAllSets = useCallback(
+    (
+      entries: WorkoutLogEntry[],
+      completedExerciseId: string,
+      completedSetNumber: number
+    ): boolean => {
+      let total = 0;
+      let done = 0;
+      for (const entry of entries) {
+        for (const s of entry.sets) {
+          total += 1;
+          if (
+            s.completed ||
+            (entry.exerciseId === completedExerciseId && s.setNumber === completedSetNumber)
+          ) {
+            done += 1;
+          }
+        }
+      }
+      return total > 0 && done === total;
+    },
+    []
+  );
 
   const triggerAlarm = useCallback(
     (sched: DaySchedule, isTest: boolean) => {
@@ -365,11 +398,16 @@ function AppContent() {
       }
 
       if (becameCompleted) {
+        const finishedAll = willFinishAllSets(
+          effectiveTodayEntriesRef.current,
+          exerciseId,
+          setNumber
+        );
         setDayJustChanged(false);
         setIsOpeningGreeting(false);
-        triggerClapBurst();
+        triggerClapBurst(finishedAll);
 
-        if (profile?.autoStartRestTimer && schedules && nextIncomplete) {
+        if (profile?.autoStartRestTimer && schedules && nextIncomplete && !finishedAll) {
           const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
           if (spec) {
             startRestTimer(spec.restSeconds, spec.name);
@@ -379,6 +417,7 @@ function AppContent() {
     },
     [
       completeTimerSet,
+      willFinishAllSets,
       profile,
       customRingtones,
       triggerClapBurst,
@@ -605,27 +644,35 @@ function AppContent() {
         return;
       }
 
+      const willAllFinish =
+        !isCurrentlyCompleted &&
+        willFinishAllSets(effectiveTodayEntries, exerciseId, setNumber);
+
       const becameCompleted = await toggleSetComplete(exerciseId, setNumber);
       if (becameCompleted) {
         setCooldownUntilMs(Date.now() + 30_000);
         setCooldownAlertTarget(null);
         setDayJustChanged(false);
         setIsOpeningGreeting(false);
-        triggerClapBurst();
+        triggerClapBurst(willAllFinish);
 
-        if (profile?.autoStartRestTimer && schedules) {
+        if (profile?.autoStartRestTimer && schedules && !willAllFinish) {
           const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
           if (spec) {
             startRestTimer(spec.restSeconds, spec.name);
           }
         }
+      } else if (isCurrentlyCompleted) {
+        clearClapBurst();
       }
     },
     [
       effectiveTodayEntries,
       cooldownRemaining,
+      willFinishAllSets,
       toggleSetComplete,
       triggerClapBurst,
+      clearClapBurst,
       profile,
       schedules,
       todayDayKey,
@@ -636,6 +683,11 @@ function AppContent() {
   const handleBypassCooldownAndComplete = useCallback(async () => {
     if (!cooldownAlertTarget) return;
     const { exerciseId, setNumber } = cooldownAlertTarget;
+    const willAllFinish = willFinishAllSets(
+      effectiveTodayEntries,
+      exerciseId,
+      setNumber
+    );
     const becameCompleted = await toggleSetComplete(exerciseId, setNumber);
     setCooldownAlertTarget(null);
 
@@ -643,9 +695,9 @@ function AppContent() {
       setCooldownUntilMs(Date.now() + 30_000);
       setDayJustChanged(false);
       setIsOpeningGreeting(false);
-      triggerClapBurst();
+      triggerClapBurst(willAllFinish);
 
-      if (profile?.autoStartRestTimer && schedules) {
+      if (profile?.autoStartRestTimer && schedules && !willAllFinish) {
         const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
         if (spec) {
           startRestTimer(spec.restSeconds, spec.name);
@@ -654,6 +706,8 @@ function AppContent() {
     }
   }, [
     cooldownAlertTarget,
+    effectiveTodayEntries,
+    willFinishAllSets,
     toggleSetComplete,
     triggerClapBurst,
     profile,
@@ -875,37 +929,68 @@ function AppContent() {
           <div className="mb-5 lg:hidden">
             <PWAInstallCard />
           </div>
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
-            {/* Primary Workspace Column */}
-            <div className="lg:col-span-8">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeTab}
-                  initial={{ opacity: 0, y: 6, scale: 0.992 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -4, scale: 0.995 }}
-                  transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                >
-                  {activeTab === 'today' && (
-                    <TodayWorkoutView
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 6, scale: 0.992 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.995 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            >
+              {activeTab === 'today' && (
+                <TodayWorkoutView
+                  now={now}
+                  todayDayKey={todayDayKey}
+                  schedules={schedules}
+                  todayEntries={effectiveTodayEntries}
+                  nextAlarm={nextAlarm}
+                  audioUnlocked={audioUnlocked}
+                  onUnlockAudio={handleUnlockAudio}
+                  restTotalSeconds={restTotalSeconds}
+                  restRemaining={restRemaining}
+                  restRunning={restRunning}
+                  restExerciseLabel={restExerciseLabel}
+                  justClapped={justClapped}
+                  dayJustChanged={dayJustChanged}
+                  userName={profile.displayName}
+                  isOpeningGreeting={isOpeningGreeting}
+                  exerciseTimers={exerciseTimers}
+                  onToggleRestPause={handleToggleRestPause}
+                  onResetRest={handleResetRest}
+                  onAdjustRest={handleAdjustRest}
+                      onStartRestTimer={startRestTimer}
+                      onStartWorkout={() => {
+                        setActiveTab('workout');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      onOpenExerciseManager={(dayKey) => {
+                        setExerciseDayKey(dayKey);
+                        setActiveTab('exercises');
+                      }}
+                      onOpenScheduleManager={() => setActiveTab('schedule')}
+                    />
+                  )}
+
+                  {activeTab === 'workout' && (
+                    <WorkoutSessionView
                       now={now}
                       todayDayKey={todayDayKey}
                       schedules={schedules}
                       todayEntries={effectiveTodayEntries}
-                      restTotalSeconds={restTotalSeconds}
                       restRemaining={restRemaining}
                       restRunning={restRunning}
                       restExerciseLabel={restExerciseLabel}
                       cooldownRemaining={cooldownRemaining}
                       cooldownAlertTarget={cooldownAlertTarget}
-                      justClapped={justClapped}
-                      dayJustChanged={dayJustChanged}
-                      userName={profile.displayName}
-                      isOpeningGreeting={isOpeningGreeting}
                       exerciseTimers={exerciseTimers}
+                      onBackToToday={() => {
+                        setActiveTab('today');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
                       onToggleRestPause={handleToggleRestPause}
                       onResetRest={handleResetRest}
                       onAdjustRest={handleAdjustRest}
+                      onStartRestTimer={startRestTimer}
                       onToggleSetComplete={handleToggleSetWithAutoRest}
                       onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
                       onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
@@ -918,7 +1003,6 @@ function AppContent() {
                       onSaveExerciseTimerSet={handleSaveExerciseTimerSet}
                       onAddSet={addSetToExercise}
                       onRemoveSet={removeSetFromExercise}
-                      onStartRestTimer={startRestTimer}
                       onOpenExerciseManager={(dayKey) => {
                         setExerciseDayKey(dayKey);
                         setActiveTab('exercises');
@@ -969,21 +1053,8 @@ function AppContent() {
                       onDeleteRingtone={deleteCustomRingtone}
                     />
                   )}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Persistent Utility Column */}
-            <div className="lg:col-span-4 lg:sticky lg:top-24">
-              <RightUtilityPanel
-                now={now}
-                timePhase={timePhase}
-                nextAlarm={nextAlarm}
-                audioUnlocked={audioUnlocked}
-                onUnlockAudio={handleUnlockAudio}
-              />
-            </div>
-          </div>
+            </motion.div>
+          </AnimatePresence>
         </main>
 
         <MobileBottomNav
