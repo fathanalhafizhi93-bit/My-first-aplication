@@ -87,7 +87,7 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "revision": "990f8de592e733ce00402407c8ba78b1"
   }, {
     "url": "index.html",
-    "revision": "3b1cad0ac301a5afd8a5766eb090bf9d"
+    "revision": "9d64d7ddac8b235cd28ac4d16d4035fe"
   }, {
     "url": "icon.svg",
     "revision": "f0a9258bfc0b2edf858585c6f809f6b8"
@@ -104,19 +104,19 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "url": "assets/workbox-window.prod.es5-Bd17z0YL.js",
     "revision": null
   }, {
-    "url": "assets/web-HalbGpq1.js",
+    "url": "assets/web-Dvq7PFNB.js",
     "revision": null
   }, {
-    "url": "assets/web-BjpM2JqW.js",
+    "url": "assets/web-CRJ_n0Sr.js",
     "revision": null
   }, {
     "url": "assets/ironpulse_splash_emblem_1794926961620-DAUEbrK4.jpg",
     "revision": null
   }, {
-    "url": "assets/index-Z6FA3CwL.css",
+    "url": "assets/index-Vc-XVUQS.js",
     "revision": null
   }, {
-    "url": "assets/index-BljfpIGV.js",
+    "url": "assets/index-0w2LHW6b.css",
     "revision": null
   }, {
     "url": "assets/gym_arena_backdrop_1794848258829-sLjOZs5A.jpg",

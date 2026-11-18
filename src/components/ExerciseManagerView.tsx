@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
+  BookOpen,
   Clock,
   Dumbbell,
   Edit3,
@@ -10,6 +11,7 @@ import {
   Search,
   Timer,
   Trash2,
+  X,
 } from 'lucide-react';
 import { EXERCISE_LIBRARY } from '../data/presets';
 import { formatCompactDuration } from '../lib/dateUtils';
@@ -91,6 +93,9 @@ export function ExerciseManagerView({
   const { lang, t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [muscleFilter, setMuscleFilter] = useState<'Semua' | MuscleGroup>('Semua');
+  const [showLibraryModal, setShowLibraryModal] = useState(false);
+  const [addingPresetName, setAddingPresetName] = useState<string | null>(null);
+  const [libraryErrorMsg, setLibraryErrorMsg] = useState<string | null>(null);
   const [showCustomForm, setShowCustomForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formState, setFormState] = useState<ExerciseFormState>(EMPTY_FORM);
@@ -299,9 +304,24 @@ export function ExerciseManagerView({
     }
   };
 
+  const handleOpenLibrary = () => {
+    setLibraryErrorMsg(null);
+    setShowLibraryModal(true);
+  };
+
+  const handleCloseLibrary = () => {
+    if (addingPresetName !== null) return;
+    setShowLibraryModal(false);
+    setLibraryErrorMsg(null);
+  };
+
   const handleQuickAddPreset = async (preset: Omit<ExerciseItem, 'id'>) => {
+    if (addingPresetName !== null) return;
+    setAddingPresetName(preset.name);
+    setLibraryErrorMsg(null);
     try {
       await onAddExercise(selectedDayKey, preset);
+      setShowLibraryModal(false);
       showToast(
         t(
           `"${preset.name}" ditambahkan ke hari ${dayLabel}.`,
@@ -309,12 +329,13 @@ export function ExerciseManagerView({
         )
       );
     } catch (err) {
-      showToast(
+      setLibraryErrorMsg(
         err instanceof Error
           ? err.message
-          : t('Gagal menambahkan gerakan.', 'Failed to add exercise.'),
-        true
+          : t('Gagal menambahkan gerakan.', 'Failed to add exercise.')
       );
+    } finally {
+      setAddingPresetName(null);
     }
   };
 
@@ -333,14 +354,25 @@ export function ExerciseManagerView({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleOpenNewForm}
-          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2.5 text-xs font-bold text-pulse-fg hover:brightness-105 whitespace-nowrap shrink-0"
-        >
-          <Plus className="h-4 w-4" />
-          {t('Buat Gerakan Baru', 'New Custom Exercise')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={handleOpenLibrary}
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#13161C]/85 px-4 py-2.5 text-xs font-bold text-[#F4F5F7] transition-colors hover:border-pulse/60 hover:text-pulse active:scale-[0.98] whitespace-nowrap shrink-0"
+          >
+            <BookOpen className="h-4 w-4 text-pulse" />
+            {t('Pustaka Gerakan', 'Exercise Library')}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleOpenNewForm}
+            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2.5 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] whitespace-nowrap shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            {t('Buat Gerakan Baru', 'New Custom Exercise')}
+          </button>
+        </div>
       </div>
 
       {feedbackMsg && (
@@ -757,11 +789,31 @@ export function ExerciseManagerView({
         </div>
 
         {schedule.exercises.length === 0 ? (
-          <div className="glass-surface rounded-2xl border border-white/12 p-6 text-center text-sm text-[#9CA3AF]">
-            {t(
-              `Belum ada gerakan pada hari ${dayLabel}. Pilih gerakan dari pustaka di bawah atau buat gerakan baru.`,
-              `No exercises scheduled for ${dayLabel}. Pick movements from the library below or create a custom one.`
-            )}
+          <div className="glass-surface rounded-2xl border border-white/12 p-6 text-center space-y-4">
+            <p className="mx-auto max-w-md text-sm text-[#9CA3AF]">
+              {t(
+                `Belum ada gerakan pada hari ${dayLabel}. Pilih cepat dari pop-up Pustaka Gerakan atau buat gerakan kustom baru.`,
+                `No exercises scheduled for ${dayLabel}. Pick quickly from the Exercise Library pop-up or create a custom exercise.`
+              )}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={handleOpenLibrary}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#13161C]/85 px-4 py-2.5 text-xs font-bold text-[#F4F5F7] transition-colors hover:border-pulse/60 hover:text-pulse active:scale-[0.98] whitespace-nowrap shrink-0"
+              >
+                <BookOpen className="h-4 w-4 text-pulse" />
+                {t('Buka Pustaka Gerakan', 'Open Exercise Library')}
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenNewForm}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2.5 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] whitespace-nowrap shrink-0"
+              >
+                <Plus className="h-4 w-4" />
+                {t('Buat Gerakan Baru', 'New Custom Exercise')}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="glass-surface divide-y divide-white/10 rounded-2xl border border-white/12">
@@ -848,87 +900,134 @@ export function ExerciseManagerView({
         )}
       </section>
 
-      {/* Curated Exercise Library */}
-      <section className="space-y-4 border-t border-white/10 pt-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="font-display text-2xl font-bold text-[#F4F5F7]">
-            {t('Pustaka Gerakan Siap Pakai', 'Ready-to-Use Exercise Library')}
-          </h2>
+      {/* Curated Exercise Library Popup Modal */}
+      <GlassModal
+        open={showLibraryModal}
+        onClose={handleCloseLibrary}
+        title={`${t('Pustaka Gerakan Siap Pakai', 'Ready-to-Use Exercise Library')} — ${dayLabel}`}
+        subtitle={t(
+          'Cari atau filter berdasarkan kelompok otot, lalu tekan Tambah untuk langsung memasukkan ke jadwal hari ini.',
+          'Search or filter by muscle group, then tap Add to immediately add it to this day’s schedule.'
+        )}
+        maxWidthClass="max-w-3xl"
+        accentBorderClass="border-pulse/30"
+      >
+        <div className="space-y-4">
+          {libraryErrorMsg && (
+            <p className="rounded-xl border border-[#DC2626]/40 bg-[#DC2626]/15 px-3.5 py-2.5 text-xs font-medium text-[#FCA5A5]">
+              {libraryErrorMsg}
+            </p>
+          )}
 
-          <div className="relative w-full sm:w-64">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
+          {/* Search Input */}
+          <div className="relative w-full">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('Cari nama gerakan atau alat...', 'Search exercise or equipment...')}
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#13161C] pl-9 pr-3 text-sm text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-pulse focus:outline-none"
+              className="h-11 w-full rounded-xl border border-white/12 bg-[#0A0B0E]/85 pl-10 pr-10 text-sm text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-pulse focus:outline-none"
             />
-          </div>
-        </div>
-
-        {/* Muscle Filter Tabs */}
-        <div className="flex flex-wrap gap-1.5">
-          {(['Semua', ...MUSCLE_GROUPS] as const).map((group) => {
-            const active = muscleFilter === group;
-            const groupLabel =
-              group === 'Semua' ? t('Semua', 'All') : MUSCLE_LABELS[lang][group];
-            return (
+            {searchQuery && (
               <button
-                key={group}
                 type="button"
-                onClick={() => setMuscleFilter(group)}
-                className={`min-h-[38px] rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
-                  active
-                    ? 'bg-pulse text-pulse-fg'
-                    : 'border border-white/10 bg-[#13161C] text-[#9CA3AF] hover:text-[#F4F5F7]'
-                }`}
+                aria-label={t('Hapus pencarian', 'Clear search')}
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-white/10 hover:text-[#F4F5F7]"
               >
-                {groupLabel}
+                <X className="h-3.5 w-3.5" />
               </button>
-            );
-          })}
-        </div>
+            )}
+          </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {filteredLibrary.map((preset) => {
-            const mode = resolveExerciseTrackingMode(preset);
-            return (
-              <div
-                key={preset.name}
-                className="glass-surface flex items-center justify-between gap-3 rounded-2xl border border-white/12 p-4"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-[#F4F5F7]">{preset.name}</p>
-                  <p className="mt-1 text-xs text-[#9CA3AF]">
-                    {MUSCLE_LABELS[lang][preset.muscleGroup]} · {preset.equipment} ·{' '}
-                    <span
-                      className={`font-mono tabular-nums ${
-                        mode === 'timer' ? 'text-[#38BDF8]' : ''
-                      }`}
-                    >
-                      {mode === 'timer'
-                        ? `${t('Timer', 'Timer')} ${preset.targetSets}×${formatCompactDuration(
-                            resolveTargetDurationSeconds(preset),
-                            lang
-                          )}`
-                        : `${preset.targetSets}×${preset.targetReps}`}
-                    </span>
-                  </p>
-                </div>
+          {/* Muscle Filter Controls */}
+          <div className="flex flex-wrap gap-1.5">
+            {(['Semua', ...MUSCLE_GROUPS] as const).map((group) => {
+              const active = muscleFilter === group;
+              const groupLabel =
+                group === 'Semua' ? t('Semua', 'All') : MUSCLE_LABELS[lang][group];
+              return (
                 <button
+                  key={group}
                   type="button"
-                  onClick={() => handleQuickAddPreset(preset)}
-                  className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-pulse/40 bg-pulse/10 px-3 py-2 text-xs font-bold text-pulse hover:bg-pulse hover:text-pulse-fg whitespace-nowrap shrink-0"
+                  onClick={() => setMuscleFilter(group)}
+                  className={`min-h-[38px] rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
+                    active
+                      ? 'bg-pulse text-pulse-fg font-bold'
+                      : 'border border-white/10 bg-[#0A0B0E]/75 text-[#9CA3AF] hover:text-[#F4F5F7]'
+                  }`}
                 >
-                  <Plus className="h-3.5 w-3.5" />
-                  {t('Tambah', 'Add')}
+                  {groupLabel}
                 </button>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* Preset Exercise Grid */}
+          {filteredLibrary.length === 0 ? (
+            <div className="rounded-xl border border-white/10 bg-[#0A0B0E]/65 p-6 text-center space-y-3">
+              <p className="text-sm text-[#9CA3AF]">
+                {t(
+                  'Tidak ada gerakan yang cocok dengan pencarian atau filter otot ini.',
+                  'No movements match your search or muscle group filter.'
+                )}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setMuscleFilter('Semua');
+                }}
+                className="inline-flex min-h-[38px] items-center justify-center rounded-lg border border-white/15 px-3.5 py-1.5 text-xs font-semibold text-[#F4F5F7] hover:border-pulse hover:text-pulse"
+              >
+                {t('Reset Pencarian & Filter', 'Reset Search & Filter')}
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              {filteredLibrary.map((preset) => {
+                const mode = resolveExerciseTrackingMode(preset);
+                const isAddingThis = addingPresetName === preset.name;
+                return (
+                  <div
+                    key={preset.name}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E]/75 p-3.5 transition-colors hover:border-white/20"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[#F4F5F7]">{preset.name}</p>
+                      <p className="mt-1 text-xs text-[#9CA3AF]">
+                        {MUSCLE_LABELS[lang][preset.muscleGroup]} · {preset.equipment} ·{' '}
+                        <span
+                          className={`font-mono tabular-nums ${
+                            mode === 'timer' ? 'text-[#38BDF8]' : ''
+                          }`}
+                        >
+                          {mode === 'timer'
+                            ? `${t('Timer', 'Timer')} ${preset.targetSets}×${formatCompactDuration(
+                                resolveTargetDurationSeconds(preset),
+                                lang
+                              )}`
+                            : `${preset.targetSets}×${preset.targetReps}`}
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={addingPresetName !== null}
+                      onClick={() => handleQuickAddPreset(preset)}
+                      className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-pulse/40 bg-pulse/10 px-3 py-2 text-xs font-bold text-pulse transition-colors hover:bg-pulse hover:text-pulse-fg active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 whitespace-nowrap shrink-0"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {isAddingThis ? t('Menambah...', 'Adding...') : t('Tambah', 'Add')}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-      </section>
+      </GlassModal>
 
       <ConfirmDeleteModal
         open={Boolean(deleteTarget)}
