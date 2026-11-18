@@ -190,7 +190,8 @@ export function TodayWorkoutView({
     );
   }, 0);
 
-  // Determine character avatar reaction mood dynamically
+  // Celebration ('clap', 'milestone', 'celebrate') triggers ONLY during the set-completion burst,
+  // then returns smoothly to time-of-day living reactions ('ready' / 'restday').
   let mascotMood: MascotMood = 'ready';
   if (justClapped) {
     if (totalSets > 0 && completedSets === totalSets) {
@@ -200,22 +201,14 @@ export function TodayWorkoutView({
     } else {
       mascotMood = 'clap';
     }
-  } else if (!activeSchedule.isGymDay) {
-    mascotMood = 'restday';
-  } else if (totalSets > 0 && completedSets === totalSets) {
-    mascotMood = 'celebrate';
   } else if (hasAnyTimerRunning) {
     mascotMood = 'timerActive';
   } else if (restRunning) {
     mascotMood = 'rest';
-  } else if (dayJustChanged || isOpeningGreeting) {
-    mascotMood = 'welcome';
-  } else if (completedSets === 0) {
-    mascotMood = 'welcome';
-  } else if (progressPct >= 50) {
-    mascotMood = 'milestone';
-  } else if (completedSets > 0) {
-    mascotMood = 'starting';
+  } else if (!activeSchedule.isGymDay) {
+    mascotMood = 'restday';
+  } else {
+    mascotMood = 'ready';
   }
 
   const restProgressRatio =
@@ -322,10 +315,11 @@ export function TodayWorkoutView({
             </h1>
           </div>
 
-          {/* Interactive Modern Coach Avatar */}
+          {/* Interactive Circular Living Companion Orb */}
           <TodayMascot
             mood={mascotMood}
             timePhase={timePhase}
+            hour={now.getHours()}
             restRemainingFormatted={restRunning ? formatRestDuration(restRemaining) : undefined}
             activeTimerExerciseName={activeTimerEntry?.name}
             progressPct={progressPct}

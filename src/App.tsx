@@ -193,7 +193,7 @@ function AppContent() {
     clapTimeoutRef.current = window.setTimeout(() => {
       setJustClapped(false);
       clapTimeoutRef.current = null;
-    }, 2800);
+    }, 3200);
   }, []);
 
   const triggerAlarm = useCallback(
