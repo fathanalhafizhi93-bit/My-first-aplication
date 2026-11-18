@@ -18,6 +18,7 @@ import {
 interface HistoryProgressViewProps {
   workoutHistory: WorkoutLog[];
   loading: boolean;
+  todayDateKey?: string;
   onGoToToday: () => void;
 }
 
@@ -69,12 +70,13 @@ function getLogStats(log: WorkoutLog) {
 export function HistoryProgressView({
   workoutHistory,
   loading,
+  todayDateKey,
   onGoToToday,
 }: HistoryProgressViewProps) {
   const { lang, t } = useI18n();
   const locale = lang === 'en' ? 'en-US' : 'id-ID';
-  const today = useMemo(() => new Date(), []);
-  const todayKey = formatLocalDateKey(today);
+  const todayKey = todayDateKey || formatLocalDateKey();
+  const today = useMemo(() => parseDateKey(todayKey), [todayKey]);
 
   const [viewMonthDate, setViewMonthDate] = useState<Date>(
     () => new Date(today.getFullYear(), today.getMonth(), 1)
@@ -224,7 +226,7 @@ export function HistoryProgressView({
             <span className="font-semibold uppercase tracking-wider">
               {t('Sesi Selesai', 'Completed Sessions')}
             </span>
-            <CalendarDays className="h-4 w-4 text-[#C8FF2E]" />
+            <CalendarDays className="h-4 w-4 text-pulse" />
           </div>
           <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-[#F4F5F7]">
             {summary.completedSessions}
@@ -239,9 +241,9 @@ export function HistoryProgressView({
             <span className="font-semibold uppercase tracking-wider">
               {t('Streak Mingguan', 'Weekly Streak')}
             </span>
-            <Flame className="h-4 w-4 text-[#C8FF2E]" />
+            <Flame className="h-4 w-4 text-pulse" />
           </div>
-          <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-[#C8FF2E]">
+          <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-pulse">
             {summary.weeklyStreak} {t('Minggu', 'Weeks')}
           </p>
           <p className="mt-1 text-xs text-[#9CA3AF]">
@@ -254,7 +256,7 @@ export function HistoryProgressView({
             <span className="font-semibold uppercase tracking-wider">
               {t('Volume Bulan Ini', 'Month Volume')}
             </span>
-            <Dumbbell className="h-4 w-4 text-[#C8FF2E]" />
+            <Dumbbell className="h-4 w-4 text-pulse" />
           </div>
           <p className="mt-2 font-mono text-3xl font-bold tabular-nums text-[#F4F5F7]">
             {summary.monthVolume.toLocaleString(locale)}{' '}
@@ -286,7 +288,7 @@ export function HistoryProgressView({
             <button
               type="button"
               onClick={jumpToCurrentMonth}
-              className="min-h-[44px] rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-xs font-semibold text-[#D1D5DB] hover:border-[#C8FF2E]/50 hover:text-[#C8FF2E]"
+              className="min-h-[44px] rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-xs font-semibold text-[#D1D5DB] hover:border-pulse/50 hover:text-pulse"
             >
               {t('Bulan Ini', 'This Month')}
             </button>
@@ -330,7 +332,7 @@ export function HistoryProgressView({
               'border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/25';
             if (stats?.isFull) {
               surfaceClass =
-                'border-[#C8FF2E]/40 bg-[#C8FF2E]/12 text-[#F4F5F7] hover:border-[#C8FF2E]/70';
+                'border-pulse/40 bg-pulse/12 text-[#F4F5F7] hover:border-pulse/70';
             } else if (stats?.isPartial) {
               surfaceClass =
                 'border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#F4F5F7] hover:border-[#38BDF8]/70';
@@ -342,15 +344,17 @@ export function HistoryProgressView({
                 type="button"
                 onClick={() => setSelectedDateKey(cell.dateKey!)}
                 className={`relative flex min-h-[46px] flex-col items-center justify-center rounded-xl border font-mono text-sm font-semibold tabular-nums transition-colors ${surfaceClass} ${
-                  isSelected ? 'ring-2 ring-[#C8FF2E] ring-offset-1 ring-offset-[#13161C]' : ''
+                  isSelected
+                    ? 'border-pulse shadow-[0_0_0_2px_rgba(var(--ip-accent-rgb),0.45)]'
+                    : ''
                 }`}
               >
-                <span className={isToday ? 'text-[#C8FF2E] font-bold' : ''}>
+                <span className={isToday ? 'text-pulse font-bold' : ''}>
                   {cell.dayNumber}
                 </span>
 
                 {stats?.isFull && (
-                  <span className="mt-0.5 h-1 w-4 rounded-full bg-[#C8FF2E]" />
+                  <span className="mt-0.5 h-1 w-4 rounded-full bg-pulse" />
                 )}
                 {stats?.isPartial && (
                   <span className="mt-0.5 h-1 w-4 rounded-full bg-[#38BDF8]" />
@@ -366,7 +370,7 @@ export function HistoryProgressView({
         {/* Minimal Calendar Legend */}
         <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/10 pt-3 text-xs text-[#9CA3AF]">
           <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-4 rounded-full bg-[#C8FF2E]" />
+            <span className="h-2 w-4 rounded-full bg-pulse" />
             {t('Selesai penuh', 'Fully completed')}
           </span>
           <span className="inline-flex items-center gap-2">
@@ -374,7 +378,7 @@ export function HistoryProgressView({
             {t('Sebagian set selesai', 'Partially completed')}
           </span>
           <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full ring-2 ring-[#C8FF2E]" />
+            <span className="h-2 w-2 rounded-full ring-2 ring-pulse" />
             {t('Tanggal dipilih', 'Selected date')}
           </span>
         </div>
@@ -384,7 +388,7 @@ export function HistoryProgressView({
       <section className="glass-surface rounded-2xl border border-white/12 p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#C8FF2E]">
+            <p className="text-xs font-semibold uppercase tracking-wider text-pulse">
               {t('Detail Sesi', 'Session Detail')}
             </p>
             <h2 className="mt-0.5 font-display text-xl font-bold capitalize text-[#F4F5F7]">
@@ -460,7 +464,7 @@ export function HistoryProgressView({
                             key={set.setNumber}
                             className={`rounded-lg border px-2.5 py-1 font-mono text-xs tabular-nums ${
                               set.completed
-                                ? 'border-[#C8FF2E]/35 bg-[#C8FF2E]/10 text-[#F4F5F7]'
+                                ? 'border-pulse/35 bg-pulse/10 text-[#F4F5F7]'
                                 : 'border-white/10 bg-[#0A0B0E] text-[#6B7280]'
                             }`}
                           >
@@ -486,7 +490,7 @@ export function HistoryProgressView({
               <button
                 type="button"
                 onClick={onGoToToday}
-                className="min-h-[44px] rounded-xl bg-[#C8FF2E] px-4 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+                className="min-h-[44px] rounded-xl bg-pulse px-4 py-2 text-xs font-bold text-pulse-fg hover:brightness-105"
               >
                 {t('Mulai Catat Latihan Hari Ini', "Log Today's Workout")}
               </button>

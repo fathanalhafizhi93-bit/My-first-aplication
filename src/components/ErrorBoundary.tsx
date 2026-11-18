@@ -29,8 +29,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-[#0A0B0E] px-6 text-[#F4F5F7]">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#13161C] p-6 space-y-4">
+        <div className="flex min-h-screen items-center justify-center bg-[var(--ip-canvas-bg)] px-6 text-[#F4F5F7]">
+          <div className="glass-surface w-full max-w-md rounded-2xl border border-white/10 p-6 space-y-4">
             <h1 className="font-display text-2xl font-bold text-[#F4F5F7]">
               Terjadi Gangguan Koneksi / Sesi
             </h1>
@@ -46,7 +46,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="min-h-[44px] w-full rounded-xl bg-[#C8FF2E] px-4 py-2.5 text-sm font-bold text-[#0A0B0E] hover:brightness-105"
+              className="min-h-[44px] w-full rounded-xl bg-pulse px-4 py-2.5 text-sm font-bold text-pulse-fg hover:brightness-105"
             >
               Muat Ulang IronPulse
             </button>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import splashEmblem from '../assets/images/ironpulse_splash_emblem_1794926961620.jpg';
 import { DayTimePhase, PHASE_THEME_TOKENS } from '../lib/i18n';
@@ -10,6 +10,8 @@ interface LaunchIntroProps {
 
 export function LaunchIntro({ timePhase, onComplete }: LaunchIntroProps) {
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     const prefersReduced =
@@ -17,16 +19,16 @@ export function LaunchIntro({ timePhase, onComplete }: LaunchIntroProps) {
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (prefersReduced) {
-      onComplete();
+      onCompleteRef.current();
       return;
     }
 
     const timer = window.setTimeout(() => {
-      onComplete();
+      onCompleteRef.current();
     }, 980);
 
     return () => window.clearTimeout(timer);
-  }, [onComplete]);
+  }, []);
 
   return (
     <motion.div
@@ -99,7 +101,7 @@ export function LaunchIntro({ timePhase, onComplete }: LaunchIntroProps) {
           initial={{ scaleX: 0, opacity: 0 }}
           animate={{ scaleX: 1, opacity: 1 }}
           transition={{ duration: 0.52, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-5 h-0.5 w-36 origin-center rounded-full bg-[#C8FF2E]"
+          className="mt-5 h-0.5 w-36 origin-center rounded-full bg-pulse"
         />
       </div>
     </motion.div>

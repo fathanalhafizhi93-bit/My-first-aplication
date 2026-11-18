@@ -99,7 +99,7 @@ export function CooldownAlertModal({
                   />
                 </svg>
                 <div className="absolute flex items-baseline gap-0.5 font-mono font-extrabold tabular-nums">
-                  <span className="text-5xl text-[#C8FF2E]">{cooldownRemaining}</span>
+                  <span className="text-5xl text-pulse">{cooldownRemaining}</span>
                   <span className="text-base text-[#9CA3AF]">{t('d', 's')}</span>
                 </div>
               </div>
@@ -135,7 +135,7 @@ export function CooldownAlertModal({
                 onClick={() => {
                   void onBypass();
                 }}
-                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 py-2.5 text-xs font-bold text-[#0A0B0E] transition-transform hover:brightness-105 active:scale-[0.98] whitespace-nowrap"
+                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2.5 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] whitespace-nowrap"
               >
                 <Check className="h-4 w-4" strokeWidth={2.5} />
                 {t('Tetap Centang (Lewati)', 'Confirm Anyway')}

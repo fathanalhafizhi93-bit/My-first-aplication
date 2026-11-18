@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
@@ -90,6 +90,81 @@ interface WorkoutSessionViewProps {
   onOpenScheduleManager: () => void;
 }
 
+interface BufferedNumberInputProps {
+  value: number;
+  min: number;
+  max: number;
+  allowDecimal?: boolean;
+  padTwo?: boolean;
+  ariaLabel: string;
+  className: string;
+  onCommit: (nextValue: number) => void | Promise<void>;
+}
+
+function BufferedNumberInput({
+  value,
+  min,
+  max,
+  allowDecimal = false,
+  padTwo = false,
+  ariaLabel,
+  className,
+  onCommit,
+}: BufferedNumberInputProps) {
+  const formatProp = (num: number) =>
+    padTwo ? String(num).padStart(2, '0') : String(num);
+
+  const [draft, setDraft] = useState(() => formatProp(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) {
+      setDraft(formatProp(value));
+    }
+  }, [value, focused, padTwo]);
+
+  const commitValue = (raw: string) => {
+    const trimmed = raw.trim().replace(',', '.');
+    const parsed = allowDecimal ? parseFloat(trimmed) : parseInt(trimmed, 10);
+    const clamped = Number.isFinite(parsed)
+      ? Math.max(min, Math.min(max, allowDecimal ? Math.round(parsed * 10) / 10 : parsed))
+      : value;
+    setDraft(formatProp(clamped));
+    if (clamped !== value) {
+      void onCommit(clamped);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode={allowDecimal ? 'decimal' : 'numeric'}
+      aria-label={ariaLabel}
+      value={draft}
+      onFocus={(e) => {
+        setFocused(true);
+        e.currentTarget.select();
+      }}
+      onChange={(e) => {
+        const cleaned = allowDecimal
+          ? e.target.value.replace(/[^0-9.,]/g, '')
+          : e.target.value.replace(/[^0-9]/g, '');
+        setDraft(cleaned);
+      }}
+      onBlur={() => {
+        setFocused(false);
+        commitValue(draft);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.currentTarget.blur();
+        }
+      }}
+      className={className}
+    />
+  );
+}
+
 export function WorkoutSessionView({
   now,
   todayDayKey,
@@ -153,7 +228,7 @@ export function WorkoutSessionView({
           <button
             type="button"
             onClick={onBackToToday}
-            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-white/15 bg-[#13161C]/80 px-3.5 py-2 text-xs font-bold text-[#F4F5F7] transition-all duration-150 hover:border-[#C8FF2E]/50 hover:text-[#C8FF2E] active:scale-[0.97] whitespace-nowrap shrink-0"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-white/15 bg-[#13161C]/80 px-3.5 py-2 text-xs font-bold text-[#F4F5F7] transition-all duration-150 hover:border-pulse/50 hover:text-pulse active:scale-[0.97] whitespace-nowrap shrink-0"
           >
             <ArrowLeft className="h-4 w-4" />
             {t('Kembali ke Hari Ini', 'Back to Today')}
@@ -166,7 +241,7 @@ export function WorkoutSessionView({
             <span aria-hidden="true" className="text-[#6B7280]">
               ·
             </span>
-            <span className="font-bold text-[#C8FF2E]">{progressPct}%</span>
+            <span className="font-bold text-pulse">{progressPct}%</span>
           </div>
         </div>
 
@@ -186,7 +261,7 @@ export function WorkoutSessionView({
         {activeSchedule.isGymDay && totalSets > 0 && (
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full w-full origin-left rounded-full bg-[#C8FF2E] transition-transform duration-300 ease-out"
+              className="h-full w-full origin-left rounded-full bg-pulse transition-transform duration-300 ease-out"
               style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressPct / 100))})` }}
             />
           </div>
@@ -213,7 +288,7 @@ export function WorkoutSessionView({
           <button
             type="button"
             onClick={onBackToToday}
-            className="min-h-[44px] shrink-0 rounded-xl bg-[#C8FF2E] px-4 py-2 text-xs font-bold text-[#0A0B0E] transition-transform hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
+            className="min-h-[44px] shrink-0 rounded-xl bg-pulse px-4 py-2 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
           >
             {t('Lihat Perayaan di Hari Ini', 'Back to Today')}
           </button>
@@ -225,7 +300,7 @@ export function WorkoutSessionView({
         <section
           className={`glass-surface rounded-2xl border p-3.5 sm:p-4 transition-colors ${
             restRunning
-              ? 'border-[#C8FF2E]/50'
+              ? 'border-pulse/50'
               : restRemaining === 0
                 ? 'border-[#16A34A]/50'
                 : 'border-white/12'
@@ -240,7 +315,7 @@ export function WorkoutSessionView({
                       restRemaining === 0
                         ? 'text-[#4ADE80]'
                         : restRunning
-                          ? 'text-[#C8FF2E]'
+                          ? 'text-pulse'
                           : 'text-[#9CA3AF]'
                     }`}
                   />
@@ -255,7 +330,7 @@ export function WorkoutSessionView({
                         restRemaining === 0
                           ? 'text-[#4ADE80]'
                           : restRunning
-                            ? 'text-[#C8FF2E]'
+                            ? 'text-pulse'
                             : 'text-[#9CA3AF]'
                       }`}
                     >
@@ -280,7 +355,7 @@ export function WorkoutSessionView({
                     key={sec}
                     type="button"
                     onClick={() => onStartRestTimer(sec, restExerciseLabel || undefined)}
-                    className="min-h-[38px] rounded-lg border border-white/10 bg-[#0A0B0E]/80 px-2.5 font-mono text-[11px] font-semibold tabular-nums text-[#D1D5DB] hover:border-[#C8FF2E] hover:text-[#C8FF2E]"
+                    className="min-h-[38px] rounded-lg border border-white/10 bg-[#0A0B0E]/80 px-2.5 font-mono text-[11px] font-semibold tabular-nums text-[#D1D5DB] hover:border-pulse hover:text-pulse"
                   >
                     {sec}
                     {secUnit}
@@ -300,7 +375,7 @@ export function WorkoutSessionView({
                 <button
                   type="button"
                   onClick={onToggleRestPause}
-                  className="flex min-h-[40px] flex-1 sm:flex-initial sm:min-w-[96px] items-center justify-center gap-1.5 rounded-xl bg-[#C8FF2E] px-3.5 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
+                  className="flex min-h-[40px] flex-1 sm:flex-initial sm:min-w-[96px] items-center justify-center gap-1.5 rounded-xl bg-pulse px-3.5 text-xs font-bold text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
                 >
                   {restRunning ? (
                     <>
@@ -366,7 +441,7 @@ export function WorkoutSessionView({
           <button
             type="button"
             onClick={onOpenScheduleManager}
-            className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
+            className="mt-5 min-h-[44px] rounded-xl bg-pulse px-5 py-2.5 text-xs font-bold text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
           >
             {t('Buka Tab Jadwal', 'Open Schedule Tab')}
           </button>
@@ -389,7 +464,7 @@ export function WorkoutSessionView({
           <button
             type="button"
             onClick={() => onOpenExerciseManager(todayDayKey)}
-            className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
+            className="mt-5 min-h-[44px] rounded-xl bg-pulse px-5 py-2.5 text-xs font-bold text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
           >
             {t('+ Tambah Gerakan Sekarang', '+ Add Exercise Now')}
           </button>
@@ -460,7 +535,7 @@ export function WorkoutSessionView({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2.5">
-                      <span className="font-mono text-xs font-bold tabular-nums text-[#C8FF2E]">
+                      <span className="font-mono text-xs font-bold tabular-nums text-pulse">
                         {String(index + 1).padStart(2, '0')}.
                       </span>
                       <h2 className="truncate text-lg font-bold text-[#F4F5F7]">
@@ -519,7 +594,7 @@ export function WorkoutSessionView({
                         onClick={() => onStartRestTimer(spec.restSeconds, entry.name)}
                         className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-white/15 bg-[#1A1E26] px-3 py-2 text-xs font-semibold text-[#F4F5F7] hover:bg-[#252B36] whitespace-nowrap"
                       >
-                        <Timer className="h-3.5 w-3.5 text-[#C8FF2E]" />
+                        <Timer className="h-3.5 w-3.5 text-pulse" />
                         {t('Istirahat', 'Rest')} {spec.restSeconds}
                         {secUnit}
                       </button>
@@ -565,13 +640,13 @@ export function WorkoutSessionView({
                           {t('Timer Gerakan', 'Exercise Timer')} · #{activeSetNumber}
                         </span>
                         {entry.sets.length > 1 && (
-                          <div className="flex items-center gap-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             {entry.sets.map((s) => (
                               <button
                                 key={s.setNumber}
                                 type="button"
                                 onClick={() => onSelectExerciseTimerSet(entry, s.setNumber)}
-                                className={`min-h-[28px] rounded-md px-2 font-mono text-[11px] font-bold tabular-nums transition-colors ${
+                                className={`min-h-[34px] min-w-[34px] rounded-md px-2 font-mono text-[11px] font-bold tabular-nums transition-colors ${
                                   s.setNumber === activeSetNumber
                                     ? 'bg-[#38BDF8] text-[#0A0B0E]'
                                     : s.completed
@@ -603,7 +678,7 @@ export function WorkoutSessionView({
                           onClick={() => onChangeExerciseTimerDirection(entry, 'countup')}
                           className={`min-h-[32px] rounded-md px-2.5 text-[11px] font-bold transition-colors whitespace-nowrap ${
                             timerDirection === 'countup'
-                              ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                              ? 'bg-pulse text-pulse-fg'
                               : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
                           }`}
                         >
@@ -639,7 +714,7 @@ export function WorkoutSessionView({
                               ? 'bg-[#F59E0B] text-[#0A0B0E]'
                               : timerDirection === 'countdown'
                                 ? 'bg-[#38BDF8] text-[#0A0B0E]'
-                                : 'bg-[#C8FF2E] text-[#0A0B0E]'
+                                : 'bg-pulse text-pulse-fg'
                           }`}
                         >
                           {timerRunning ? (
@@ -680,7 +755,7 @@ export function WorkoutSessionView({
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                       <div
                         className={`h-full w-full origin-left rounded-full transition-transform duration-300 ease-out ${
-                          timerDirection === 'countdown' ? 'bg-[#38BDF8]' : 'bg-[#C8FF2E]'
+                          timerDirection === 'countdown' ? 'bg-[#38BDF8]' : 'bg-pulse'
                         }`}
                         style={{ transform: `scaleX(${Math.max(0, Math.min(1, timerProgressPct / 100))})` }}
                       />
@@ -729,22 +804,21 @@ export function WorkoutSessionView({
 
                             {usesWeight && (
                               <td className="py-2 px-2">
-                                <input
-                                  type="number"
+                                <BufferedNumberInput
                                   min={0}
                                   max={999}
-                                  step="0.5"
-                                  aria-label={`${t('Beban set', 'Weight set')} ${setRow.setNumber} ${entry.name}`}
+                                  allowDecimal
+                                  ariaLabel={`${t('Beban set', 'Weight set')} ${setRow.setNumber} ${entry.name}`}
                                   value={setRow.weightKg}
-                                  onChange={(e) =>
+                                  onCommit={(nextWeight) =>
                                     onUpdateSetMetrics(
                                       entry.exerciseId,
                                       setRow.setNumber,
-                                      parseFloat(e.target.value) || 0,
+                                      nextWeight,
                                       setRow.reps
                                     )
                                   }
-                                  className="h-11 w-24 rounded-lg border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                                  className="h-11 w-20 sm:w-24 rounded-lg border border-white/10 bg-[#0A0B0E] px-2.5 sm:px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-pulse focus:outline-none"
                                 />
                               </td>
                             )}
@@ -752,65 +826,54 @@ export function WorkoutSessionView({
                             {mode === 'timer' ? (
                               <td className="py-2 px-2">
                                 <div className="flex items-center gap-1.5">
-                                  <input
-                                    type="number"
+                                  <BufferedNumberInput
                                     min={0}
                                     max={180}
-                                    aria-label={`${t('Menit set', 'Minutes set')} ${setRow.setNumber} ${entry.name}`}
+                                    ariaLabel={`${t('Menit set', 'Minutes set')} ${setRow.setNumber} ${entry.name}`}
                                     value={rowMins}
-                                    onChange={(e) => {
-                                      const m = Math.max(
-                                        0,
-                                        Math.min(180, parseInt(e.target.value, 10) || 0)
-                                      );
-                                      void onUpdateSetDuration(
+                                    onCommit={(m) =>
+                                      onUpdateSetDuration(
                                         entry.exerciseId,
                                         setRow.setNumber,
                                         Math.max(1, m * 60 + rowSecs)
-                                      );
-                                    }}
-                                    className="h-11 w-16 rounded-lg border border-white/10 bg-[#0A0B0E] px-2.5 text-center font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
+                                      )
+                                    }
+                                    className="h-11 w-14 sm:w-16 rounded-lg border border-white/10 bg-[#0A0B0E] px-2 text-center font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
                                   />
                                   <span className="font-mono text-sm font-bold text-[#6B7280]">:</span>
-                                  <input
-                                    type="number"
+                                  <BufferedNumberInput
                                     min={0}
                                     max={59}
-                                    aria-label={`${t('Detik set', 'Seconds set')} ${setRow.setNumber} ${entry.name}`}
-                                    value={String(rowSecs).padStart(2, '0')}
-                                    onChange={(e) => {
-                                      const s = Math.max(
-                                        0,
-                                        Math.min(59, parseInt(e.target.value, 10) || 0)
-                                      );
-                                      void onUpdateSetDuration(
+                                    padTwo
+                                    ariaLabel={`${t('Detik set', 'Seconds set')} ${setRow.setNumber} ${entry.name}`}
+                                    value={rowSecs}
+                                    onCommit={(s) =>
+                                      onUpdateSetDuration(
                                         entry.exerciseId,
                                         setRow.setNumber,
                                         Math.max(1, rowMins * 60 + s)
-                                      );
-                                    }}
-                                    className="h-11 w-16 rounded-lg border border-white/10 bg-[#0A0B0E] px-2.5 text-center font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
+                                      )
+                                    }
+                                    className="h-11 w-14 sm:w-16 rounded-lg border border-white/10 bg-[#0A0B0E] px-2 text-center font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
                                   />
                                 </div>
                               </td>
                             ) : (
                               <td className="py-2 px-2">
-                                <input
-                                  type="number"
+                                <BufferedNumberInput
                                   min={0}
                                   max={999}
-                                  step="1"
-                                  aria-label={`${t('Repetisi set', 'Reps set')} ${setRow.setNumber} ${entry.name}`}
+                                  ariaLabel={`${t('Repetisi set', 'Reps set')} ${setRow.setNumber} ${entry.name}`}
                                   value={setRow.reps}
-                                  onChange={(e) =>
+                                  onCommit={(nextReps) =>
                                     onUpdateSetMetrics(
                                       entry.exerciseId,
                                       setRow.setNumber,
                                       setRow.weightKg,
-                                      parseInt(e.target.value, 10) || 0
+                                      nextReps
                                     )
                                   }
-                                  className="h-11 w-20 rounded-lg border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                                  className="h-11 w-16 sm:w-20 rounded-lg border border-white/10 bg-[#0A0B0E] px-2.5 sm:px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-pulse focus:outline-none"
                                 />
                               </td>
                             )}
@@ -831,7 +894,7 @@ export function WorkoutSessionView({
                                     ? 'border-[#16A34A] bg-[#16A34A] text-white'
                                     : isBlockedByCooldown
                                       ? 'border-[#38BDF8]/40 bg-[#1A1E26] font-mono text-xs font-bold tabular-nums text-[#38BDF8] hover:border-[#FBBF24] hover:text-[#FBBF24]'
-                                      : 'border-white/15 bg-[#1A1E26] text-[#6B7280] hover:border-[#C8FF2E] hover:text-[#C8FF2E]'
+                                      : 'border-white/15 bg-[#1A1E26] text-[#6B7280] hover:border-pulse hover:text-pulse'
                                 }`}
                               >
                                 {setRow.completed ? (
@@ -861,7 +924,7 @@ export function WorkoutSessionView({
                       onClick={() => onAddSet(entry.exerciseId)}
                       className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#D1D5DB] hover:bg-white/5"
                     >
-                      <Plus className="h-3.5 w-3.5 text-[#C8FF2E]" />
+                      <Plus className="h-3.5 w-3.5 text-pulse" />
                       {t('Tambah Set', 'Add Set')}
                     </button>
                     {entry.sets.length > 1 && (

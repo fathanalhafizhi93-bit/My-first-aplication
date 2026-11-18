@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dumbbell } from 'lucide-react';
+import gymArenaBackdrop from '../assets/images/gym_arena_backdrop_1794848258829.jpg';
 import { useI18n } from '../lib/i18n';
 import { PWAInstallCard } from './PWAInstallBanner';
 
@@ -23,12 +24,12 @@ export function AuthGate({ onSignIn, authError }: AuthGateProps) {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col justify-between overflow-hidden bg-[#0A0B0E] text-[#F4F5F7]">
+    <div className="relative flex min-h-screen flex-col justify-between overflow-hidden bg-[var(--ip-canvas-bg)] text-[#F4F5F7]">
       {/* Backdrop Image with Fallback */}
       <div className="absolute inset-0 z-0">
         {!imgFailed ? (
           <img
-            src="/src/assets/images/gym_arena_backdrop_1794848258829.jpg"
+            src={gymArenaBackdrop}
             alt={t(
               'Suasana ruang latihan beban modern bernuansa gelap',
               'Dark atmospheric modern strength training gym'
@@ -56,7 +57,7 @@ export function AuthGate({ onSignIn, authError }: AuthGateProps) {
               type="button"
               onClick={() => setLang('id')}
               className={`min-h-[28px] rounded-lg px-2.5 text-[11px] font-bold transition-colors ${
-                lang === 'id' ? 'bg-[#C8FF2E] text-[#0A0B0E]' : 'text-[#9CA3AF]'
+                lang === 'id' ? 'bg-pulse text-pulse-fg' : 'text-[#9CA3AF]'
               }`}
             >
               ID
@@ -65,7 +66,7 @@ export function AuthGate({ onSignIn, authError }: AuthGateProps) {
               type="button"
               onClick={() => setLang('en')}
               className={`min-h-[28px] rounded-lg px-2.5 text-[11px] font-bold transition-colors ${
-                lang === 'en' ? 'bg-[#C8FF2E] text-[#0A0B0E]' : 'text-[#9CA3AF]'
+                lang === 'en' ? 'bg-pulse text-pulse-fg' : 'text-[#9CA3AF]'
               }`}
             >
               EN
@@ -79,7 +80,7 @@ export function AuthGate({ onSignIn, authError }: AuthGateProps) {
 
       <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 items-center px-6 py-12 sm:px-8">
         <div className="max-w-2xl space-y-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C8FF2E]">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pulse">
             {t('Gym Reminder & Pelacak Latihan', 'Gym Reminder & Workout Tracker')}
           </p>
 
@@ -115,7 +116,7 @@ export function AuthGate({ onSignIn, authError }: AuthGateProps) {
               type="button"
               disabled={loading}
               onClick={handleLogin}
-              className="inline-flex min-h-[48px] items-center justify-center gap-3 rounded-xl bg-[#C8FF2E] px-6 py-3 text-sm font-bold text-[#0A0B0E] transition-transform hover:brightness-105 active:scale-[0.98] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C8FF2E]"
+              className="inline-flex min-h-[48px] items-center justify-center gap-3 rounded-xl bg-pulse px-6 py-3 text-sm font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pulse"
             >
               {loading
                 ? t('Menghubungkan Akun...', 'Connecting Account...')

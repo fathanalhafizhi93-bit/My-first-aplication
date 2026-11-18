@@ -1,7 +1,11 @@
 import { BellRing, Clock, Play, VolumeX } from 'lucide-react';
-import { formatAlarmTime } from '../lib/dateUtils';
+import { formatAlarmTime, formatCompactDuration } from '../lib/dateUtils';
 import { useI18n } from '../lib/i18n';
-import { DaySchedule } from '../types/gym';
+import {
+  DaySchedule,
+  resolveExerciseTrackingMode,
+  resolveTargetDurationSeconds,
+} from '../types/gym';
 
 interface ActiveAlarmOverlayProps {
   schedule: DaySchedule;
@@ -22,7 +26,7 @@ export function ActiveAlarmOverlay({
   onSnooze,
   onDismiss,
 }: ActiveAlarmOverlayProps) {
-  const { clockFormat, t } = useI18n();
+  const { lang, clockFormat, t } = useI18n();
 
   return (
     <div
@@ -31,8 +35,8 @@ export function ActiveAlarmOverlay({
       aria-labelledby="alarm-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
     >
-      <div className="glass-surface w-full max-w-lg rounded-2xl border border-[#C8FF2E]/40 p-6 sm:p-8">
-        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-[#C8FF2E]">
+      <div className="glass-surface w-full max-w-lg rounded-2xl border border-pulse/40 p-6 sm:p-8">
+        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-pulse">
           <span>
             {isTest
               ? t('Pratinjau Alarm Gym', 'Gym Alarm Preview')
@@ -44,7 +48,7 @@ export function ActiveAlarmOverlay({
         </div>
 
         <div className="mt-6 flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#C8FF2E] text-[#0A0B0E]">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-pulse text-pulse-fg">
             <BellRing className="h-7 w-7 animate-bounce" />
           </div>
           <div>
@@ -67,16 +71,25 @@ export function ActiveAlarmOverlay({
               {t('Gerakan pembuka hari ini:', "Today's opening exercises:")}
             </p>
             <ul className="mt-2 space-y-1.5 text-sm text-[#E5E7EB]">
-              {schedule.exercises.slice(0, 4).map((ex, idx) => (
-                <li key={ex.id} className="flex items-center justify-between">
-                  <span className="truncate pr-3">
-                    {idx + 1}. {ex.name}
-                  </span>
-                  <span className="font-mono text-xs tabular-nums text-[#9CA3AF] shrink-0">
-                    {ex.targetSets}×{ex.targetReps}
-                  </span>
-                </li>
-              ))}
+              {schedule.exercises.slice(0, 4).map((ex, idx) => {
+                const isTimer = resolveExerciseTrackingMode(ex) === 'timer';
+                const targetText = isTimer
+                  ? `${ex.targetSets}×${formatCompactDuration(
+                      resolveTargetDurationSeconds(ex),
+                      lang
+                    )}`
+                  : `${ex.targetSets}×${ex.targetReps}`;
+                return (
+                  <li key={ex.id} className="flex items-center justify-between">
+                    <span className="truncate pr-3">
+                      {idx + 1}. {ex.name}
+                    </span>
+                    <span className="font-mono text-xs tabular-nums text-[#9CA3AF] shrink-0">
+                      {targetText}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
@@ -85,7 +98,7 @@ export function ActiveAlarmOverlay({
           <button
             type="button"
             onClick={onStartWorkout}
-            className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-5 py-3 text-sm font-bold text-[#0A0B0E] transition-transform hover:brightness-105 active:scale-[0.98]"
+            className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-pulse px-5 py-3 text-sm font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98]"
           >
             <Play className="h-4 w-4 fill-current" />
             {t('Mulai Latihan', 'Start Workout')}

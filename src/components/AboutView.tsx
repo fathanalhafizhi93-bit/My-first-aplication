@@ -23,8 +23,8 @@ export function AboutView({ embeddedInModal = false }: AboutViewProps) {
         </div>
       )}
 
-      <section className="glass-surface rounded-2xl border border-[#C8FF2E]/30 p-6 sm:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C8FF2E]">
+      <section className="glass-surface rounded-2xl border border-pulse/30 p-6 sm:p-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pulse">
           {t('Kredit & Pembuat', 'Credits & Creators')}
         </p>
         <p
@@ -51,7 +51,7 @@ export function AboutView({ embeddedInModal = false }: AboutViewProps) {
           </div>
           <div>
             <p className="text-xs font-medium text-[#9CA3AF]">Scripter</p>
-            <p className="mt-1 font-mono text-sm font-semibold text-[#C8FF2E]">
+            <p className="mt-1 font-mono text-sm font-semibold text-pulse">
               fathan, some ai
             </p>
           </div>

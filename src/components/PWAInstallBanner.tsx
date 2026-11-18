@@ -14,9 +14,9 @@ export function PWAInstallCard() {
 
   if (isInstallable) {
     return (
-      <section className="glass-surface rounded-2xl border border-[#C8FF2E]/35 p-5">
+      <section className="glass-surface rounded-2xl border border-pulse/35 p-5">
         <div className="flex items-start gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#C8FF2E]/15 text-[#C8FF2E]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-pulse/15 text-pulse">
             <Smartphone className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -32,7 +32,7 @@ export function PWAInstallCard() {
             <button
               type="button"
               onClick={install}
-              className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+              className="mt-3 inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2 text-xs font-bold text-pulse-fg hover:brightness-105"
             >
               <Download className="h-4 w-4" />
               {t('Instal Aplikasi IronPulse', 'Install IronPulse App')}
@@ -62,7 +62,7 @@ export function PWAInstallCard() {
             <button
               type="button"
               onClick={() => setShowIOSGuide(true)}
-              className="min-h-[40px] rounded-xl border border-[#C8FF2E]/40 bg-[#C8FF2E]/10 px-3.5 py-2 text-xs font-bold text-[#C8FF2E] whitespace-nowrap shrink-0"
+              className="min-h-[40px] rounded-xl border border-pulse/40 bg-pulse/10 px-3.5 py-2 text-xs font-bold text-pulse whitespace-nowrap shrink-0"
             >
               {t('Cara Pasang', 'How to Install')}
             </button>
@@ -111,7 +111,7 @@ export function PWAInstallCard() {
               <button
                 type="button"
                 onClick={() => setShowIOSGuide(false)}
-                className="mt-5 min-h-[44px] w-full rounded-xl bg-[#C8FF2E] text-xs font-bold text-[#0A0B0E]"
+                className="mt-5 min-h-[44px] w-full rounded-xl bg-pulse text-xs font-bold text-pulse-fg"
               >
                 {t('Mengerti', 'Got It')}
               </button>
@@ -134,7 +134,7 @@ export function OfflineIndicator() {
   return (
     <div
       role="status"
-      className="fixed bottom-20 left-4 z-50 flex items-center gap-2 rounded-xl border border-[#D97706]/50 bg-[#1A1E26] px-3.5 py-2 text-xs font-semibold text-[#FCD34D] md:bottom-4"
+      className="fixed bottom-24 left-4 z-50 flex items-center gap-2 rounded-xl border border-[#D97706]/50 bg-[#1A1E26] px-3.5 py-2 text-xs font-semibold text-[#FCD34D] md:bottom-4"
     >
       <WifiOff className="h-4 w-4 shrink-0" />
       <span>

@@ -5,14 +5,12 @@ import {
   Check,
   Clock,
   Dumbbell,
-  Moon,
   Pause,
   Play,
   RotateCcw,
-  Sun,
-  Sunrise,
   Volume2,
 } from 'lucide-react';
+import gymArenaBackdrop from '../assets/images/gym_arena_backdrop_1794848258829.jpg';
 import {
   formatAlarmTime,
   formatClockTime,
@@ -23,7 +21,6 @@ import {
 } from '../lib/dateUtils';
 import {
   DAY_LABELS,
-  DayTimePhase,
   MUSCLE_LABELS,
   PHASE_THEME_TOKENS,
   resolveDayTimePhase,
@@ -37,6 +34,8 @@ import {
   TimerDirection,
   WorkoutLogEntry,
 } from '../types/gym';
+import { FluidClockDisplay } from './FluidClockDisplay';
+import { PhaseLogoEmblem } from './PhaseLogoEmblem';
 import { PWAInstallCard } from './PWAInstallBanner';
 import { MascotMood, TodayMascot } from './TodayMascot';
 
@@ -74,12 +73,6 @@ interface TodayWorkoutViewProps {
   onOpenScheduleManager: () => void;
 }
 
-const PHASE_ICONS: Record<DayTimePhase, typeof Sunrise> = {
-  morning: Sunrise,
-  afternoon: Sun,
-  night: Moon,
-};
-
 export function TodayWorkoutView({
   now,
   todayDayKey,
@@ -105,14 +98,13 @@ export function TodayWorkoutView({
   onOpenExerciseManager,
   onOpenScheduleManager,
 }: TodayWorkoutViewProps) {
-  const { lang, t, clockFormat, todayThemeMode } = useI18n();
+  const { lang, t, clockFormat, todayThemeMode, uiTheme } = useI18n();
   const [imgFailed, setImgFailed] = useState(false);
 
   const activeSchedule = schedules[todayDayKey];
   const dayLabel = DAY_LABELS[lang][todayDayKey].label;
   const timePhase = resolveDayTimePhase(todayThemeMode, now);
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
-  const PhaseIcon = PHASE_ICONS[timePhase];
   const formattedClock = formatClockTime(now, clockFormat, true);
   const formattedAlarm = formatAlarmTime(activeSchedule.alarmTime, clockFormat);
 
@@ -197,7 +189,7 @@ export function TodayWorkoutView({
       >
         {!imgFailed ? (
           <img
-            src="/src/assets/images/gym_arena_backdrop_1794848258829.jpg"
+            src={gymArenaBackdrop}
             alt={t('Suasana ruang latihan gym', 'Gym training arena backdrop')}
             referrerPolicy="no-referrer"
             onError={() => setImgFailed(true)}
@@ -219,64 +211,69 @@ export function TodayWorkoutView({
           <circle cx="280" cy="40" r="74" stroke={phaseToken.accentBright} strokeWidth="1" />
         </svg>
 
-        <div className="relative z-10 p-5 sm:p-7 space-y-5">
-          {/* Row 1: Enlarged Time-of-Day Emblem + Live Real Clock + Merged Next Alarm Summary */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-                <div
-                  className={`flex h-14 w-14 sm:h-16 sm:w-16 shrink-0 items-center justify-center rounded-2xl border transition-colors duration-300 ${phaseToken.emblemClass}`}
-                >
-                  <PhaseIcon className="h-7 w-7 sm:h-8 sm:w-8" strokeWidth={2.2} />
-                </div>
+        <div className="relative z-10 p-4 sm:p-7 space-y-4 sm:space-y-5">
+          {/* Zone 1 (Dominant Focal Anchor): Flat Phase Emblem + Enlarged Left-Aligned Fluid Clock */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-4 lg:gap-5 min-w-0">
+              <PhaseLogoEmblem timePhase={timePhase} uiTheme={uiTheme} />
 
-                <div className="min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-mono text-4xl sm:text-5xl font-extrabold leading-none tracking-tight tabular-nums text-[#F4F5F7]">
-                      {formattedClock.timeText}
-                    </span>
-                    {formattedClock.meridiem && (
-                      <span className="font-mono text-sm sm:text-base font-bold text-[#C8FF2E]">
-                        {formattedClock.meridiem}
-                      </span>
-                    )}
-                  </div>
+              <div className="min-w-0">
+                <FluidClockDisplay
+                  timeText={formattedClock.timeText}
+                  meridiem={formattedClock.meridiem}
+                />
 
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                    <span className={`text-sm sm:text-base font-bold tracking-tight ${phaseToken.labelClass}`}>
-                      {phaseLabel}
-                    </span>
-                    <span aria-hidden="true" className="text-[#6B7280]">
-                      ·
-                    </span>
-                    <span className="font-mono text-xs sm:text-sm font-medium tabular-nums text-[#9CA3AF]">
-                      {activeSchedule.isGymDay
-                        ? activeSchedule.alarmEnabled
-                          ? `${t('Alarm Hari Ini', 'Today Alarm')} ${formattedAlarm}`
-                          : `${formattedAlarm} (${t('Alarm Mati', 'Alarm Off')})`
-                        : t('Hari Istirahat', 'Rest Day')}
-                    </span>
-                  </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className={`text-xs sm:text-sm font-bold tracking-tight ${phaseToken.labelClass}`}>
+                    {phaseLabel}
+                  </span>
+                  <span aria-hidden="true" className="text-[#6B7280]">
+                    ·
+                  </span>
+                  <span className="font-mono text-xs sm:text-sm font-medium tabular-nums text-[#CBD5E1]">
+                    {activeSchedule.isGymDay
+                      ? activeSchedule.alarmEnabled
+                        ? `${t('Alarm Hari Ini', 'Today Alarm')} ${formattedAlarm}`
+                        : `${formattedAlarm} (${t('Alarm Mati', 'Alarm Off')})`
+                      : t('Hari Istirahat', 'Rest Day')}
+                  </span>
                 </div>
               </div>
-
-              {!audioUnlocked && (
-                <button
-                  type="button"
-                  onClick={onUnlockAudio}
-                  className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-xl border border-[#C8FF2E]/35 bg-[#C8FF2E]/10 px-3 py-1.5 text-xs font-bold text-[#C8FF2E] transition-colors hover:bg-[#C8FF2E]/20 whitespace-nowrap"
-                >
-                  <Volume2 className="h-3.5 w-3.5" />
-                  {t('Aktifkan Audio', 'Enable Audio')}
-                </button>
-              )}
             </div>
 
-            {/* Compact Next Alarm Inline Strip */}
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#D1D5DB]">
-              <Bell className="h-3.5 w-3.5 shrink-0 text-[#C8FF2E]" />
+            {!audioUnlocked && (
+              <button
+                type="button"
+                onClick={onUnlockAudio}
+                className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-xl border border-pulse/35 bg-pulse/10 px-3 py-1.5 text-xs font-bold text-pulse transition-colors hover:bg-pulse/20 whitespace-nowrap"
+              >
+                <Volume2 className="h-3.5 w-3.5" />
+                {t('Aktifkan Audio', 'Enable Audio')}
+              </button>
+            )}
+          </div>
+
+          {/* Zone 2: Dominant Workout Schedule Title, Crisp Date Lead-In & Next Alarm Summary */}
+          <div className="space-y-3 border-t border-white/10 pt-4">
+            <div className="space-y-1.5">
+              <p className="text-[13px] sm:text-sm font-bold tracking-wide text-pulse">
+                {formatIndonesianDate(now, lang)}
+              </p>
+
+              <h1
+                className="font-display text-[2.375rem] sm:text-5xl lg:text-[3.75rem] font-extrabold leading-[1.0] tracking-[-0.015em] text-[#F8FAFC]"
+                style={{ textWrap: 'balance' }}
+              >
+                {activeSchedule.isGymDay
+                  ? activeSchedule.focusTitle
+                  : `${dayLabel} — ${t('Hari Istirahat', 'Rest Day')}`}
+              </h1>
+            </div>
+
+            <div className="flex items-center gap-2 pt-0.5 text-xs sm:text-[13px] text-[#CBD5E1] min-w-0">
+              <Bell className="h-3.5 w-3.5 shrink-0 text-pulse" />
               {nextAlarm ? (
-                <>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                   <span className="font-semibold text-[#9CA3AF]">
                     {t('Alarm Berikutnya:', 'Next Alarm:')}
                   </span>
@@ -284,18 +281,20 @@ export function TodayWorkoutView({
                   <span aria-hidden="true" className="text-[#6B7280]">
                     ·
                   </span>
-                  <span className="font-mono font-bold tabular-nums text-[#C8FF2E]">
+                  <span className="font-mono font-bold tabular-nums text-pulse">
                     {formatAlarmTime(nextAlarm.alarmTime, clockFormat)}
                   </span>
                   <span aria-hidden="true" className="text-[#6B7280]">
                     ·
                   </span>
-                  <span className="font-medium text-[#D1D5DB]">{nextAlarm.countdownText}</span>
-                  <span aria-hidden="true" className="text-[#6B7280]">
+                  <span className="font-medium text-[#E2E8F0]">{nextAlarm.countdownText}</span>
+                  <span aria-hidden="true" className="hidden sm:inline text-[#6B7280]">
                     ·
                   </span>
-                  <span className="truncate text-[#9CA3AF]">{nextAlarm.focusTitle}</span>
-                </>
+                  <span className="hidden sm:inline truncate text-[#9CA3AF]">
+                    {nextAlarm.focusTitle}
+                  </span>
+                </div>
               ) : (
                 <span className="text-[#9CA3AF]">
                   {t(
@@ -305,22 +304,6 @@ export function TodayWorkoutView({
                 </span>
               )}
             </div>
-          </div>
-
-          {/* Row 2: Enlarged Day, Date & Year + Focused Schedule Title */}
-          <div className="space-y-2 border-t border-white/10 pt-4">
-            <p className="text-base sm:text-xl font-bold tracking-tight text-[#C8FF2E]">
-              {formatIndonesianDate(now, lang)}
-            </p>
-
-            <h1
-              className="font-display text-3xl sm:text-5xl font-extrabold leading-[1.06] tracking-tight text-[#F4F5F7]"
-              style={{ textWrap: 'balance' }}
-            >
-              {activeSchedule.isGymDay
-                ? activeSchedule.focusTitle
-                : `${dayLabel} — ${t('Hari Istirahat', 'Rest Day')}`}
-            </h1>
           </div>
 
           {/* Interactive Circular Living Companion Orb */}
@@ -363,13 +346,13 @@ export function TodayWorkoutView({
                     </>
                   )}
                 </div>
-                <span className="font-mono text-sm font-bold tabular-nums text-[#C8FF2E]">
+                <span className="font-mono text-sm font-bold tabular-nums text-pulse">
                   {progressPct}%
                 </span>
               </div>
               <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full w-full origin-left rounded-full bg-[#C8FF2E] transition-transform duration-300 ease-out"
+                  className="h-full w-full origin-left rounded-full bg-pulse transition-transform duration-300 ease-out"
                   style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressPct / 100))})` }}
                 />
               </div>
@@ -383,7 +366,7 @@ export function TodayWorkoutView({
         <section
           className={`glass-surface rounded-2xl border p-4 sm:p-5 transition-colors ${
             restRunning
-              ? 'border-[#C8FF2E]/50'
+              ? 'border-pulse/50'
               : restRemaining === 0
                 ? 'border-[#16A34A]/50'
                 : 'border-white/12'
@@ -406,7 +389,7 @@ export function TodayWorkoutView({
                     cy="48"
                     r="38"
                     fill="none"
-                    stroke={restRemaining === 0 ? '#16A34A' : '#C8FF2E'}
+                    stroke={restRemaining === 0 ? '#16A34A' : 'var(--ip-accent)'}
                     strokeWidth="6"
                     strokeLinecap="round"
                     strokeDasharray={restCircumference}
@@ -431,7 +414,7 @@ export function TodayWorkoutView({
                     restRemaining === 0
                       ? 'text-[#4ADE80]'
                       : restRunning
-                        ? 'text-[#C8FF2E]'
+                        ? 'text-pulse'
                         : 'text-[#D1D5DB]'
                   }`}
                 >
@@ -451,7 +434,7 @@ export function TodayWorkoutView({
                     key={sec}
                     type="button"
                     onClick={() => onStartRestTimer(sec, restExerciseLabel || undefined)}
-                    className="min-h-[38px] rounded-lg border border-white/10 bg-[#0A0B0E] px-2.5 font-mono text-xs font-semibold tabular-nums text-[#D1D5DB] hover:border-[#C8FF2E] hover:text-[#C8FF2E]"
+                    className="min-h-[38px] rounded-lg border border-white/10 bg-[#0A0B0E] px-2.5 font-mono text-xs font-semibold tabular-nums text-[#D1D5DB] hover:border-pulse hover:text-pulse"
                   >
                     {sec}
                     {secUnit}
@@ -471,7 +454,7 @@ export function TodayWorkoutView({
                 <button
                   type="button"
                   onClick={onToggleRestPause}
-                  className="flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
+                  className="flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-xl bg-pulse px-4 text-xs font-bold text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
                 >
                   {restRunning ? (
                     <>
@@ -512,17 +495,17 @@ export function TodayWorkoutView({
           <button
             type="button"
             onClick={onStartWorkout}
-            className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-2xl bg-[#C8FF2E] px-5 py-3.5 text-left text-[#0A0B0E] shadow-lg shadow-[#C8FF2E]/10 transition-transform duration-150 hover:brightness-105 active:scale-[0.98]"
+            className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-2xl bg-pulse px-5 py-3.5 text-left text-pulse-fg shadow-lg shadow-pulse/10 transition-transform duration-150 hover:brightness-105 active:scale-[0.98]"
           >
             <span className="flex items-center gap-3 min-w-0">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0A0B0E]/12">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black/12">
                 <Dumbbell className="h-5 w-5" strokeWidth={2.3} />
               </span>
               <span className="min-w-0">
                 <span className="block truncate font-display text-base font-extrabold tracking-tight">
                   {startBtnLabel}
                 </span>
-                <span className="block truncate text-xs font-semibold text-[#0A0B0E]/75">
+                <span className="block truncate text-xs font-semibold opacity-80">
                   {t(
                     'Buka fokus set, beban & repetisi',
                     'Open focused sets & reps view'
@@ -565,7 +548,7 @@ export function TodayWorkoutView({
             <button
               type="button"
               onClick={onOpenScheduleManager}
-              className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
+              className="mt-5 min-h-[44px] rounded-xl bg-pulse px-5 py-2.5 text-xs font-bold text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
             >
               {t('Buka Tab Jadwal', 'Open Schedule Tab')}
             </button>
@@ -587,7 +570,7 @@ export function TodayWorkoutView({
             <button
               type="button"
               onClick={() => onOpenExerciseManager(todayDayKey)}
-              className="mt-5 min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
+              className="mt-5 min-h-[44px] rounded-xl bg-pulse px-5 py-2.5 text-xs font-bold text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-[0.97]"
             >
               {t('+ Tambah Gerakan Sekarang', '+ Add Exercise Now')}
             </button>
@@ -622,11 +605,11 @@ export function TodayWorkoutView({
                     key={entry.exerciseId}
                     type="button"
                     onClick={onStartWorkout}
-                    className="flex min-h-[56px] w-full items-center justify-between gap-3 py-3 text-left transition-colors hover:bg-white/[0.03] first:pt-1 last:pb-1 rounded-xl px-2 -mx-2"
+                    className="flex min-h-[56px] w-[calc(100%+1rem)] -mx-2 items-center justify-between gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-white/[0.03] first:pt-2 last:pb-2"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold tabular-nums text-[#C8FF2E]">
+                        <span className="font-mono text-xs font-bold tabular-nums text-pulse">
                           {String(index + 1).padStart(2, '0')}.
                         </span>
                         <span className="truncate text-sm font-bold text-[#F4F5F7]">

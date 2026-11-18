@@ -92,7 +92,7 @@ export function TodayMascot({
   userName,
   dayJustChanged = false,
 }: TodayMascotProps) {
-  const { lang, t } = useI18n();
+  const { lang, accentColor, t } = useI18n();
   const cleanName = (userName || '').trim();
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
 
@@ -216,7 +216,7 @@ export function TodayMascot({
 
   const phaseColor =
     mood === 'celebrate' || mood === 'clap' || mood === 'milestone'
-      ? '#C8FF2E'
+      ? accentColor
       : mood === 'timerActive' || mood === 'rest'
         ? '#38BDF8'
         : phaseToken.accentBright;
@@ -753,7 +753,7 @@ export function TodayMascot({
             ? 'IronPulse circular companion orb. Tap to switch reaction.'
             : 'Orb pendamping bulat IronPulse. Ketuk untuk ganti reaksi.'
         }
-        className="relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#C8FF2E]"
+        className="relative flex h-16 w-16 shrink-0 cursor-pointer items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-pulse"
       >
         {/* Outer Breathing Pulse Ring */}
         <motion.span

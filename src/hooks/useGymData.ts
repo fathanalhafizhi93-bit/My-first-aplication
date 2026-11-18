@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import {
@@ -145,6 +145,28 @@ export function useGymData() {
   const todayDayKey = getTodayDayKey();
   const todayDateKey = formatLocalDateKey();
 
+  const schedulesRef = useRef(schedules);
+  const todayLogRef = useRef(todayLog);
+  const todayDayKeyRef = useRef(todayDayKey);
+  const todayDateKeyRef = useRef(todayDateKey);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  useEffect(() => {
+    schedulesRef.current = schedules;
+  }, [schedules]);
+
+  useEffect(() => {
+    todayLogRef.current = todayLog;
+  }, [todayLog]);
+
+  useEffect(() => {
+    todayDayKeyRef.current = todayDayKey;
+  }, [todayDayKey]);
+
+  useEffect(() => {
+    todayDateKeyRef.current = todayDateKey;
+  }, [todayDateKey]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -154,6 +176,7 @@ export function useGymData() {
         setSchedules(null);
         setCustomRingtones([]);
         setTodayLog(null);
+        todayLogRef.current = null;
         setWorkoutHistory([]);
         setHistoryLoading(false);
         setDataLoading(false);
@@ -170,7 +193,6 @@ export function useGymData() {
     let unsubProfile: (() => void) | undefined;
     let unsubSchedules: (() => void) | undefined;
     let unsubRingtones: (() => void) | undefined;
-    let unsubTodayLog: (() => void) | undefined;
     let unsubHistory: (() => void) | undefined;
 
     setDataLoading(true);
@@ -276,24 +298,11 @@ export function useGymData() {
         (err) => handleFirestoreError(err, OperationType.LIST, `users/${uid}/ringtones`)
       );
 
-      unsubTodayLog = onSnapshot(
-        doc(db, 'users', uid, 'workoutLogs', todayDateKey),
-        (snap) => {
-          if (snap.exists()) {
-            setTodayLog(snap.data() as WorkoutLog);
-          } else {
-            setTodayLog(null);
-          }
-        },
-        (err) =>
-          handleFirestoreError(err, OperationType.GET, `users/${uid}/workoutLogs/${todayDateKey}`)
-      );
-
       unsubHistory = onSnapshot(
         query(
           collection(db, 'users', uid, 'workoutLogs'),
           where('userId', '==', uid),
-          limit(120)
+          limit(400)
         ),
         (snap) => {
           const logs = snap.docs
@@ -316,9 +325,35 @@ export function useGymData() {
       unsubProfile?.();
       unsubSchedules?.();
       unsubRingtones?.();
-      unsubTodayLog?.();
       unsubHistory?.();
     };
+  }, [authReady, user]);
+
+  // Subscribe to today's workout log independently so midnight rollover swaps seamlessly without reload flash
+  useEffect(() => {
+    if (!authReady || !user) return;
+
+    setTodayLog(null);
+    todayLogRef.current = null;
+    const uid = user.uid;
+
+    const unsubTodayLog = onSnapshot(
+      doc(db, 'users', uid, 'workoutLogs', todayDateKey),
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data() as WorkoutLog;
+          todayLogRef.current = data;
+          setTodayLog(data);
+        } else {
+          todayLogRef.current = null;
+          setTodayLog(null);
+        }
+      },
+      (err) =>
+        handleFirestoreError(err, OperationType.GET, `users/${uid}/workoutLogs/${todayDateKey}`)
+    );
+
+    return () => unsubTodayLog();
   }, [authReady, user, todayDateKey]);
 
   const signInWithGoogle = useCallback(async () => {
@@ -516,101 +551,148 @@ export function useGymData() {
     return buildEntriesFromSchedule(sched.exercises, todayLog?.entries || []);
   }, [schedules, todayDayKey, todayLog]);
 
-  const persistTodayEntries = useCallback(
-    async (nextEntries: WorkoutLogEntry[], completedOverride?: boolean) => {
-      if (!user || !schedules) return;
-      const sched = schedules[todayDayKey];
-      const path = `users/${user.uid}/workoutLogs/${todayDateKey}`;
-      const allSets = nextEntries.flatMap((e) => e.sets);
-      const isAllCompleted =
-        completedOverride !== undefined
-          ? completedOverride
-          : allSets.length > 0 && allSets.every((s) => s.completed);
-
-      try {
-        if (!todayLog) {
-          await setDoc(doc(db, 'users', user.uid, 'workoutLogs', todayDateKey), {
-            userId: user.uid,
-            dateKey: todayDateKey,
-            dayKey: todayDayKey,
-            focusTitle: (sched?.focusTitle || 'Latihan Hari Ini').slice(0, 80),
-            entries: nextEntries.slice(0, 30),
-            completed: isAllCompleted,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          });
-        } else {
-          await updateDoc(doc(db, 'users', user.uid, 'workoutLogs', todayDateKey), {
-            focusTitle: (sched?.focusTitle || todayLog.focusTitle).slice(0, 80),
-            entries: nextEntries.slice(0, 30),
-            completed: isAllCompleted,
-            updatedAt: serverTimestamp(),
-          });
-        }
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, path);
+  const mutateTodayEntries = useCallback(
+    async <T,>(
+      mutator: (currentEntries: WorkoutLogEntry[]) => { next: WorkoutLogEntry[]; result: T }
+    ): Promise<T> => {
+      if (!user) {
+        return mutator([]).result;
       }
+
+      let resolvedResult!: T;
+
+      const task = writeQueueRef.current.then(async () => {
+        const curSchedules = schedulesRef.current;
+        const curDayKey = todayDayKeyRef.current;
+        const curDateKey = todayDateKeyRef.current;
+        const curLog = todayLogRef.current;
+        const sched = curSchedules?.[curDayKey];
+        const baseEntries = sched
+          ? buildEntriesFromSchedule(sched.exercises, curLog?.entries || [])
+          : [];
+
+        const { next, result } = mutator(baseEntries);
+        resolvedResult = result;
+
+        const trimmedEntries = next.slice(0, 30);
+        const allSets = trimmedEntries.flatMap((e) => e.sets);
+        const isAllCompleted = allSets.length > 0 && allSets.every((s) => s.completed);
+        const focusTitle = (
+          sched?.focusTitle ||
+          curLog?.focusTitle ||
+          'Latihan Hari Ini'
+        ).slice(0, 80);
+
+        const optimisticLog: WorkoutLog = {
+          userId: user.uid,
+          dateKey: curDateKey,
+          dayKey: curDayKey,
+          focusTitle,
+          entries: trimmedEntries,
+          completed: isAllCompleted,
+        };
+        const existedBefore = Boolean(curLog && curLog.dateKey === curDateKey);
+        todayLogRef.current = optimisticLog;
+        setTodayLog(optimisticLog);
+
+        const path = `users/${user.uid}/workoutLogs/${curDateKey}`;
+        try {
+          if (!existedBefore) {
+            await setDoc(doc(db, 'users', user.uid, 'workoutLogs', curDateKey), {
+              userId: user.uid,
+              dateKey: curDateKey,
+              dayKey: curDayKey,
+              focusTitle,
+              entries: trimmedEntries,
+              completed: isAllCompleted,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            await updateDoc(doc(db, 'users', user.uid, 'workoutLogs', curDateKey), {
+              focusTitle,
+              entries: trimmedEntries,
+              completed: isAllCompleted,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        } catch (err) {
+          handleFirestoreError(err, OperationType.WRITE, path);
+        }
+      });
+
+      writeQueueRef.current = task.catch(() => {
+        // Keep queue alive if one write rejects
+      });
+
+      await task;
+      return resolvedResult;
     },
-    [user, schedules, todayDayKey, todayDateKey, todayLog]
+    [user]
   );
 
   const toggleSetComplete = useCallback(
     async (exerciseId: string, setNumber: number): Promise<boolean> => {
-      let becameCompleted = false;
-      const next = effectiveTodayEntries.map((entry) => {
-        if (entry.exerciseId !== exerciseId) return entry;
-        return {
-          ...entry,
-          sets: entry.sets.map((s) => {
-            if (s.setNumber !== setNumber) return s;
-            const nextVal = !s.completed;
-            if (nextVal) becameCompleted = true;
-            return { ...s, completed: nextVal };
-          }),
-        };
+      return mutateTodayEntries((entries) => {
+        let becameCompleted = false;
+        const next = entries.map((entry) => {
+          if (entry.exerciseId !== exerciseId) return entry;
+          return {
+            ...entry,
+            sets: entry.sets.map((s) => {
+              if (s.setNumber !== setNumber) return s;
+              const nextVal = !s.completed;
+              if (nextVal) becameCompleted = true;
+              return { ...s, completed: nextVal };
+            }),
+          };
+        });
+        return { next, result: becameCompleted };
       });
-      await persistTodayEntries(next);
-      return becameCompleted;
     },
-    [effectiveTodayEntries, persistTodayEntries]
+    [mutateTodayEntries]
   );
 
   const updateSetMetrics = useCallback(
     async (exerciseId: string, setNumber: number, weightKg: number, reps: number) => {
       const safeWeight = Math.max(0, Math.min(999, Number.isFinite(weightKg) ? weightKg : 0));
       const safeReps = Math.max(0, Math.min(999, Number.isFinite(reps) ? reps : 0));
-      const next = effectiveTodayEntries.map((entry) => {
-        if (entry.exerciseId !== exerciseId) return entry;
-        return {
-          ...entry,
-          sets: entry.sets.map((s) =>
-            s.setNumber === setNumber ? { ...s, weightKg: safeWeight, reps: safeReps } : s
-          ),
-        };
-      });
-      await persistTodayEntries(next);
+      await mutateTodayEntries((entries) => ({
+        next: entries.map((entry) => {
+          if (entry.exerciseId !== exerciseId) return entry;
+          return {
+            ...entry,
+            sets: entry.sets.map((s) =>
+              s.setNumber === setNumber ? { ...s, weightKg: safeWeight, reps: safeReps } : s
+            ),
+          };
+        }),
+        result: undefined,
+      }));
     },
-    [effectiveTodayEntries, persistTodayEntries]
+    [mutateTodayEntries]
   );
 
   const updateSetDuration = useCallback(
     async (exerciseId: string, setNumber: number, durationSeconds: number) => {
       const safeDuration = Math.max(
         1,
-        Math.min(10800, Number.isFinite(durationSeconds) ? Math.round(durationSeconds) : 0)
+        Math.min(10800, Number.isFinite(durationSeconds) ? Math.round(durationSeconds) : 1)
       );
-      const next = effectiveTodayEntries.map((entry) => {
-        if (entry.exerciseId !== exerciseId) return entry;
-        return {
-          ...entry,
-          sets: entry.sets.map((s) =>
-            s.setNumber === setNumber ? { ...s, durationSeconds: safeDuration } : s
-          ),
-        };
-      });
-      await persistTodayEntries(next);
+      await mutateTodayEntries((entries) => ({
+        next: entries.map((entry) => {
+          if (entry.exerciseId !== exerciseId) return entry;
+          return {
+            ...entry,
+            sets: entry.sets.map((s) =>
+              s.setNumber === setNumber ? { ...s, durationSeconds: safeDuration } : s
+            ),
+          };
+        }),
+        result: undefined,
+      }));
     },
-    [effectiveTodayEntries, persistTodayEntries]
+    [mutateTodayEntries]
   );
 
   const completeTimerSet = useCallback(
@@ -619,67 +701,72 @@ export function useGymData() {
         1,
         Math.min(10800, Number.isFinite(durationSeconds) ? Math.round(durationSeconds) : 1)
       );
-      let becameCompleted = false;
-      const next = effectiveTodayEntries.map((entry) => {
-        if (entry.exerciseId !== exerciseId) return entry;
-        return {
-          ...entry,
-          sets: entry.sets.map((s) => {
-            if (s.setNumber !== setNumber) return s;
-            if (!s.completed) becameCompleted = true;
-            return {
-              ...s,
-              durationSeconds: safeDuration,
-              completed: true,
-            };
-          }),
-        };
+      return mutateTodayEntries((entries) => {
+        let becameCompleted = false;
+        const next = entries.map((entry) => {
+          if (entry.exerciseId !== exerciseId) return entry;
+          return {
+            ...entry,
+            sets: entry.sets.map((s) => {
+              if (s.setNumber !== setNumber) return s;
+              if (!s.completed) becameCompleted = true;
+              return {
+                ...s,
+                durationSeconds: safeDuration,
+                completed: true,
+              };
+            }),
+          };
+        });
+        return { next, result: becameCompleted };
       });
-      await persistTodayEntries(next);
-      return becameCompleted;
     },
-    [effectiveTodayEntries, persistTodayEntries]
+    [mutateTodayEntries]
   );
 
   const addSetToExercise = useCallback(
     async (exerciseId: string) => {
-      const next = effectiveTodayEntries.map((entry) => {
-        if (entry.exerciseId !== exerciseId) return entry;
-        if (entry.sets.length >= 12) return entry;
-        const last = entry.sets[entry.sets.length - 1];
-        const fallbackDuration =
-          entry.trackingMode === 'timer' ? entry.targetDurationSeconds || 60 : 0;
-        return {
-          ...entry,
-          sets: [
-            ...entry.sets,
-            {
-              setNumber: entry.sets.length + 1,
-              weightKg: entry.usesWeight === false ? 0 : last ? last.weightKg : 0,
-              reps: last ? last.reps : 10,
-              durationSeconds: last?.durationSeconds ?? fallbackDuration,
-              completed: false,
-            },
-          ],
-        };
-      });
-      await persistTodayEntries(next);
+      await mutateTodayEntries((entries) => ({
+        next: entries.map((entry) => {
+          if (entry.exerciseId !== exerciseId) return entry;
+          if (entry.sets.length >= 12) return entry;
+          const last = entry.sets[entry.sets.length - 1];
+          const fallbackDuration =
+            entry.trackingMode === 'timer' ? entry.targetDurationSeconds || 60 : 0;
+          return {
+            ...entry,
+            sets: [
+              ...entry.sets,
+              {
+                setNumber: entry.sets.length + 1,
+                weightKg: entry.usesWeight === false ? 0 : last ? last.weightKg : 0,
+                reps: last ? last.reps : 10,
+                durationSeconds: last?.durationSeconds ?? fallbackDuration,
+                completed: false,
+              },
+            ],
+          };
+        }),
+        result: undefined,
+      }));
     },
-    [effectiveTodayEntries, persistTodayEntries]
+    [mutateTodayEntries]
   );
 
   const removeSetFromExercise = useCallback(
     async (exerciseId: string) => {
-      const next = effectiveTodayEntries.map((entry) => {
-        if (entry.exerciseId !== exerciseId || entry.sets.length <= 1) return entry;
-        return {
-          ...entry,
-          sets: entry.sets.slice(0, -1),
-        };
-      });
-      await persistTodayEntries(next);
+      await mutateTodayEntries((entries) => ({
+        next: entries.map((entry) => {
+          if (entry.exerciseId !== exerciseId || entry.sets.length <= 1) return entry;
+          return {
+            ...entry,
+            sets: entry.sets.slice(0, -1),
+          };
+        }),
+        result: undefined,
+      }));
     },
-    [effectiveTodayEntries, persistTodayEntries]
+    [mutateTodayEntries]
   );
 
   const addCustomRingtone = useCallback(
@@ -693,12 +780,13 @@ export function useGymData() {
         await saveAudioToIndexedDB(id, parsed.dataUrl);
       }
 
+      const safeDuration = Math.max(0, Math.min(3600, Math.round(parsed.durationSeconds || 0)));
       const payload = {
         userId: user.uid,
         name: finalName,
         mimeType: parsed.mimeType.slice(0, 60),
         sizeBytes: parsed.sizeBytes,
-        durationSeconds: parsed.durationSeconds,
+        durationSeconds: safeDuration,
         storageMode: parsed.storageMode,
         audioDataUrl: parsed.storageMode === 'cloud' ? parsed.dataUrl : '',
         createdAt: serverTimestamp(),
@@ -718,7 +806,7 @@ export function useGymData() {
         name: finalName,
         mimeType: parsed.mimeType,
         sizeBytes: parsed.sizeBytes,
-        durationSeconds: parsed.durationSeconds,
+        durationSeconds: safeDuration,
         storageMode: parsed.storageMode,
         audioDataUrl: parsed.storageMode === 'cloud' ? parsed.dataUrl : '',
       };
@@ -741,11 +829,19 @@ export function useGymData() {
         if (profile?.restRingtoneId === ringtoneId) {
           await updateProfile({ restRingtoneId: 'builtin_kettlebell_chime' });
         }
+        const curSchedules = schedulesRef.current;
+        if (curSchedules) {
+          for (const dayMeta of DAY_LIST) {
+            if (curSchedules[dayMeta.key]?.ringtoneId === ringtoneId) {
+              await updateSchedule(dayMeta.key, { ringtoneId: 'default' });
+            }
+          }
+        }
       } catch (err) {
         handleFirestoreError(err, OperationType.DELETE, path);
       }
     },
-    [user, profile, updateProfile]
+    [user, profile, updateProfile, updateSchedule]
   );
 
   return {

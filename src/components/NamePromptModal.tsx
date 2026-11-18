@@ -67,7 +67,7 @@ export function NamePromptModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 6 }}
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="glass-surface w-full max-w-md rounded-2xl border border-[#C8FF2E]/35 p-6 sm:p-7"
+            className="glass-surface w-full max-w-md rounded-2xl border border-pulse/35 p-6 sm:p-7"
           >
             {/* Friendly Circular Mascot Orb */}
             <div className="flex items-center gap-4">
@@ -76,25 +76,25 @@ export function NamePromptModal({
                   aria-hidden="true"
                   animate={{ scale: [0.96, 1.2, 0.96], opacity: [0.45, 0.1, 0.45] }}
                   transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute inset-0 rounded-full border-2 border-[#C8FF2E]"
+                  className="absolute inset-0 rounded-full border-2 border-pulse"
                 />
                 <motion.div
                   animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
-                  className="relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-[#C8FF2E] bg-[#0A0B0E]"
+                  className="relative flex h-14 w-14 items-center justify-center rounded-full border-2 border-pulse bg-[#0A0B0E]"
                 >
                   <svg viewBox="0 0 48 48" className="h-10 w-10" fill="none" aria-hidden="true">
                     <circle cx="17.5" cy="20" r="2.4" fill="#F4F5F7" />
                     <circle cx="30.5" cy="20" r="2.4" fill="#F4F5F7" />
                     <path
                       d="M18 27C20.5 29.8 27.5 29.8 30 27"
-                      stroke="#C8FF2E"
+                      stroke="var(--ip-accent)"
                       strokeWidth="2.5"
                       strokeLinecap="round"
                     />
                     <motion.path
                       d="M36 11C38.5 13 39.5 15.5 39 18"
-                      stroke="#C8FF2E"
+                      stroke="var(--ip-accent)"
                       strokeWidth="2.2"
                       strokeLinecap="round"
                       animate={{ rotate: [0, 14, -8, 0] }}
@@ -106,7 +106,7 @@ export function NamePromptModal({
               </div>
 
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#C8FF2E]">
+                <p className="text-xs font-semibold uppercase tracking-wider text-pulse">
                   {t('Kenalan dengan Maskot', 'Meet Your Companion')}
                 </p>
                 <h2
@@ -143,7 +143,7 @@ export function NamePromptModal({
                   if (errorMsg) setErrorMsg(null);
                 }}
                 placeholder={t('Contoh: Fathan', 'e.g. Alex')}
-                className="h-12 w-full rounded-xl border border-white/15 bg-[#0A0B0E] px-3.5 text-sm font-semibold text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-[#C8FF2E] focus:outline-none"
+                className="h-12 w-full rounded-xl border border-white/15 bg-[#0A0B0E] px-3.5 text-sm font-semibold text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-pulse focus:outline-none"
               />
               {errorMsg && (
                 <p className="mt-1.5 text-xs font-medium text-[#FCA5A5]">{errorMsg}</p>
@@ -153,7 +153,7 @@ export function NamePromptModal({
             <button
               type="submit"
               disabled={saving}
-              className="mt-6 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-5 py-3 text-sm font-bold text-[#0A0B0E] transition-transform hover:brightness-105 active:scale-[0.98] disabled:opacity-60"
+              className="mt-6 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-pulse px-5 py-3 text-sm font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] disabled:opacity-60"
             >
               <UserCheck className="h-4 w-4" />
               <span>

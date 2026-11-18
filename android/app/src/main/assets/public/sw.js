@@ -87,7 +87,7 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "revision": "990f8de592e733ce00402407c8ba78b1"
   }, {
     "url": "index.html",
-    "revision": "0e4872c6b723cb76c7884d217096511d"
+    "revision": "3b1cad0ac301a5afd8a5766eb090bf9d"
   }, {
     "url": "icon.svg",
     "revision": "f0a9258bfc0b2edf858585c6f809f6b8"
@@ -104,19 +104,22 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "url": "assets/workbox-window.prod.es5-Bd17z0YL.js",
     "revision": null
   }, {
-    "url": "assets/web-Dwo9i5V8.js",
+    "url": "assets/web-HalbGpq1.js",
     "revision": null
   }, {
-    "url": "assets/web-DAxYsByp.js",
+    "url": "assets/web-BjpM2JqW.js",
     "revision": null
   }, {
     "url": "assets/ironpulse_splash_emblem_1794926961620-DAUEbrK4.jpg",
     "revision": null
   }, {
-    "url": "assets/index-Cf9kevVu.js",
+    "url": "assets/index-Z6FA3CwL.css",
     "revision": null
   }, {
-    "url": "assets/index-CdnohsYj.css",
+    "url": "assets/index-BljfpIGV.js",
+    "revision": null
+  }, {
+    "url": "assets/gym_arena_backdrop_1794848258829-sLjOZs5A.jpg",
     "revision": null
   }, {
     "url": "apple-touch-icon.png",

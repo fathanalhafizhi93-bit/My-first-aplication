@@ -107,7 +107,9 @@ export interface ParsedAudioFile {
 
 export function readUploadedAudioFile(file: File): Promise<ParsedAudioFile> {
   return new Promise((resolve, reject) => {
-    if (!file.type.startsWith('audio/')) {
+    const hasAudioMime = file.type.startsWith('audio/');
+    const hasAudioExt = /\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(file.name);
+    if (!hasAudioMime && !hasAudioExt) {
       reject(new Error('Format file harus berupa audio (.mp3, .wav, .ogg, .m4a).'));
       return;
     }
@@ -121,20 +123,34 @@ export function readUploadedAudioFile(file: File): Promise<ParsedAudioFile> {
     reader.onload = () => {
       const dataUrl = String(reader.result || '');
       const tempAudio = new Audio(dataUrl);
+      let settled = false;
+
       const finalize = (duration: number) => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(metaTimeout);
+        tempAudio.onloadedmetadata = null;
+        tempAudio.onerror = null;
+        tempAudio.src = '';
+
         // Firestore limit per doc is 1MB; keep <= 550,000 chars for cloud sync
         const storageMode = dataUrl.length <= 550000 ? 'cloud' : 'local_idb';
         const cleanName = file.name.replace(/\.[^/.]+$/, '').slice(0, 80) || 'Ringtone Kustom';
+        const clampedDuration = Number.isFinite(duration)
+          ? Math.max(0, Math.min(3600, Math.round(duration)))
+          : 0;
+
         resolve({
           name: cleanName,
-          mimeType: file.type || 'audio/mpeg',
+          mimeType: (file.type || 'audio/mpeg').slice(0, 60),
           sizeBytes: file.size,
-          durationSeconds: Number.isFinite(duration) ? Math.round(duration) : 0,
+          durationSeconds: clampedDuration,
           storageMode,
           dataUrl,
         });
       };
 
+      const metaTimeout = window.setTimeout(() => finalize(0), 4000);
       tempAudio.onloadedmetadata = () => finalize(tempAudio.duration);
       tempAudio.onerror = () => finalize(0);
     };
@@ -146,8 +162,10 @@ class GymAudioEngine {
   private ctx: AudioContext | null = null;
   private htmlAudio: HTMLAudioElement | null = null;
   private loopTimer: number | null = null;
+  private endTimer: number | null = null;
   private activeOscillators: OscillatorNode[] = [];
   private unlocked = false;
+  private playToken = 0;
 
   private ensureContext(): AudioContext {
     if (!this.ctx) {
@@ -188,9 +206,14 @@ class GymAudioEngine {
   }
 
   public stop(): void {
+    this.playToken += 1;
     if (this.loopTimer !== null) {
       window.clearInterval(this.loopTimer);
       this.loopTimer = null;
+    }
+    if (this.endTimer !== null) {
+      window.clearTimeout(this.endTimer);
+      this.endTimer = null;
     }
     for (const osc of this.activeOscillators) {
       try {
@@ -203,6 +226,7 @@ class GymAudioEngine {
     this.activeOscillators = [];
 
     if (this.htmlAudio) {
+      this.htmlAudio.onended = null;
       this.htmlAudio.pause();
       this.htmlAudio.currentTime = 0;
       this.htmlAudio.loop = false;
@@ -282,6 +306,7 @@ class GymAudioEngine {
     }
   ): Promise<void> {
     this.stop();
+    const token = this.playToken;
     const volume = Math.max(0, Math.min(1, options.volume));
 
     const custom = options.customRingtones?.find((r) => r.id === ringtoneId);
@@ -290,12 +315,14 @@ class GymAudioEngine {
       if (!sourceUrl && custom.storageMode === 'local_idb') {
         sourceUrl = (await getAudioFromIndexedDB(custom.id)) || '';
       }
+      if (token !== this.playToken) return;
 
       if (sourceUrl) {
         const audio = new Audio(sourceUrl);
         audio.volume = volume;
         audio.loop = Boolean(options.loop);
         audio.onended = () => {
+          if (token !== this.playToken) return;
           if (!options.loop) {
             this.htmlAudio = null;
             options.onEnded?.();
@@ -306,19 +333,34 @@ class GymAudioEngine {
           await audio.play();
           return;
         } catch {
+          if (token !== this.playToken) return;
+          this.htmlAudio = null;
           // Fallback to built-in tone if browser blocked playback or blob unavailable
         }
       }
     }
 
+    try {
+      const ctx = this.ensureContext();
+      if (ctx.state === 'suspended') {
+        await ctx.resume();
+      }
+    } catch {
+      // ignore resume failure
+    }
+    if (token !== this.playToken) return;
+
     // Play built-in synthesized tone
     this.playSynthBurst(ringtoneId, volume);
     if (options.loop) {
       this.loopTimer = window.setInterval(() => {
+        if (token !== this.playToken) return;
         this.playSynthBurst(ringtoneId, volume);
       }, 1500);
     } else {
-      window.setTimeout(() => {
+      this.endTimer = window.setTimeout(() => {
+        if (token !== this.playToken) return;
+        this.endTimer = null;
         options.onEnded?.();
       }, 1300);
     }

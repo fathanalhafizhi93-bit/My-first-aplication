@@ -19,8 +19,10 @@ export function MobileBottomNav({
   restRemaining,
   restRunning,
 }: MobileBottomNavProps) {
-  const { t } = useI18n();
+  const { t, uiTheme } = useI18n();
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
+  const isFrosted = uiTheme === 'midnight-frosted';
+  const isCarbon = uiTheme === 'carbon-forge';
 
   const tabs: { id: AppTab; label: string; Icon: typeof PlayCircle }[] = [
     { id: 'today', label: t('Hari Ini', 'Today'), Icon: PlayCircle },
@@ -33,9 +35,15 @@ export function MobileBottomNav({
   return (
     <nav
       aria-label={t('Navigasi Mobile', 'Mobile Navigation')}
-      className={`glass-bar fixed bottom-0 left-0 right-0 z-40 border-t transition-colors duration-500 md:hidden ${phaseToken.headerTint}`}
+      className={
+        isFrosted
+          ? 'glass-bar fixed bottom-3 left-3 right-3 z-40 rounded-[28px] border border-white/22 px-1.5 py-1 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.78)] transition-all duration-300 md:hidden'
+          : `glass-bar fixed bottom-0 left-0 right-0 z-40 border-t transition-colors duration-500 md:hidden ${
+              isCarbon ? 'border-white/12' : phaseToken.headerTint
+            }`
+      }
     >
-      <div className="grid h-16 grid-cols-5 items-center">
+      <div className={`grid items-center ${isFrosted ? 'h-14 grid-cols-5 gap-1' : 'h-16 grid-cols-5'}`}>
         {tabs.map(({ id, label, Icon }) => {
           const active = activeTab === id || (id === 'today' && activeTab === 'workout');
           return (
@@ -43,15 +51,30 @@ export function MobileBottomNav({
               key={id}
               type="button"
               onClick={() => onSelectTab(id)}
-              className={`relative flex min-h-[48px] flex-col items-center justify-center gap-1 transition-all duration-150 active:scale-95 ${
-                active ? 'text-[#C8FF2E]' : 'text-[#9CA3AF]'
-              }`}
+              className={`relative flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
+                isFrosted
+                  ? 'min-h-[48px] rounded-[22px]'
+                  : isCarbon
+                    ? 'min-h-[48px] gap-1 rounded-md'
+                    : 'min-h-[48px] gap-1'
+              } ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`}
             >
-              {active && (
+              {active && isFrosted && (
+                <motion.span
+                  layoutId="mobile-nav-frosted-pill"
+                  transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                  className="absolute inset-0 -z-10 rounded-[22px] border border-white/18 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+                />
+              )}
+              {active && !isFrosted && (
                 <motion.span
                   layoutId="mobile-nav-indicator"
                   transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-                  className="absolute top-0 h-0.5 w-8 rounded-full bg-[#C8FF2E]"
+                  className={`absolute top-0 bg-pulse ${
+                    isCarbon
+                      ? 'h-[2.5px] w-9 rounded-none shadow-[0_0_10px_rgba(var(--ip-accent-rgb),0.6)]'
+                      : 'h-0.5 w-8 rounded-full'
+                  }`}
                 />
               )}
               <Icon

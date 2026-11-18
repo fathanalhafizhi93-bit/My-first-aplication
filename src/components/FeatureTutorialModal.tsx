@@ -167,6 +167,22 @@ export function FeatureTutorialModal({
     }
   }, [open, startAtLanguageStep]);
 
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setConfirmSkip(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const isLanguageStep = stepIndex === -1;
@@ -231,7 +247,7 @@ export function FeatureTutorialModal({
                     'Tidak apa-apa jika Anda ingin langsung masuk dan mencoba sendiri. Namun kalau nanti bingung mencari letak pengaturan jadwal, gerakan, atau alarm, Anda selalu bisa membuka ulang panduan ini lewat tombol ',
                     'That is totally fine if you want to jump right in. If you ever get lost looking for schedule, exercise, or alarm controls, you can always reopen this guide from '
                   )}
-                  <span className="font-semibold text-[#C8FF2E]">
+                  <span className="font-semibold text-pulse">
                     {t('Panduan Fitur', 'Feature Guide')}
                   </span>
                   .
@@ -243,7 +259,7 @@ export function FeatureTutorialModal({
               <button
                 type="button"
                 onClick={() => setConfirmSkip(false)}
-                className="min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+                className="min-h-[44px] rounded-xl bg-pulse px-5 text-xs font-bold text-pulse-fg hover:brightness-105"
               >
                 {t('Kembali ke Panduan', 'Back to Guide')}
               </button>
@@ -260,7 +276,7 @@ export function FeatureTutorialModal({
           /* Opening Step: Language Picker (Indonesia & English) */
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-4">
-              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-[#C8FF2E]">
+              <span className="font-mono text-xs font-semibold uppercase tracking-wider text-pulse">
                 {t('Selamat Datang di IronPulse', 'Welcome to IronPulse')}
               </span>
               <button
@@ -274,7 +290,7 @@ export function FeatureTutorialModal({
             </div>
 
             <div className="flex items-start gap-3.5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#C8FF2E]/30 bg-[#C8FF2E]/10 text-[#C8FF2E]">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-pulse/30 bg-pulse/10 text-pulse">
                 <Globe className="h-5 w-5" />
               </div>
               <div>
@@ -299,7 +315,7 @@ export function FeatureTutorialModal({
                 onClick={() => handleSelectLanguage('id')}
                 className={`flex min-h-[68px] flex-col items-start justify-center rounded-xl border px-4 py-3 text-left transition-colors ${
                   lang === 'id'
-                    ? 'border-[#C8FF2E] bg-[#C8FF2E]/15 text-[#F4F5F7]'
+                    ? 'border-pulse bg-pulse/15 text-[#F4F5F7]'
                     : 'border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/25'
                 }`}
               >
@@ -314,7 +330,7 @@ export function FeatureTutorialModal({
                 onClick={() => handleSelectLanguage('en')}
                 className={`flex min-h-[68px] flex-col items-start justify-center rounded-xl border px-4 py-3 text-left transition-colors ${
                   lang === 'en'
-                    ? 'border-[#C8FF2E] bg-[#C8FF2E]/15 text-[#F4F5F7]'
+                    ? 'border-pulse bg-pulse/15 text-[#F4F5F7]'
                     : 'border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/25'
                 }`}
               >
@@ -329,7 +345,7 @@ export function FeatureTutorialModal({
               <button
                 type="button"
                 onClick={handleNext}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[#C8FF2E] px-5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-pulse px-5 text-xs font-bold text-pulse-fg hover:brightness-105"
               >
                 {t('Mulai Panduan (5 Langkah)', 'Start Guide (5 Steps)')}
                 <ArrowRight className="h-4 w-4" />
@@ -340,7 +356,7 @@ export function FeatureTutorialModal({
           /* Feature Steps 1 - 5 */
           <>
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 font-mono text-xs font-semibold tabular-nums text-[#C8FF2E]">
+              <div className="flex items-center gap-2 font-mono text-xs font-semibold tabular-nums text-pulse">
                 <span>
                   {t(
                     `Langkah ${stepIndex + 1} / ${TUTORIAL_STEPS.length}`,
@@ -374,7 +390,7 @@ export function FeatureTutorialModal({
                   )}`}
                   onClick={() => setStepIndex(idx)}
                   className={`h-1.5 rounded-full transition-colors ${
-                    idx <= stepIndex ? 'bg-[#C8FF2E]' : 'bg-white/10 hover:bg-white/25'
+                    idx <= stepIndex ? 'bg-pulse' : 'bg-white/10 hover:bg-white/25'
                   }`}
                 />
               ))}
@@ -382,7 +398,7 @@ export function FeatureTutorialModal({
 
             <div className="mt-6 space-y-4">
               <div className="flex items-start gap-3.5">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#C8FF2E]/30 bg-[#C8FF2E]/10 text-[#C8FF2E]">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-pulse/30 bg-pulse/10 text-pulse">
                   <StepIcon className="h-5 w-5" />
                 </div>
                 <div>
@@ -405,7 +421,7 @@ export function FeatureTutorialModal({
                     key={idx}
                     className="flex items-start gap-2.5 text-xs leading-relaxed text-[#D1D5DB]"
                   >
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#C8FF2E]" />
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-pulse" />
                     <span>{tip}</span>
                   </li>
                 ))}
@@ -419,7 +435,7 @@ export function FeatureTutorialModal({
                   onJumpToTab(step.id);
                   onComplete();
                 }}
-                className="min-h-[44px] rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-xs font-semibold text-[#D1D5DB] hover:border-[#C8FF2E]/40 hover:text-[#C8FF2E]"
+                className="min-h-[44px] rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-xs font-semibold text-[#D1D5DB] hover:border-pulse/40 hover:text-pulse"
               >
                 {t(`Buka ${step.tabLabelId}`, `Open ${step.tabLabelEn}`)}
               </button>
@@ -439,7 +455,7 @@ export function FeatureTutorialModal({
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[#C8FF2E] px-5 text-xs font-bold text-[#0A0B0E] hover:brightness-105"
+                  className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-pulse px-5 text-xs font-bold text-pulse-fg hover:brightness-105"
                 >
                   {isLastFeature
                     ? t('Selesai & Mulai', 'Finish & Start')

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
   ArrowUp,
@@ -54,12 +54,12 @@ interface ExerciseFormState {
   trackingMode: ExerciseTrackingMode;
   usesWeight: boolean;
   timerDirection: TimerDirection;
-  targetSets: number;
+  targetSets: string;
   targetReps: string;
-  targetWeightKg: number;
-  durationMinutes: number;
-  durationSeconds: number;
-  restSeconds: number;
+  targetWeightKg: string;
+  durationMinutes: string;
+  durationSeconds: string;
+  restSeconds: string;
   notes: string;
 }
 
@@ -70,12 +70,12 @@ const EMPTY_FORM: ExerciseFormState = {
   trackingMode: 'reps',
   usesWeight: true,
   timerDirection: 'countdown',
-  targetSets: 3,
+  targetSets: '3',
   targetReps: '10-12',
-  targetWeightKg: 20,
-  durationMinutes: 1,
-  durationSeconds: 0,
-  restSeconds: 90,
+  targetWeightKg: '20',
+  durationMinutes: '1',
+  durationSeconds: '0',
+  restSeconds: '90',
   notes: '',
 };
 
@@ -96,6 +96,17 @@ export function ExerciseManagerView({
   const [formState, setFormState] = useState<ExerciseFormState>(EMPTY_FORM);
   const [deleteTarget, setDeleteTarget] = useState<ExerciseItem | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [formErrorMsg, setFormErrorMsg] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current !== null) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const schedule = schedules[selectedDayKey];
   const dayLabel = DAY_LABELS[lang][selectedDayKey].label;
@@ -116,13 +127,27 @@ export function ExerciseManagerView({
     });
   }, [searchQuery, muscleFilter, lang]);
 
-  const showToast = (msg: string) => {
-    setFeedbackMsg(msg);
-    window.setTimeout(() => setFeedbackMsg(null), 2500);
+  const showToast = (msg: string, isError = false) => {
+    if (toastTimeoutRef.current !== null) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    if (isError) {
+      setFeedbackMsg(null);
+      setErrorMsg(msg);
+    } else {
+      setErrorMsg(null);
+      setFeedbackMsg(msg);
+    }
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setFeedbackMsg(null);
+      setErrorMsg(null);
+      toastTimeoutRef.current = null;
+    }, 3200);
   };
 
   const handleOpenNewForm = () => {
     setEditingId(null);
+    setFormErrorMsg(null);
     setFormState(EMPTY_FORM);
     setShowCustomForm(true);
   };
@@ -130,6 +155,7 @@ export function ExerciseManagerView({
   const handleCloseForm = () => {
     setShowCustomForm(false);
     setEditingId(null);
+    setFormErrorMsg(null);
     setFormState(EMPTY_FORM);
   };
 
@@ -138,6 +164,7 @@ export function ExerciseManagerView({
     const usesWeight = resolveExerciseUsesWeight(ex);
     const totalDur = resolveTargetDurationSeconds(ex);
     setEditingId(ex.id);
+    setFormErrorMsg(null);
     setFormState({
       name: ex.name,
       muscleGroup: ex.muscleGroup,
@@ -145,12 +172,12 @@ export function ExerciseManagerView({
       trackingMode: mode,
       usesWeight,
       timerDirection: ex.timerDirection === 'countup' ? 'countup' : 'countdown',
-      targetSets: ex.targetSets,
+      targetSets: String(ex.targetSets),
       targetReps: ex.targetReps,
-      targetWeightKg: ex.targetWeightKg,
-      durationMinutes: Math.floor(totalDur / 60),
-      durationSeconds: totalDur % 60,
-      restSeconds: ex.restSeconds,
+      targetWeightKg: String(ex.targetWeightKg),
+      durationMinutes: String(Math.floor(totalDur / 60)),
+      durationSeconds: String(totalDur % 60),
+      restSeconds: String(ex.restSeconds),
       notes: ex.notes,
     });
     setShowCustomForm(true);
@@ -167,8 +194,8 @@ export function ExerciseManagerView({
           trackingMode: 'timer',
           usesWeight: false,
           equipment: defaultEquipment,
-          targetWeightKg: 0,
-          targetSets: prev.targetSets === 3 ? 1 : prev.targetSets,
+          targetWeightKg: '0',
+          targetSets: prev.targetSets === '3' ? '1' : prev.targetSets,
         };
       }
       return {
@@ -190,11 +217,16 @@ export function ExerciseManagerView({
       ) {
         nextEquipment = 'Barbel';
       }
+      const parsedWeight = parseFloat(prev.targetWeightKg);
       return {
         ...prev,
         usesWeight: nextUsesWeight,
         equipment: nextEquipment,
-        targetWeightKg: nextUsesWeight ? prev.targetWeightKg || 10 : 0,
+        targetWeightKg: nextUsesWeight
+          ? parsedWeight > 0
+            ? prev.targetWeightKg
+            : '10'
+          : '0',
       };
     });
   };
@@ -202,20 +234,20 @@ export function ExerciseManagerView({
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formState.name.trim()) return;
+    setFormErrorMsg(null);
 
-    const totalDur = Math.max(
-      5,
-      Math.min(
-        10800,
-        (Math.max(0, Number(formState.durationMinutes) || 0) * 60) +
-          Math.max(0, Math.min(59, Number(formState.durationSeconds) || 0))
-      )
-    );
+    const parsedMins = Math.max(0, Math.min(180, parseInt(formState.durationMinutes, 10) || 0));
+    const parsedSecs = Math.max(0, Math.min(59, parseInt(formState.durationSeconds, 10) || 0));
+    const totalDur = Math.max(5, Math.min(10800, parsedMins * 60 + parsedSecs));
 
     const formattedTargetText =
       formState.trackingMode === 'timer'
         ? formatCompactDuration(totalDur, lang)
         : formState.targetReps.trim().slice(0, 20) || '10';
+
+    const parsedSets = parseInt(formState.targetSets, 10);
+    const parsedWeight = parseFloat(formState.targetWeightKg.replace(',', '.'));
+    const parsedRest = parseInt(formState.restSeconds, 10);
 
     const cleanPayload: Omit<ExerciseItem, 'id'> = {
       name: formState.name.trim().slice(0, 60),
@@ -223,12 +255,12 @@ export function ExerciseManagerView({
       equipment:
         formState.equipment.trim().slice(0, 40) ||
         (formState.usesWeight ? t('Bebas', 'Free Weights') : t('Tanpa Alat', 'No Equipment')),
-      targetSets: Math.max(1, Math.min(12, Number(formState.targetSets) || 1)),
+      targetSets: Math.max(1, Math.min(12, Number.isFinite(parsedSets) ? parsedSets : 1)),
       targetReps: formattedTargetText,
       targetWeightKg: formState.usesWeight
-        ? Math.max(0, Math.min(999, Number(formState.targetWeightKg) || 0))
+        ? Math.max(0, Math.min(999, Number.isFinite(parsedWeight) ? parsedWeight : 0))
         : 0,
-      restSeconds: Math.max(15, Math.min(600, Number(formState.restSeconds) || 60)),
+      restSeconds: Math.max(15, Math.min(600, Number.isFinite(parsedRest) ? parsedRest : 60)),
       notes: formState.notes.trim().slice(0, 200),
       trackingMode: formState.trackingMode,
       usesWeight: formState.usesWeight,
@@ -236,37 +268,54 @@ export function ExerciseManagerView({
       targetDurationSeconds: totalDur,
     };
 
-    if (editingId) {
-      await onUpdateExercise(selectedDayKey, editingId, cleanPayload);
-      showToast(
-        t(
-          `Gerakan "${cleanPayload.name}" diperbarui.`,
-          `Exercise "${cleanPayload.name}" updated.`
-        )
-      );
-    } else {
-      await onAddExercise(selectedDayKey, cleanPayload);
-      showToast(
-        t(
-          `"${cleanPayload.name}" ditambahkan ke hari ${dayLabel}.`,
-          `"${cleanPayload.name}" added to ${dayLabel}.`
-        )
+    try {
+      if (editingId) {
+        await onUpdateExercise(selectedDayKey, editingId, cleanPayload);
+        showToast(
+          t(
+            `Gerakan "${cleanPayload.name}" diperbarui.`,
+            `Exercise "${cleanPayload.name}" updated.`
+          )
+        );
+      } else {
+        await onAddExercise(selectedDayKey, cleanPayload);
+        showToast(
+          t(
+            `"${cleanPayload.name}" ditambahkan ke hari ${dayLabel}.`,
+            `"${cleanPayload.name}" added to ${dayLabel}.`
+          )
+        );
+      }
+
+      setShowCustomForm(false);
+      setEditingId(null);
+      setFormState(EMPTY_FORM);
+    } catch (err) {
+      setFormErrorMsg(
+        err instanceof Error
+          ? err.message
+          : t('Gagal menyimpan gerakan. Coba lagi.', 'Failed to save exercise. Please try again.')
       );
     }
-
-    setShowCustomForm(false);
-    setEditingId(null);
-    setFormState(EMPTY_FORM);
   };
 
   const handleQuickAddPreset = async (preset: Omit<ExerciseItem, 'id'>) => {
-    await onAddExercise(selectedDayKey, preset);
-    showToast(
-      t(
-        `"${preset.name}" ditambahkan ke hari ${dayLabel}.`,
-        `"${preset.name}" added to ${dayLabel}.`
-      )
-    );
+    try {
+      await onAddExercise(selectedDayKey, preset);
+      showToast(
+        t(
+          `"${preset.name}" ditambahkan ke hari ${dayLabel}.`,
+          `"${preset.name}" added to ${dayLabel}.`
+        )
+      );
+    } catch (err) {
+      showToast(
+        err instanceof Error
+          ? err.message
+          : t('Gagal menambahkan gerakan.', 'Failed to add exercise.'),
+        true
+      );
+    }
   };
 
   return (
@@ -287,7 +336,7 @@ export function ExerciseManagerView({
         <button
           type="button"
           onClick={handleOpenNewForm}
-          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 py-2.5 text-xs font-bold text-[#0A0B0E] hover:brightness-105 whitespace-nowrap shrink-0"
+          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2.5 text-xs font-bold text-pulse-fg hover:brightness-105 whitespace-nowrap shrink-0"
         >
           <Plus className="h-4 w-4" />
           {t('Buat Gerakan Baru', 'New Custom Exercise')}
@@ -297,6 +346,12 @@ export function ExerciseManagerView({
       {feedbackMsg && (
         <div className="rounded-xl border border-[#16A34A]/40 bg-[#16A34A]/15 px-4 py-3 text-sm font-medium text-[#86EFAC]">
           {feedbackMsg}
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="rounded-xl border border-[#DC2626]/45 bg-[#DC2626]/15 px-4 py-3 text-sm font-medium text-[#FCA5A5]">
+          {errorMsg}
         </div>
       )}
 
@@ -312,7 +367,7 @@ export function ExerciseManagerView({
               onClick={() => onSelectDayKey(day.key)}
               className={`min-h-[40px] flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                 active
-                  ? 'bg-[#C8FF2E] text-[#0A0B0E] font-bold'
+                  ? 'bg-pulse text-pulse-fg font-bold'
                   : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
               }`}
             >
@@ -336,7 +391,7 @@ export function ExerciseManagerView({
           'Pick sets & reps or duration timer mode, then customize your workout targets.'
         )}
         maxWidthClass="max-w-2xl"
-        accentBorderClass="border-[#C8FF2E]/35"
+        accentBorderClass="border-pulse/35"
       >
         <form onSubmit={handleSubmitForm} className="space-y-5">
 
@@ -351,13 +406,13 @@ export function ExerciseManagerView({
                 onClick={() => handleSwitchTrackingMode('reps')}
                 className={`flex min-h-[52px] items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
                   formState.trackingMode === 'reps'
-                    ? 'border-[#C8FF2E] bg-[#C8FF2E]/12 text-[#F4F5F7]'
+                    ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
                     : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
                 }`}
               >
                 <Repeat
                   className={`h-4 w-4 shrink-0 ${
-                    formState.trackingMode === 'reps' ? 'text-[#C8FF2E]' : 'text-[#6B7280]'
+                    formState.trackingMode === 'reps' ? 'text-pulse' : 'text-[#6B7280]'
                   }`}
                 />
                 <div className="min-w-0">
@@ -412,7 +467,7 @@ export function ExerciseManagerView({
                     ? t('Misal: Plank / Incline Walk', 'e.g. Plank / Incline Walk')
                     : t('Misal: Push-Up / Bench Press', 'e.g. Push-Up / Bench Press')
                 }
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-pulse focus:outline-none"
               />
             </div>
 
@@ -425,7 +480,7 @@ export function ExerciseManagerView({
                 onChange={(e) =>
                   setFormState({ ...formState, muscleGroup: e.target.value as MuscleGroup })
                 }
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-pulse focus:outline-none"
               >
                 {MUSCLE_GROUPS.map((m) => (
                   <option key={m} value={m}>
@@ -459,7 +514,7 @@ export function ExerciseManagerView({
                   onClick={() => handleToggleUsesWeight(!formState.usesWeight)}
                   className={`min-h-[38px] rounded-lg px-3.5 text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${
                     !formState.usesWeight
-                      ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                      ? 'bg-pulse text-pulse-fg'
                       : 'border border-white/15 bg-[#1A1E26] text-[#D1D5DB] hover:border-white/30'
                   }`}
                 >
@@ -483,7 +538,7 @@ export function ExerciseManagerView({
                   'Tanpa Alat, Treadmill, Barbel, Dumbbell',
                   'No Equipment, Treadmill, Barbell, Dumbbell'
                 )}
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-pulse focus:outline-none"
               />
             </div>
 
@@ -494,14 +549,16 @@ export function ExerciseManagerView({
                     {t('Target Set', 'Target Sets')}
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    max={12}
+                    type="text"
+                    inputMode="numeric"
                     value={formState.targetSets}
                     onChange={(e) =>
-                      setFormState({ ...formState, targetSets: Number(e.target.value) })
+                      setFormState({
+                        ...formState,
+                        targetSets: e.target.value.replace(/[^0-9]/g, ''),
+                      })
                     }
-                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-pulse focus:outline-none"
                   />
                 </div>
                 <div>
@@ -514,7 +571,7 @@ export function ExerciseManagerView({
                     value={formState.targetReps}
                     onChange={(e) => setFormState({ ...formState, targetReps: e.target.value })}
                     placeholder="8-12"
-                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                    className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm text-[#F4F5F7] focus:border-pulse focus:outline-none"
                   />
                 </div>
               </div>
@@ -525,12 +582,14 @@ export function ExerciseManagerView({
                     {t('Set', 'Sets')}
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    max={12}
+                    type="text"
+                    inputMode="numeric"
                     value={formState.targetSets}
                     onChange={(e) =>
-                      setFormState({ ...formState, targetSets: Number(e.target.value) })
+                      setFormState({
+                        ...formState,
+                        targetSets: e.target.value.replace(/[^0-9]/g, ''),
+                      })
                     }
                     className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
                   />
@@ -540,14 +599,13 @@ export function ExerciseManagerView({
                     {t('Menit', 'Minutes')}
                   </label>
                   <input
-                    type="number"
-                    min={0}
-                    max={180}
+                    type="text"
+                    inputMode="numeric"
                     value={formState.durationMinutes}
                     onChange={(e) =>
                       setFormState({
                         ...formState,
-                        durationMinutes: Math.max(0, Math.min(180, Number(e.target.value) || 0)),
+                        durationMinutes: e.target.value.replace(/[^0-9]/g, ''),
                       })
                     }
                     className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
@@ -558,14 +616,13 @@ export function ExerciseManagerView({
                     {t('Detik', 'Seconds')}
                   </label>
                   <input
-                    type="number"
-                    min={0}
-                    max={59}
+                    type="text"
+                    inputMode="numeric"
                     value={formState.durationSeconds}
                     onChange={(e) =>
                       setFormState({
                         ...formState,
-                        durationSeconds: Math.max(0, Math.min(59, Number(e.target.value) || 0)),
+                        durationSeconds: e.target.value.replace(/[^0-9]/g, ''),
                       })
                     }
                     className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#38BDF8] focus:outline-none"
@@ -597,11 +654,11 @@ export function ExerciseManagerView({
                     onClick={() => setFormState({ ...formState, timerDirection: 'countup' })}
                     className={`flex min-h-[44px] items-center justify-center gap-2 rounded-xl border px-3 text-xs font-bold transition-colors ${
                       formState.timerDirection === 'countup'
-                        ? 'border-[#C8FF2E] bg-[#C8FF2E]/15 text-[#F4F5F7]'
+                        ? 'border-pulse bg-pulse/15 text-[#F4F5F7]'
                         : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:text-[#F4F5F7]'
                     }`}
                   >
-                    <Clock className="h-3.5 w-3.5 text-[#C8FF2E]" />
+                    <Clock className="h-3.5 w-3.5 text-pulse" />
                     {t('Hitung Maju (Stopwatch)', 'Count-Up (Stopwatch)')}
                   </button>
                 </div>
@@ -614,15 +671,16 @@ export function ExerciseManagerView({
                   {t('Beban Awal (kg)', 'Starting Weight (kg)')}
                 </label>
                 <input
-                  type="number"
-                  min={0}
-                  max={999}
-                  step="0.5"
+                  type="text"
+                  inputMode="decimal"
                   value={formState.targetWeightKg}
                   onChange={(e) =>
-                    setFormState({ ...formState, targetWeightKg: Number(e.target.value) })
+                    setFormState({
+                      ...formState,
+                      targetWeightKg: e.target.value.replace(/[^0-9.,]/g, ''),
+                    })
                   }
-                  className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                  className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-pulse focus:outline-none"
                 />
               </div>
             )}
@@ -632,15 +690,16 @@ export function ExerciseManagerView({
                 {t('Durasi Istirahat Antar Set (detik)', 'Rest Between Sets (seconds)')}
               </label>
               <input
-                type="number"
-                min={15}
-                max={600}
-                step="15"
+                type="text"
+                inputMode="numeric"
                 value={formState.restSeconds}
                 onChange={(e) =>
-                  setFormState({ ...formState, restSeconds: Number(e.target.value) })
+                  setFormState({
+                    ...formState,
+                    restSeconds: e.target.value.replace(/[^0-9]/g, ''),
+                  })
                 }
-                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm tabular-nums text-[#F4F5F7] focus:border-pulse focus:outline-none"
               />
             </div>
           </div>
@@ -658,9 +717,15 @@ export function ExerciseManagerView({
                 'Misal: Tahan posisi lurus, atau incline 10% kecepatan 5 km/jam.',
                 'e.g. Keep a straight line, or 10% incline at 5 km/h.'
               )}
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+              className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-pulse focus:outline-none"
             />
           </div>
+
+          {formErrorMsg && (
+            <p className="rounded-xl border border-[#DC2626]/40 bg-[#DC2626]/15 px-3 py-2 text-xs font-medium text-[#FCA5A5]">
+              {formErrorMsg}
+            </p>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <button
@@ -672,7 +737,7 @@ export function ExerciseManagerView({
             </button>
             <button
               type="submit"
-              className="min-h-[44px] rounded-xl bg-[#C8FF2E] px-5 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105 active:scale-[0.98]"
+              className="min-h-[44px] rounded-xl bg-pulse px-5 py-2 text-xs font-bold text-pulse-fg hover:brightness-105 active:scale-[0.98]"
             >
               {editingId ? t('Simpan Perubahan', 'Save Changes') : t('Tambahkan Gerakan', 'Add Exercise')}
             </button>
@@ -711,7 +776,7 @@ export function ExerciseManagerView({
                 >
                   <div className="min-w-0">
                     <p className="font-semibold text-[#F4F5F7]">
-                      <span className="mr-2 font-mono text-xs text-[#C8FF2E]">
+                      <span className="mr-2 font-mono text-xs text-pulse">
                         {String(idx + 1).padStart(2, '0')}.
                       </span>
                       {ex.name}
@@ -763,7 +828,7 @@ export function ExerciseManagerView({
                       type="button"
                       aria-label={`Edit ${ex.name}`}
                       onClick={() => handleOpenEditForm(ex)}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#D1D5DB] hover:border-[#C8FF2E]"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-[#1A1E26] text-[#D1D5DB] hover:border-pulse"
                     >
                       <Edit3 className="h-4 w-4" />
                     </button>
@@ -797,7 +862,7 @@ export function ExerciseManagerView({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('Cari nama gerakan atau alat...', 'Search exercise or equipment...')}
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#13161C] pl-9 pr-3 text-sm text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-[#C8FF2E] focus:outline-none"
+              className="h-11 w-full rounded-xl border border-white/10 bg-[#13161C] pl-9 pr-3 text-sm text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-pulse focus:outline-none"
             />
           </div>
         </div>
@@ -815,7 +880,7 @@ export function ExerciseManagerView({
                 onClick={() => setMuscleFilter(group)}
                 className={`min-h-[38px] rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
                   active
-                    ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                    ? 'bg-pulse text-pulse-fg'
                     : 'border border-white/10 bg-[#13161C] text-[#9CA3AF] hover:text-[#F4F5F7]'
                 }`}
               >
@@ -854,7 +919,7 @@ export function ExerciseManagerView({
                 <button
                   type="button"
                   onClick={() => handleQuickAddPreset(preset)}
-                  className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-[#C8FF2E]/40 bg-[#C8FF2E]/10 px-3 py-2 text-xs font-bold text-[#C8FF2E] hover:bg-[#C8FF2E] hover:text-[#0A0B0E] whitespace-nowrap shrink-0"
+                  className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-pulse/40 bg-pulse/10 px-3 py-2 text-xs font-bold text-pulse hover:bg-pulse hover:text-pulse-fg whitespace-nowrap shrink-0"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   {t('Tambah', 'Add')}

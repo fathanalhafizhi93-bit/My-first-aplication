@@ -53,9 +53,9 @@ export function WeeklyScheduleView({
           </p>
         </div>
         <div className="text-xs font-medium text-[#D1D5DB] whitespace-nowrap">
-          <span className="font-mono tabular-nums text-[#C8FF2E]">{activeGymDaysCount}/7</span>{' '}
+          <span className="font-mono tabular-nums text-pulse">{activeGymDaysCount}/7</span>{' '}
           {t('Hari Gym', 'Gym Days')} ·{' '}
-          <span className="font-mono tabular-nums text-[#C8FF2E]">{activeAlarmsCount}</span>{' '}
+          <span className="font-mono tabular-nums text-pulse">{activeAlarmsCount}</span>{' '}
           {t('Alarm Aktif', 'Active Alarms')}
         </div>
       </div>
@@ -84,7 +84,7 @@ export function WeeklyScheduleView({
                       {localizedDayLabel}
                     </h2>
                     {isToday && (
-                      <span className="text-xs font-semibold text-[#C8FF2E]">
+                      <span className="text-xs font-semibold text-pulse">
                         · {t('Hari Ini', 'Today')}
                       </span>
                     )}
@@ -107,7 +107,7 @@ export function WeeklyScheduleView({
                     }
                     className={`min-h-[42px] rounded-xl px-3.5 py-2 text-xs font-bold transition-colors whitespace-nowrap ${
                       sched.isGymDay
-                        ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                        ? 'bg-pulse text-pulse-fg'
                         : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]'
                     }`}
                   >
@@ -140,14 +140,23 @@ export function WeeklyScheduleView({
                       maxLength={80}
                       defaultValue={sched.focusTitle}
                       key={`${day.key}-${sched.focusTitle}`}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.currentTarget.blur();
+                        }
+                      }}
                       onBlur={(e) => {
                         const val = e.target.value.trim();
-                        if (val && val !== sched.focusTitle) {
+                        if (!val) {
+                          e.target.value = sched.focusTitle;
+                          return;
+                        }
+                        if (val !== sched.focusTitle) {
                           void onUpdateSchedule(day.key, { focusTitle: val });
                         }
                       }}
                       placeholder={t('Misal: Push — Dada & Bahu', 'e.g. Push — Chest & Shoulders')}
-                      className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                      className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-pulse focus:outline-none"
                     />
                   </div>
 
@@ -158,7 +167,7 @@ export function WeeklyScheduleView({
                         {t('Jam Alarm', 'Alarm Time')}
                       </label>
                       {clockFormat === '12h' && (
-                        <span className="font-mono text-[11px] font-semibold tabular-nums text-[#C8FF2E]">
+                        <span className="font-mono text-[11px] font-semibold tabular-nums text-pulse">
                           {formatAlarmTime(sched.alarmTime, '12h')}
                         </span>
                       )}
@@ -174,7 +183,7 @@ export function WeeklyScheduleView({
                             });
                           }
                         }}
-                        className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                        className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 font-mono text-sm font-semibold tabular-nums text-[#F4F5F7] focus:border-pulse focus:outline-none"
                       />
                       <button
                         type="button"
@@ -186,7 +195,7 @@ export function WeeklyScheduleView({
                         }
                         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                           sched.alarmEnabled
-                            ? 'border-[#C8FF2E]/50 bg-[#C8FF2E]/15 text-[#C8FF2E]'
+                            ? 'border-pulse/50 bg-pulse/15 text-pulse'
                             : 'border-white/10 bg-[#1A1E26] text-[#6B7280]'
                         }`}
                       >
@@ -205,11 +214,17 @@ export function WeeklyScheduleView({
                       {t('Nada Alarm', 'Alarm Tone')}
                     </label>
                     <select
-                      value={sched.ringtoneId}
+                      value={
+                        sched.ringtoneId === 'default' ||
+                        BUILTIN_RINGTONES.some((r) => r.id === sched.ringtoneId) ||
+                        customRingtones.some((r) => r.id === sched.ringtoneId)
+                          ? sched.ringtoneId
+                          : 'default'
+                      }
                       onChange={(e) =>
                         onUpdateSchedule(day.key, { ringtoneId: e.target.value })
                       }
-                      className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+                      className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3 text-sm text-[#F4F5F7] focus:border-pulse focus:outline-none"
                     >
                       <option value="default">
                         {t('Ikuti Ringtone Utama', 'Use Default Ringtone')}

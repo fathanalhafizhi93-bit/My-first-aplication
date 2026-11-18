@@ -65,6 +65,12 @@ export function RingtoneManagerView({
   const [androidDiag, setAndroidDiag] = useState<AndroidAlarmDiagnostics | null>(null);
   const [testNotifStatus, setTestNotifStatus] = useState<string | null>(null);
   const [schedulingTest, setSchedulingTest] = useState(false);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(() =>
+    typeof window !== 'undefined' && 'Notification' in window
+      ? Notification.permission
+      : 'denied'
+  );
+  const isPreviewingRef = useRef(false);
 
   const runningNativeAndroid = isNativeAndroid();
   const secUnit = t('d', 's');
@@ -79,24 +85,33 @@ export function RingtoneManagerView({
     void refreshAndroidDiagnostics();
   }, [refreshAndroidDiagnostics]);
 
-  const notifPermission =
-    typeof window !== 'undefined' && 'Notification' in window
-      ? Notification.permission
-      : 'denied';
+  useEffect(() => {
+    return () => {
+      if (isPreviewingRef.current) {
+        audioEngine.stop();
+        isPreviewingRef.current = false;
+      }
+    };
+  }, []);
 
   const handlePreview = async (id: string) => {
     if (playingId === id) {
       audioEngine.stop();
+      isPreviewingRef.current = false;
       setPlayingId(null);
       return;
     }
+    isPreviewingRef.current = true;
     setPlayingId(id);
     await audioEngine.unlock();
     await audioEngine.play(id, {
       volume: profile.volume,
       loop: false,
       customRingtones,
-      onEnded: () => setPlayingId((curr) => (curr === id ? null : curr)),
+      onEnded: () => {
+        isPreviewingRef.current = false;
+        setPlayingId((curr) => (curr === id ? null : curr));
+      },
     });
   };
 
@@ -118,7 +133,7 @@ export function RingtoneManagerView({
             )
           : t(
               `Ringtone "${created.name}" tersimpan lokal di browser ini (ukuran > 450 KB).`,
-              `Ringtone "${created.name}" saved locally on this browser (> 450 KB).`
+              `Ringtone "${created.name}" saved locally on this device (> 450 KB).`
             )
       );
     } catch (err) {
@@ -141,6 +156,7 @@ export function RingtoneManagerView({
     }
     if (typeof window === 'undefined' || !('Notification' in window)) return;
     const perm = await Notification.requestPermission();
+    setNotifPermission(perm);
     await onUpdateProfile({ notificationsEnabled: perm === 'granted' });
   };
 
@@ -202,10 +218,10 @@ export function RingtoneManagerView({
 
       {/* Android APK Native Background Alarm Diagnostics */}
       {runningNativeAndroid && (
-        <section className="glass-surface rounded-2xl border border-[#C8FF2E]/30 p-5 space-y-4">
+        <section className="glass-surface rounded-2xl border border-pulse/30 p-5 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
-              <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-[#C8FF2E]" />
+              <Smartphone className="mt-0.5 h-5 w-5 shrink-0 text-pulse" />
               <div>
                 <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
                   {t('Status Alarm Background Android', 'Android Background Alarm Status')}
@@ -220,7 +236,7 @@ export function RingtoneManagerView({
             </div>
 
             {androidDiag && (
-              <span className="font-mono text-xs font-semibold tabular-nums text-[#C8FF2E]">
+              <span className="font-mono text-xs font-semibold tabular-nums text-pulse">
                 {androidDiag.pendingCount} {t('Jadwal Terdaftar', 'Pending Alarms')}
               </span>
             )}
@@ -250,7 +266,7 @@ export function RingtoneManagerView({
                 <button
                   type="button"
                   onClick={handleRequestNotifications}
-                  className="min-h-[40px] shrink-0 rounded-lg bg-[#C8FF2E] px-3 text-xs font-bold text-[#0A0B0E]"
+                  className="min-h-[40px] shrink-0 rounded-lg bg-pulse px-3 text-xs font-bold text-pulse-fg"
                 >
                   {t('Izinkan', 'Allow')}
                 </button>
@@ -296,7 +312,7 @@ export function RingtoneManagerView({
               type="button"
               disabled={schedulingTest}
               onClick={handleScheduleTestNotification}
-              className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-4 py-2 text-xs font-bold text-[#0A0B0E] hover:brightness-105 disabled:opacity-60"
+              className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2 text-xs font-bold text-pulse-fg hover:brightness-105 disabled:opacity-60"
             >
               <BellRing className="h-4 w-4" />
               {schedulingTest
@@ -306,7 +322,7 @@ export function RingtoneManagerView({
           </div>
 
           {testNotifStatus && (
-            <p className="text-xs font-medium text-[#C8FF2E]">{testNotifStatus}</p>
+            <p className="text-xs font-medium text-pulse">{testNotifStatus}</p>
           )}
         </section>
       )}
@@ -321,10 +337,10 @@ export function RingtoneManagerView({
           <div>
             <div className="mb-2 flex items-center justify-between text-xs font-medium text-[#D1D5DB]">
               <span className="flex items-center gap-2">
-                <Volume2 className="h-4 w-4 text-[#C8FF2E]" />
+                <Volume2 className="h-4 w-4 text-pulse" />
                 {t('Volume Alarm & Timer', 'Alarm & Timer Volume')}
               </span>
-              <span className="font-mono tabular-nums text-[#C8FF2E]">
+              <span className="font-mono tabular-nums text-pulse">
                 {Math.round(profile.volume * 100)}%
               </span>
             </div>
@@ -337,7 +353,7 @@ export function RingtoneManagerView({
               onChange={(e) =>
                 onUpdateProfile({ volume: parseFloat(e.target.value) })
               }
-              className="h-2 w-full cursor-pointer accent-[#C8FF2E]"
+              className="h-2 w-full cursor-pointer accent-pulse"
             />
           </div>
 
@@ -353,7 +369,7 @@ export function RingtoneManagerView({
                   onClick={() => onUpdateProfile({ snoozeMinutes: mins })}
                   className={`min-h-[40px] rounded-xl border text-xs font-bold font-mono tabular-nums transition-colors ${
                     profile.snoozeMinutes === mins
-                      ? 'border-[#C8FF2E] bg-[#C8FF2E] text-[#0A0B0E]'
+                      ? 'border-pulse bg-pulse text-pulse-fg'
                       : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:text-[#F4F5F7]'
                   }`}
                 >
@@ -384,7 +400,7 @@ export function RingtoneManagerView({
               }
               className={`min-h-[38px] rounded-lg px-3.5 text-xs font-bold whitespace-nowrap ${
                 profile.autoStartRestTimer
-                  ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                  ? 'bg-pulse text-pulse-fg'
                   : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF]'
               }`}
             >
@@ -456,7 +472,7 @@ export function RingtoneManagerView({
               'Nama ringtone (opsional, misal: Lagu Semangat Pagi)',
               'Ringtone name (optional, e.g. Morning Pump)'
             )}
-            className="h-11 flex-1 rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-sm text-[#F4F5F7] focus:border-[#C8FF2E] focus:outline-none"
+            className="h-11 flex-1 rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-sm text-[#F4F5F7] focus:border-pulse focus:outline-none"
           />
 
           <input
@@ -469,7 +485,7 @@ export function RingtoneManagerView({
           />
           <label
             htmlFor="ringtone-upload-input"
-            className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#C8FF2E] px-5 py-2.5 text-xs font-bold text-[#0A0B0E] hover:brightness-105 whitespace-nowrap shrink-0"
+            className="inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl bg-pulse px-5 py-2.5 text-xs font-bold text-pulse-fg hover:brightness-105 whitespace-nowrap shrink-0"
           >
             <Upload className="h-4 w-4" />
             {uploading
@@ -517,12 +533,12 @@ export function RingtoneManagerView({
                     >
                       {isPlaying ? (
                         <>
-                          <Square className="h-3.5 w-3.5 fill-current text-[#C8FF2E]" />
+                          <Square className="h-3.5 w-3.5 fill-current text-pulse" />
                           Stop
                         </>
                       ) : (
                         <>
-                          <Play className="h-3.5 w-3.5 fill-current text-[#C8FF2E]" />
+                          <Play className="h-3.5 w-3.5 fill-current text-pulse" />
                           {t('Putar', 'Play')}
                         </>
                       )}
@@ -533,7 +549,7 @@ export function RingtoneManagerView({
                       onClick={() => onUpdateProfile({ defaultRingtoneId: rt.id })}
                       className={`inline-flex min-h-[38px] items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold whitespace-nowrap ${
                         isMain
-                          ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                          ? 'bg-pulse text-pulse-fg'
                           : 'border border-white/10 bg-[#13161C] text-[#D1D5DB] hover:border-white/30'
                       }`}
                     >
@@ -602,12 +618,12 @@ export function RingtoneManagerView({
                   >
                     {isPlaying ? (
                       <>
-                        <Square className="h-3.5 w-3.5 fill-current text-[#C8FF2E]" />
+                        <Square className="h-3.5 w-3.5 fill-current text-pulse" />
                         Stop
                       </>
                     ) : (
                       <>
-                        <Play className="h-3.5 w-3.5 fill-current text-[#C8FF2E]" />
+                        <Play className="h-3.5 w-3.5 fill-current text-pulse" />
                         {t('Putar', 'Play')}
                       </>
                     )}
@@ -618,7 +634,7 @@ export function RingtoneManagerView({
                     onClick={() => onUpdateProfile({ defaultRingtoneId: rt.id })}
                     className={`inline-flex min-h-[38px] items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold whitespace-nowrap ${
                       isMain
-                        ? 'bg-[#C8FF2E] text-[#0A0B0E]'
+                        ? 'bg-pulse text-pulse-fg'
                         : 'border border-white/10 bg-[#0A0B0E] text-[#D1D5DB] hover:border-white/30'
                     }`}
                   >

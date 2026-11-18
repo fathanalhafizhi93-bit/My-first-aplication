@@ -59,7 +59,9 @@ interface CooldownAlertTarget {
 }
 
 function AppContent() {
-  const { lang, t, todayThemeMode } = useI18n();
+  const { lang, t, todayThemeMode, uiTheme } = useI18n();
+  const isFrosted = uiTheme === 'midnight-frosted';
+  const isCarbon = uiTheme === 'carbon-forge';
   const {
     user,
     authReady,
@@ -69,6 +71,7 @@ function AppContent() {
     schedules,
     customRingtones,
     todayDayKey,
+    todayDateKey,
     workoutHistory,
     historyLoading,
     effectiveTodayEntries,
@@ -116,6 +119,7 @@ function AppContent() {
   // Active alarm & snooze state
   const [activeAlarm, setActiveAlarm] = useState<TriggeredAlarmState | null>(null);
   const [snoozeTargetMs, setSnoozeTargetMs] = useState<number | null>(null);
+  const snoozedAlarmRef = useRef<{ schedule: DaySchedule; isTest: boolean } | null>(null);
   const lastTriggeredSlotRef = useRef<string | null>(null);
 
   // Inter-set rest timer state
@@ -124,6 +128,9 @@ function AppContent() {
   const [restRunning, setRestRunning] = useState(false);
   const [restExerciseLabel, setRestExerciseLabel] = useState<string | null>(null);
   const [restFinishedBanner, setRestFinishedBanner] = useState(false);
+  const restEndAtRef = useRef<number | null>(null);
+  const restShouldChimeRef = useRef(false);
+  const restBannerTimeoutRef = useRef<number | null>(null);
 
   // Per-exercise timer state (Countdown & Count-Up for timed movements like Plank / Incline Walk)
   const [exerciseTimers, setExerciseTimers] = useState<Record<string, ExerciseTimerState>>({});
@@ -176,11 +183,14 @@ function AppContent() {
     };
   }, []);
 
-  // Cleanup mascot clap timeout on unmount
+  // Cleanup mascot clap & rest banner timeouts on unmount
   useEffect(() => {
     return () => {
       if (clapTimeoutRef.current !== null) {
         window.clearTimeout(clapTimeoutRef.current);
+      }
+      if (restBannerTimeoutRef.current !== null) {
+        window.clearTimeout(restBannerTimeoutRef.current);
       }
     };
   }, []);
@@ -281,10 +291,16 @@ function AppContent() {
       // Check snoozed alarm
       if (snoozeTargetMs !== null && current.getTime() >= snoozeTargetMs) {
         setSnoozeTargetMs(null);
-        const dayKey = getTodayDayKey(current);
-        const sched = schedules[dayKey];
-        if (sched) {
-          triggerAlarm(sched, false);
+        const snoozed = snoozedAlarmRef.current;
+        snoozedAlarmRef.current = null;
+        if (snoozed) {
+          triggerAlarm(snoozed.schedule, snoozed.isTest);
+        } else {
+          const dayKey = getTodayDayKey(current);
+          const sched = schedules[dayKey];
+          if (sched) {
+            triggerAlarm(sched, false);
+          }
         }
         return;
       }
@@ -325,38 +341,68 @@ function AppContent() {
     void syncNativeWeeklyAlarms(schedules);
   }, [schedules]);
 
-  // Rest timer countdown loop
+  // Rest timer countdown loop (wall-clock anchored so backgrounding never drifts)
   useEffect(() => {
     if (!restRunning) return;
-    const timer = window.setInterval(() => {
-      setRestRemaining((prev) => {
-        if (prev <= 1) {
-          setRestRunning(false);
-          setRestFinishedBanner(true);
-          const restToneId = profile?.restRingtoneId || 'builtin_kettlebell_chime';
-          void audioEngine.play(restToneId, {
-            volume: profile?.volume ?? 0.85,
-            loop: false,
-            customRingtones,
-          });
-          window.setTimeout(() => setRestFinishedBanner(false), 5000);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    if (restEndAtRef.current === null) {
+      restEndAtRef.current = Date.now() + restRemaining * 1000;
+    }
+    const tick = () => {
+      const endAt = restEndAtRef.current;
+      if (endAt === null) return;
+      const rem = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+      setRestRemaining(rem);
+      if (rem <= 0) {
+        restEndAtRef.current = null;
+        setRestRunning(false);
+      }
+    };
+    tick();
+    const timer = window.setInterval(tick, 250);
 
     return () => window.clearInterval(timer);
-  }, [restRunning, profile, customRingtones]);
+  }, [restRunning]);
 
-  const startRestTimer = useCallback((seconds: number, label?: string) => {
-    const safeSec = Math.max(10, Math.min(600, seconds));
-    setRestFinishedBanner(false);
-    setRestTotalSeconds(safeSec);
-    setRestRemaining(safeSec);
-    setRestExerciseLabel(label || null);
-    setRestRunning(true);
-  }, []);
+  // Pure completion effect for rest timer (fires once when timer reaches 0)
+  useEffect(() => {
+    if (restRunning || restRemaining !== 0 || !restShouldChimeRef.current) return;
+    restShouldChimeRef.current = false;
+    setRestFinishedBanner(true);
+
+    const restToneId = profile?.restRingtoneId || 'builtin_kettlebell_chime';
+    void audioEngine.play(restToneId, {
+      volume: profile?.volume ?? 0.85,
+      loop: false,
+      customRingtones,
+    });
+
+    if (restBannerTimeoutRef.current !== null) {
+      window.clearTimeout(restBannerTimeoutRef.current);
+    }
+    restBannerTimeoutRef.current = window.setTimeout(() => {
+      setRestFinishedBanner(false);
+      restBannerTimeoutRef.current = null;
+    }, 5000);
+  }, [restRunning, restRemaining, profile, customRingtones]);
+
+  const startRestTimer = useCallback(
+    (seconds: number, label?: string) => {
+      void handleUnlockAudio();
+      if (restBannerTimeoutRef.current !== null) {
+        window.clearTimeout(restBannerTimeoutRef.current);
+        restBannerTimeoutRef.current = null;
+      }
+      const safeSec = Math.max(10, Math.min(600, seconds));
+      restEndAtRef.current = Date.now() + safeSec * 1000;
+      restShouldChimeRef.current = true;
+      setRestFinishedBanner(false);
+      setRestTotalSeconds(safeSec);
+      setRestRemaining(safeSec);
+      setRestExerciseLabel(label || null);
+      setRestRunning(true);
+    },
+    [handleUnlockAudio]
+  );
 
   const handleFinishExerciseTimerSet = useCallback(
     async (
@@ -612,25 +658,60 @@ function AppContent() {
   );
 
   const handleToggleRestPause = useCallback(() => {
+    void handleUnlockAudio();
+    if (restBannerTimeoutRef.current !== null) {
+      window.clearTimeout(restBannerTimeoutRef.current);
+      restBannerTimeoutRef.current = null;
+    }
     if (restRemaining === 0) {
+      restEndAtRef.current = Date.now() + restTotalSeconds * 1000;
+      restShouldChimeRef.current = true;
       setRestRemaining(restTotalSeconds);
       setRestRunning(true);
       setRestFinishedBanner(false);
       return;
     }
-    setRestRunning((r) => !r);
-  }, [restRemaining, restTotalSeconds]);
+    setRestRunning((currentlyRunning) => {
+      if (currentlyRunning) {
+        restEndAtRef.current = null;
+        return false;
+      }
+      restEndAtRef.current = Date.now() + restRemaining * 1000;
+      restShouldChimeRef.current = true;
+      return true;
+    });
+  }, [handleUnlockAudio, restRemaining, restTotalSeconds]);
 
   const handleResetRest = useCallback(() => {
+    if (restBannerTimeoutRef.current !== null) {
+      window.clearTimeout(restBannerTimeoutRef.current);
+      restBannerTimeoutRef.current = null;
+    }
+    restShouldChimeRef.current = false;
+    restEndAtRef.current = null;
     setRestRunning(false);
     setRestRemaining(restTotalSeconds);
     setRestFinishedBanner(false);
   }, [restTotalSeconds]);
 
-  const handleAdjustRest = useCallback((delta: number) => {
-    setRestRemaining((prev) => Math.max(0, Math.min(600, prev + delta)));
-    setRestTotalSeconds((prev) => Math.max(15, Math.min(600, prev + delta)));
-  }, []);
+  const handleAdjustRest = useCallback(
+    (delta: number) => {
+      const nextRemaining = Math.max(0, Math.min(600, restRemaining + delta));
+      setRestRemaining(nextRemaining);
+      setRestTotalSeconds((prev) =>
+        Math.max(15, Math.min(600, Math.max(nextRemaining, prev + delta)))
+      );
+      if (restRunning) {
+        if (nextRemaining === 0) {
+          restEndAtRef.current = null;
+          setRestRunning(false);
+        } else {
+          restEndAtRef.current = Date.now() + nextRemaining * 1000;
+        }
+      }
+    },
+    [restRemaining, restRunning]
+  );
 
   const handleToggleSetWithAutoRest = useCallback(
     async (exerciseId: string, setNumber: number, exerciseName: string) => {
@@ -726,18 +807,28 @@ function AppContent() {
   const handleDismissAlarm = useCallback(() => {
     audioEngine.stop();
     setActiveAlarm(null);
+    setSnoozeTargetMs(null);
+    snoozedAlarmRef.current = null;
   }, []);
 
   const handleSnoozeAlarm = useCallback(() => {
     audioEngine.stop();
     const mins = profile?.snoozeMinutes ?? 5;
+    if (activeAlarm) {
+      snoozedAlarmRef.current = {
+        schedule: activeAlarm.schedule,
+        isTest: activeAlarm.isTest,
+      };
+    }
     setSnoozeTargetMs(Date.now() + mins * 60 * 1000);
     setActiveAlarm(null);
-  }, [profile]);
+  }, [profile, activeAlarm]);
 
   const handleStartWorkoutFromAlarm = useCallback(() => {
     audioEngine.stop();
     setActiveAlarm(null);
+    setSnoozeTargetMs(null);
+    snoozedAlarmRef.current = null;
     setActiveTab('today');
   }, []);
 
@@ -746,11 +837,31 @@ function AppContent() {
     [schedules, now, lang]
   );
 
-  // Check whether signed-in user has confirmed their display name after login
+  // Check whether signed-in user has confirmed their display name after login,
+  // and reset active session timers/alarms cleanly on sign-out.
   useEffect(() => {
     setIsOpeningGreeting(true);
     if (!user) {
       setNameConfirmed(true);
+      audioEngine.stop();
+      setActiveAlarm(null);
+      setSnoozeTargetMs(null);
+      snoozedAlarmRef.current = null;
+      lastTriggeredSlotRef.current = null;
+      restShouldChimeRef.current = false;
+      restEndAtRef.current = null;
+      if (restBannerTimeoutRef.current !== null) {
+        window.clearTimeout(restBannerTimeoutRef.current);
+        restBannerTimeoutRef.current = null;
+      }
+      setRestRunning(false);
+      setRestFinishedBanner(false);
+      setExerciseTimers({});
+      exerciseTimersRef.current = {};
+      setCooldownUntilMs(null);
+      setCooldownAlertTarget(null);
+      setActivePopup(null);
+      setTutorialOpen(false);
       return;
     }
     try {
@@ -829,7 +940,7 @@ function AppContent() {
   const renderBody = () => {
     if (!authReady) {
       return (
-        <div className="flex min-h-screen items-center justify-center bg-[#0A0B0E] text-sm text-[#9CA3AF]">
+        <div className="flex min-h-screen items-center justify-center bg-[var(--ip-canvas-bg)] text-sm text-[#9CA3AF]">
           {t('Memuat sesi IronPulse...', 'Loading IronPulse session...')}
         </div>
       );
@@ -841,7 +952,7 @@ function AppContent() {
 
     if (dataLoading || !profile || !schedules) {
       return (
-        <div className="min-h-screen bg-[#0A0B0E] text-[#F4F5F7]">
+        <div className="min-h-screen bg-[var(--ip-canvas-bg)] text-[#F4F5F7]">
           <TopBar
             activeTab={activeTab}
             activePopup={activePopup}
@@ -879,28 +990,48 @@ function AppContent() {
           scale: showIntro ? 0.978 : 1,
         }}
         transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
-        className="relative min-h-screen bg-[#0A0B0E] text-[#F4F5F7]"
+        className="relative min-h-screen bg-[var(--ip-canvas-bg)] text-[#F4F5F7]"
       >
         {/* Lightweight Fixed Atmospheric Time-of-Day Ambient Glow & Glass Refraction Orbs */}
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 top-0 z-0 h-[440px] transition-opacity duration-500"
+          className={`pointer-events-none fixed inset-x-0 top-0 z-0 h-[440px] transition-opacity duration-500 ${
+            isCarbon ? 'opacity-45' : 'opacity-100'
+          }`}
           style={{ background: phaseToken.ambientGlow }}
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed -left-24 top-28 z-0 h-80 w-80 rounded-full opacity-25 transition-colors duration-500"
+          className={`pointer-events-none fixed -left-24 top-28 z-0 rounded-full transition-all duration-500 ${
+            isFrosted ? 'h-96 w-96 opacity-45' : isCarbon ? 'h-72 w-72 opacity-10' : 'h-80 w-80 opacity-25'
+          }`}
           style={{
-            background: `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
+            background: isFrosted
+              ? `radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.72) 0%, ${phaseToken.accent}52 42%, transparent 74%)`
+              : `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
           }}
         />
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed -right-24 top-44 z-0 h-96 w-96 rounded-full opacity-20 transition-colors duration-500"
+          className={`pointer-events-none fixed -right-24 top-44 z-0 rounded-full transition-all duration-500 ${
+            isFrosted ? 'h-[28rem] w-[28rem] opacity-35' : isCarbon ? 'h-80 w-80 opacity-8' : 'h-96 w-96 opacity-20'
+          }`}
           style={{
-            background: `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
+            background: isFrosted
+              ? `radial-gradient(circle, rgba(var(--ip-accent-rgb), 0.24) 0%, ${phaseToken.accentBright}35 44%, transparent 74%)`
+              : `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
           }}
         />
+        {isFrosted && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed bottom-10 left-1/3 z-0 h-80 w-80 rounded-full opacity-30 transition-all duration-500"
+            style={{
+              background:
+                'radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.65) 0%, rgba(var(--ip-accent-rgb), 0.14) 48%, transparent 75%)',
+            }}
+          />
+        )}
 
         <TopBar
           activeTab={activeTab}
@@ -1028,6 +1159,7 @@ function AppContent() {
                     <HistoryProgressView
                       workoutHistory={workoutHistory}
                       loading={historyLoading}
+                      todayDateKey={todayDateKey}
                       onGoToToday={() => setActiveTab('today')}
                     />
                   )}
@@ -1082,11 +1214,11 @@ function AppContent() {
           onClose={() => setActivePopup(null)}
           title={t('Pengaturan Aplikasi', 'App Settings')}
           subtitle={t(
-            'Atur bahasa, format jam, tema tampilan, dan preferensi alarm.',
-            'Configure language, clock format, display theme, and alarm preferences.'
+            'Atur tema material, warna tombol, bahasa, format jam, dan preferensi alarm.',
+            'Configure material theme, button colors, language, clock format, and alarm preferences.'
           )}
           maxWidthClass="max-w-2xl"
-          accentBorderClass="border-[#C8FF2E]/30"
+          accentBorderClass="border-pulse/30"
           closeAriaLabel={t('Tutup Pengaturan', 'Close Settings')}
         >
           <SettingsView
@@ -1118,7 +1250,7 @@ function AppContent() {
             'Developer credits, concept notes, release info, and app overview.'
           )}
           maxWidthClass="max-w-xl"
-          accentBorderClass="border-[#C8FF2E]/30"
+          accentBorderClass="border-pulse/30"
           closeAriaLabel={t('Tutup Tentang Aplikasi', 'Close About')}
         >
           <AboutView embeddedInModal />
@@ -1142,13 +1274,17 @@ function AppContent() {
     );
   };
 
+  const handleIntroComplete = useCallback(() => {
+    setShowIntro(false);
+  }, []);
+
   return (
     <>
       <AnimatePresence>
         {showIntro && (
           <LaunchIntro
             timePhase={timePhase}
-            onComplete={() => setShowIntro(false)}
+            onComplete={handleIntroComplete}
           />
         )}
       </AnimatePresence>

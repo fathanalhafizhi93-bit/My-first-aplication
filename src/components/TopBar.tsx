@@ -22,8 +22,10 @@ export function TopBar({
   onOpenAbout,
   onTestAlarm,
 }: TopBarProps) {
-  const { t } = useI18n();
+  const { t, uiTheme } = useI18n();
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
+  const isFrosted = uiTheme === 'midnight-frosted';
+  const isCarbon = uiTheme === 'carbon-forge';
 
   const navItems: { id: AppTab; label: string }[] = [
     { id: 'today', label: t('Hari Ini', 'Today') },
@@ -38,21 +40,31 @@ export function TopBar({
 
   return (
     <header
-      className={`glass-bar sticky top-0 z-30 border-b transition-colors duration-500 ${phaseToken.headerTint}`}
+      className={`glass-bar sticky top-0 z-30 border-b transition-colors duration-500 ${
+        isFrosted
+          ? 'border-white/15'
+          : isCarbon
+            ? 'border-white/12'
+            : phaseToken.headerTint
+      }`}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:gap-8 lg:px-8">
         {/* Zone 1: Single-line brand wordmark */}
         <button
           type="button"
           onClick={() => onSelectTab('today')}
-          className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7] transition-transform active:scale-95 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#C8FF2E]"
+          className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7] transition-transform active:scale-95 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-pulse"
         >
           IronPulse
         </button>
 
-        {/* Zone 2: 5 core single-line workspace nav links with fluid spring indicator */}
+        {/* Zone 2: 5 core single-line workspace nav links */}
         <nav
-          className="hidden md:flex items-center gap-5 lg:gap-7"
+          className={`hidden md:flex items-center ${
+            isFrosted
+              ? 'gap-2 rounded-full border border-white/12 bg-white/[0.04] px-2 py-1'
+              : 'gap-5 lg:gap-7'
+          }`}
           aria-label={t('Navigasi Utama', 'Primary Navigation')}
         >
           {navItems.map((item) => {
@@ -64,18 +76,33 @@ export function TopBar({
                 key={item.id}
                 type="button"
                 onClick={() => onSelectTab(item.id)}
-                className={`relative py-2 text-sm font-medium transition-colors duration-150 active:scale-[0.97] whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-[#C8FF2E] ${
+                className={`relative whitespace-nowrap shrink-0 text-sm transition-colors duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-pulse ${
+                  isCarbon ? 'font-semibold tracking-wide' : 'font-medium'
+                } ${
+                  isFrosted ? 'rounded-full px-3.5 py-1.5' : 'py-2'
+                } ${
                   isActive
-                    ? 'text-[#C8FF2E]'
+                    ? 'text-pulse'
                     : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
                 }`}
               >
+                {isActive && isFrosted && (
+                  <motion.span
+                    layoutId="desktop-nav-capsule"
+                    transition={{ type: 'spring', stiffness: 440, damping: 32 }}
+                    className="absolute inset-0 -z-10 rounded-full border border-white/20 bg-white/[0.11] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+                  />
+                )}
                 {item.label}
-                {isActive && (
+                {isActive && !isFrosted && (
                   <motion.span
                     layoutId="desktop-nav-underline"
                     transition={{ type: 'spring', stiffness: 460, damping: 34 }}
-                    className="absolute inset-x-0 -bottom-[17px] h-0.5 rounded-full bg-[#C8FF2E]"
+                    className={`absolute inset-x-0 -bottom-[17px] bg-pulse ${
+                      isCarbon
+                        ? 'h-[2.5px] rounded-none shadow-[0_0_10px_rgba(var(--ip-accent-rgb),0.6)]'
+                        : 'h-0.5 rounded-full'
+                    }`}
                   />
                 )}
               </button>
@@ -89,10 +116,16 @@ export function TopBar({
             type="button"
             aria-label={t('Buka pop-up pengaturan', 'Open settings popup')}
             onClick={onOpenSettings}
-            className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border transition-all duration-150 active:scale-95 ${
+            className={`flex min-h-[40px] min-w-[40px] items-center justify-center border transition-all duration-150 active:scale-95 ${
+              isFrosted ? 'rounded-full' : isCarbon ? 'rounded-md' : 'rounded-lg'
+            } ${
               settingsActive
-                ? 'border-[#C8FF2E]/60 bg-[#C8FF2E]/18 text-[#C8FF2E]'
-                : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                ? 'border-pulse/60 bg-pulse/18 text-pulse'
+                : isFrosted
+                  ? 'border-white/18 bg-white/[0.08] text-[#D1D5DB] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:border-white/30 hover:text-[#F4F5F7]'
+                  : isCarbon
+                    ? 'border-white/14 bg-[#12151B]/95 text-[#9CA3AF] hover:border-white/30 hover:text-[#F4F5F7]'
+                    : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
             }`}
           >
             <Settings className="h-4 w-4" />
@@ -102,10 +135,16 @@ export function TopBar({
             type="button"
             aria-label={t('Buka pop-up Tentang IronPulse', 'Open About IronPulse popup')}
             onClick={onOpenAbout}
-            className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border transition-all duration-150 active:scale-95 ${
+            className={`flex min-h-[40px] min-w-[40px] items-center justify-center border transition-all duration-150 active:scale-95 ${
+              isFrosted ? 'rounded-full' : isCarbon ? 'rounded-md' : 'rounded-lg'
+            } ${
               aboutActive
-                ? 'border-[#C8FF2E]/60 bg-[#C8FF2E]/18 text-[#C8FF2E]'
-                : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                ? 'border-pulse/60 bg-pulse/18 text-pulse'
+                : isFrosted
+                  ? 'border-white/18 bg-white/[0.08] text-[#D1D5DB] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:border-white/30 hover:text-[#F4F5F7]'
+                  : isCarbon
+                    ? 'border-white/14 bg-[#12151B]/95 text-[#9CA3AF] hover:border-white/30 hover:text-[#F4F5F7]'
+                    : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
             }`}
           >
             <Info className="h-4 w-4" />
@@ -114,7 +153,9 @@ export function TopBar({
           <button
             type="button"
             onClick={onTestAlarm}
-            className="min-h-[40px] rounded-lg bg-[#C8FF2E] px-4 py-2 text-xs font-bold tracking-wide text-[#0A0B0E] transition-transform duration-150 hover:brightness-105 active:scale-95 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C8FF2E]"
+            className={`min-h-[40px] bg-pulse px-4 py-2 text-xs font-bold tracking-wide text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-95 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pulse ${
+              isFrosted ? 'rounded-full' : isCarbon ? 'rounded-md' : 'rounded-lg'
+            }`}
           >
             {t('Tes Alarm', 'Test Alarm')}
           </button>
