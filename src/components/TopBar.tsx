@@ -77,7 +77,7 @@ export function TopBar({ activeTab, onSelectTab, onTestAlarm }: TopBarProps) {
 
           <button
             type="button"
-            aria-label={t('Tentang & Fitur Upcoming', 'About & Upcoming Features')}
+            aria-label={t('Tentang IronPulse', 'About IronPulse')}
             onClick={() => onSelectTab('about')}
             className={`flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg border transition-colors md:hidden ${
               activeTab === 'about'

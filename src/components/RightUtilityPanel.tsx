@@ -191,9 +191,9 @@ export function RightUtilityPanel({
           >
             <span className="inline-flex items-center gap-2">
               <Info className="h-4 w-4 text-[#C8FF2E]" />
-              {t('Tentang IronPulse & Fitur Upcoming', 'About IronPulse & Roadmap')}
+              {t('Tentang IronPulse', 'About IronPulse')}
             </span>
-            <span className="font-mono text-[11px] text-[#9CA3AF]">Roadmap</span>
+            <span className="font-mono text-[11px] text-[#9CA3AF]">About</span>
           </button>
         </div>
       </section>
