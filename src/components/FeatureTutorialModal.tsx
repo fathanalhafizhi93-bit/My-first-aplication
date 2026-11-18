@@ -15,6 +15,7 @@ import {
 import { motion } from 'motion/react';
 import { AppLanguage, useI18n } from '../lib/i18n';
 import { AppTab } from '../types/gym';
+import { ModalPortal, useBodyScrollLock } from './ModalPortal';
 
 interface TutorialStep {
   id: AppTab;
@@ -167,10 +168,10 @@ export function FeatureTutorialModal({
     }
   }, [open, startAtLanguageStep]);
 
+  useBodyScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setConfirmSkip(true);
@@ -178,7 +179,6 @@ export function FeatureTutorialModal({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [open]);
@@ -216,18 +216,19 @@ export function FeatureTutorialModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="tutorial-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0B0E]/85 px-4 py-6 backdrop-blur-sm"
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-        className="glass-surface w-full max-w-lg rounded-2xl border border-white/15 p-6 shadow-2xl"
+    <ModalPortal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tutorial-modal-title"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0A0B0E]/85 p-4 backdrop-blur-md"
       >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+          className="glass-surface max-h-[min(90dvh,calc(100dvh-2rem))] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-white/15 p-6 shadow-2xl"
+        >
         {confirmSkip ? (
           /* Gentle Skip Warning Confirmation */
           <div className="space-y-5">
@@ -466,7 +467,8 @@ export function FeatureTutorialModal({
             </div>
           </>
         )}
-      </motion.div>
-    </div>
+        </motion.div>
+      </div>
+    </ModalPortal>
   );
 }

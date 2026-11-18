@@ -1,12 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Smartphone, WifiOff, X } from 'lucide-react';
 import { useOnlineStatus, usePWAInstall } from '../hooks/usePWAInstall';
 import { useI18n } from '../lib/i18n';
+import { ModalPortal, useBodyScrollLock } from './ModalPortal';
 
 export function PWAInstallCard() {
   const { t } = useI18n();
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
+
+  useBodyScrollLock(showIOSGuide);
+
+  useEffect(() => {
+    if (!showIOSGuide) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowIOSGuide(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showIOSGuide]);
 
   if (isInstalled) {
     return null;
@@ -70,53 +82,59 @@ export function PWAInstallCard() {
         </section>
 
         {showIOSGuide && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
-          >
-            <div className="glass-surface w-full max-w-sm rounded-2xl border border-white/15 p-6">
-              <div className="flex items-center justify-between">
-                <h3 className="font-display text-xl font-bold text-[#F4F5F7]">
-                  {t('Pasang di iPhone / iPad', 'Install on iPhone / iPad')}
-                </h3>
+          <ModalPortal>
+            <div
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setShowIOSGuide(false)}
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="glass-surface max-h-[min(88dvh,calc(100dvh-2rem))] w-full max-w-sm overflow-y-auto overscroll-contain rounded-2xl border border-white/15 p-6 shadow-2xl"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-display text-xl font-bold text-[#F4F5F7]">
+                    {t('Pasang di iPhone / iPad', 'Install on iPhone / iPad')}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowIOSGuide(false)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-white/5"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <ol className="mt-4 space-y-2 text-sm text-[#D1D5DB]">
+                  <li>
+                    {t(
+                      '1. Ketuk tombol Share (ikon kotak dengan panah ke atas) di toolbar Safari.',
+                      '1. Tap the Share icon (square with an upward arrow) in Safari toolbar.'
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      '2. Gulir ke bawah dan pilih Add to Home Screen.',
+                      '2. Scroll down and select Add to Home Screen.'
+                    )}
+                  </li>
+                  <li>
+                    {t(
+                      '3. Ketuk Add di pojok kanan atas.',
+                      '3. Tap Add in the top-right corner.'
+                    )}
+                  </li>
+                </ol>
                 <button
                   type="button"
                   onClick={() => setShowIOSGuide(false)}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-white/5"
+                  className="mt-5 min-h-[44px] w-full rounded-xl bg-pulse text-xs font-bold text-pulse-fg"
                 >
-                  <X className="h-5 w-5" />
+                  {t('Mengerti', 'Got It')}
                 </button>
               </div>
-              <ol className="mt-4 space-y-2 text-sm text-[#D1D5DB]">
-                <li>
-                  {t(
-                    '1. Ketuk tombol Share (ikon kotak dengan panah ke atas) di toolbar Safari.',
-                    '1. Tap the Share icon (square with an upward arrow) in Safari toolbar.'
-                  )}
-                </li>
-                <li>
-                  {t(
-                    '2. Gulir ke bawah dan pilih Add to Home Screen.',
-                    '2. Scroll down and select Add to Home Screen.'
-                  )}
-                </li>
-                <li>
-                  {t(
-                    '3. Ketuk Add di pojok kanan atas.',
-                    '3. Tap Add in the top-right corner.'
-                  )}
-                </li>
-              </ol>
-              <button
-                type="button"
-                onClick={() => setShowIOSGuide(false)}
-                className="mt-5 min-h-[44px] w-full rounded-xl bg-pulse text-xs font-bold text-pulse-fg"
-              >
-                {t('Mengerti', 'Got It')}
-              </button>
             </div>
-          </div>
+          </ModalPortal>
         )}
       </>
     );

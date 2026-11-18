@@ -4,7 +4,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, MotionConfig } from 'motion/react';
+import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { AboutView } from './components/AboutView';
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
@@ -58,8 +58,41 @@ interface CooldownAlertTarget {
   exerciseName: string;
 }
 
+const TAB_ORDER: Record<AppTab, number> = {
+  today: 0,
+  workout: 0.5,
+  schedule: 1,
+  history: 2,
+  exercises: 3,
+  ringtones: 4,
+  settings: 5,
+  about: 6,
+};
+
+const TAB_SLIDE_VARIANTS = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? 36 : direction < 0 ? -36 : 0,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? -36 : direction < 0 ? 36 : 0,
+    opacity: 0,
+  }),
+};
+
+const REDUCED_TAB_VARIANTS = {
+  enter: { opacity: 0 },
+  center: { opacity: 1 },
+  exit: { opacity: 0 },
+};
+
 function AppContent() {
   const { lang, t, todayThemeMode, uiTheme } = useI18n();
+  const prefersReducedMotion = useReducedMotion();
   const isFrosted = uiTheme === 'midnight-frosted';
   const isCarbon = uiTheme === 'carbon-forge';
   const {
@@ -93,8 +126,16 @@ function AppContent() {
     deleteCustomRingtone,
   } = useGymData();
 
-  const [activeTab, setActiveTab] = useState<AppTab>('today');
+  const [[activeTab, tabDirection], setTabState] = useState<[AppTab, number]>(['today', 0]);
   const [activePopup, setActivePopup] = useState<'settings' | 'about' | null>(null);
+
+  const navigateToTab = useCallback((nextTab: AppTab) => {
+    setTabState(([prevTab]) => {
+      if (prevTab === nextTab) return [prevTab, 0];
+      const dir = TAB_ORDER[nextTab] >= TAB_ORDER[prevTab] ? 1 : -1;
+      return [nextTab, dir];
+    });
+  }, []);
   const [showIntro, setShowIntro] = useState(true);
   const [nameConfirmed, setNameConfirmed] = useState<boolean>(true);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -829,8 +870,8 @@ function AppContent() {
     setActiveAlarm(null);
     setSnoozeTargetMs(null);
     snoozedAlarmRef.current = null;
-    setActiveTab('today');
-  }, []);
+    navigateToTab('today');
+  }, [navigateToTab]);
 
   const nextAlarm = useMemo(
     () => (schedules ? computeNextAlarm(schedules, now, lang) : null),
@@ -928,14 +969,17 @@ function AppContent() {
     setTutorialOpen(false);
   }, [user]);
 
-  const handleSelectTab = useCallback((tab: AppTab) => {
-    if (tab === 'settings' || tab === 'about') {
-      setActivePopup(tab);
-      return;
-    }
-    setActivePopup(null);
-    setActiveTab(tab);
-  }, []);
+  const handleSelectTab = useCallback(
+    (tab: AppTab) => {
+      if (tab === 'settings' || tab === 'about') {
+        setActivePopup(tab);
+        return;
+      }
+      setActivePopup(null);
+      navigateToTab(tab);
+    },
+    [navigateToTab]
+  );
 
   const renderBody = () => {
     if (!authReady) {
@@ -1060,133 +1104,142 @@ function AppContent() {
           <div className="mb-5 lg:hidden">
             <PWAInstallCard />
           </div>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 6, scale: 0.992 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -4, scale: 0.995 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            >
-              {activeTab === 'today' && (
-                <TodayWorkoutView
-                  now={now}
-                  todayDayKey={todayDayKey}
-                  schedules={schedules}
-                  todayEntries={effectiveTodayEntries}
-                  nextAlarm={nextAlarm}
-                  audioUnlocked={audioUnlocked}
-                  onUnlockAudio={handleUnlockAudio}
-                  restTotalSeconds={restTotalSeconds}
-                  restRemaining={restRemaining}
-                  restRunning={restRunning}
-                  restExerciseLabel={restExerciseLabel}
-                  justClapped={justClapped}
-                  dayJustChanged={dayJustChanged}
-                  userName={profile.displayName}
-                  isOpeningGreeting={isOpeningGreeting}
-                  exerciseTimers={exerciseTimers}
-                  onToggleRestPause={handleToggleRestPause}
-                  onResetRest={handleResetRest}
-                  onAdjustRest={handleAdjustRest}
-                      onStartRestTimer={startRestTimer}
-                      onStartWorkout={() => {
-                        setActiveTab('workout');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      onOpenExerciseManager={(dayKey) => {
-                        setExerciseDayKey(dayKey);
-                        setActiveTab('exercises');
-                      }}
-                      onOpenScheduleManager={() => setActiveTab('schedule')}
-                    />
-                  )}
+          <div className="relative overflow-x-clip">
+            <AnimatePresence mode="popLayout" initial={false} custom={tabDirection}>
+              <motion.div
+                key={activeTab}
+                custom={tabDirection}
+                variants={prefersReducedMotion ? REDUCED_TAB_VARIANTS : TAB_SLIDE_VARIANTS}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={
+                  prefersReducedMotion
+                    ? { duration: 0.12 }
+                    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                }
+                className="w-full will-change-transform"
+              >
+                {activeTab === 'today' && (
+                  <TodayWorkoutView
+                    now={now}
+                    todayDayKey={todayDayKey}
+                    schedules={schedules}
+                    todayEntries={effectiveTodayEntries}
+                    nextAlarm={nextAlarm}
+                    audioUnlocked={audioUnlocked}
+                    onUnlockAudio={handleUnlockAudio}
+                    restTotalSeconds={restTotalSeconds}
+                    restRemaining={restRemaining}
+                    restRunning={restRunning}
+                    restExerciseLabel={restExerciseLabel}
+                    justClapped={justClapped}
+                    dayJustChanged={dayJustChanged}
+                    userName={profile.displayName}
+                    isOpeningGreeting={isOpeningGreeting}
+                    exerciseTimers={exerciseTimers}
+                    onToggleRestPause={handleToggleRestPause}
+                    onResetRest={handleResetRest}
+                    onAdjustRest={handleAdjustRest}
+                    onStartRestTimer={startRestTimer}
+                    onStartWorkout={() => {
+                      navigateToTab('workout');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    onOpenExerciseManager={(dayKey) => {
+                      setExerciseDayKey(dayKey);
+                      navigateToTab('exercises');
+                    }}
+                    onOpenScheduleManager={() => navigateToTab('schedule')}
+                  />
+                )}
 
-                  {activeTab === 'workout' && (
-                    <WorkoutSessionView
-                      now={now}
-                      todayDayKey={todayDayKey}
-                      schedules={schedules}
-                      todayEntries={effectiveTodayEntries}
-                      restRemaining={restRemaining}
-                      restRunning={restRunning}
-                      restExerciseLabel={restExerciseLabel}
-                      cooldownRemaining={cooldownRemaining}
-                      cooldownAlertTarget={cooldownAlertTarget}
-                      exerciseTimers={exerciseTimers}
-                      onBackToToday={() => {
-                        setActiveTab('today');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      onToggleRestPause={handleToggleRestPause}
-                      onResetRest={handleResetRest}
-                      onAdjustRest={handleAdjustRest}
-                      onStartRestTimer={startRestTimer}
-                      onToggleSetComplete={handleToggleSetWithAutoRest}
-                      onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
-                      onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
-                      onUpdateSetMetrics={updateSetMetrics}
-                      onUpdateSetDuration={updateSetDuration}
-                      onToggleExerciseTimer={handleToggleExerciseTimer}
-                      onResetExerciseTimer={handleResetExerciseTimer}
-                      onChangeExerciseTimerDirection={handleChangeExerciseTimerDirection}
-                      onSelectExerciseTimerSet={handleSelectExerciseTimerSet}
-                      onSaveExerciseTimerSet={handleSaveExerciseTimerSet}
-                      onAddSet={addSetToExercise}
-                      onRemoveSet={removeSetFromExercise}
-                      onOpenExerciseManager={(dayKey) => {
-                        setExerciseDayKey(dayKey);
-                        setActiveTab('exercises');
-                      }}
-                      onOpenScheduleManager={() => setActiveTab('schedule')}
-                    />
-                  )}
+                {activeTab === 'workout' && (
+                  <WorkoutSessionView
+                    now={now}
+                    todayDayKey={todayDayKey}
+                    schedules={schedules}
+                    todayEntries={effectiveTodayEntries}
+                    restRemaining={restRemaining}
+                    restRunning={restRunning}
+                    restExerciseLabel={restExerciseLabel}
+                    cooldownRemaining={cooldownRemaining}
+                    cooldownAlertTarget={cooldownAlertTarget}
+                    exerciseTimers={exerciseTimers}
+                    onBackToToday={() => {
+                      navigateToTab('today');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    onToggleRestPause={handleToggleRestPause}
+                    onResetRest={handleResetRest}
+                    onAdjustRest={handleAdjustRest}
+                    onStartRestTimer={startRestTimer}
+                    onToggleSetComplete={handleToggleSetWithAutoRest}
+                    onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
+                    onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
+                    onUpdateSetMetrics={updateSetMetrics}
+                    onUpdateSetDuration={updateSetDuration}
+                    onToggleExerciseTimer={handleToggleExerciseTimer}
+                    onResetExerciseTimer={handleResetExerciseTimer}
+                    onChangeExerciseTimerDirection={handleChangeExerciseTimerDirection}
+                    onSelectExerciseTimerSet={handleSelectExerciseTimerSet}
+                    onSaveExerciseTimerSet={handleSaveExerciseTimerSet}
+                    onAddSet={addSetToExercise}
+                    onRemoveSet={removeSetFromExercise}
+                    onOpenExerciseManager={(dayKey) => {
+                      setExerciseDayKey(dayKey);
+                      navigateToTab('exercises');
+                    }}
+                    onOpenScheduleManager={() => navigateToTab('schedule')}
+                  />
+                )}
 
-                  {activeTab === 'schedule' && (
-                    <WeeklyScheduleView
-                      todayDayKey={todayDayKey}
-                      schedules={schedules}
-                      customRingtones={customRingtones}
-                      onUpdateSchedule={updateSchedule}
-                      onOpenExerciseManager={(dayKey) => {
-                        setExerciseDayKey(dayKey);
-                        setActiveTab('exercises');
-                      }}
-                    />
-                  )}
+                {activeTab === 'schedule' && (
+                  <WeeklyScheduleView
+                    todayDayKey={todayDayKey}
+                    schedules={schedules}
+                    customRingtones={customRingtones}
+                    onUpdateSchedule={updateSchedule}
+                    onOpenExerciseManager={(dayKey) => {
+                      setExerciseDayKey(dayKey);
+                      navigateToTab('exercises');
+                    }}
+                  />
+                )}
 
-                  {activeTab === 'history' && (
-                    <HistoryProgressView
-                      workoutHistory={workoutHistory}
-                      loading={historyLoading}
-                      todayDateKey={todayDateKey}
-                      onGoToToday={() => setActiveTab('today')}
-                    />
-                  )}
+                {activeTab === 'history' && (
+                  <HistoryProgressView
+                    workoutHistory={workoutHistory}
+                    loading={historyLoading}
+                    todayDateKey={todayDateKey}
+                    onGoToToday={() => navigateToTab('today')}
+                  />
+                )}
 
-                  {activeTab === 'exercises' && (
-                    <ExerciseManagerView
-                      selectedDayKey={exerciseDayKey}
-                      onSelectDayKey={setExerciseDayKey}
-                      schedules={schedules}
-                      onAddExercise={addExerciseToDay}
-                      onUpdateExercise={updateExerciseInDay}
-                      onRemoveExercise={removeExerciseFromDay}
-                      onMoveExercise={moveExerciseInDay}
-                    />
-                  )}
+                {activeTab === 'exercises' && (
+                  <ExerciseManagerView
+                    selectedDayKey={exerciseDayKey}
+                    onSelectDayKey={setExerciseDayKey}
+                    schedules={schedules}
+                    onAddExercise={addExerciseToDay}
+                    onUpdateExercise={updateExerciseInDay}
+                    onRemoveExercise={removeExerciseFromDay}
+                    onMoveExercise={moveExerciseInDay}
+                  />
+                )}
 
-                  {activeTab === 'ringtones' && (
-                    <RingtoneManagerView
-                      profile={profile}
-                      customRingtones={customRingtones}
-                      onUpdateProfile={updateProfile}
-                      onUploadRingtone={addCustomRingtone}
-                      onDeleteRingtone={deleteCustomRingtone}
-                    />
-                  )}
-            </motion.div>
-          </AnimatePresence>
+                {activeTab === 'ringtones' && (
+                  <RingtoneManagerView
+                    profile={profile}
+                    customRingtones={customRingtones}
+                    onUpdateProfile={updateProfile}
+                    onUploadRingtone={addCustomRingtone}
+                    onDeleteRingtone={deleteCustomRingtone}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </main>
 
         <MobileBottomNav
@@ -1228,7 +1281,7 @@ function AppContent() {
             onUpdateProfile={updateProfile}
             onOpenRingtones={() => {
               setActivePopup(null);
-              setActiveTab('ringtones');
+              navigateToTab('ringtones');
             }}
             onOpenTutorial={() => {
               setActivePopup(null);

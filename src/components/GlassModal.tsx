@@ -2,6 +2,7 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useI18n } from '../lib/i18n';
+import { ModalPortal, useBodyScrollLock } from './ModalPortal';
 
 interface GlassModalProps {
   open: boolean;
@@ -27,6 +28,8 @@ export function GlassModal({
   const { t } = useI18n();
   const backdropMouseDownRef = useRef(false);
 
+  useBodyScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -34,70 +37,69 @@ export function GlassModal({
         onClose();
       }
     };
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [open, onClose]);
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          role="dialog"
-          aria-modal="true"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.16 }}
-          onMouseDown={(e) => {
-            backdropMouseDownRef.current = e.target === e.currentTarget;
-          }}
-          onClick={(e) => {
-            if (backdropMouseDownRef.current && e.target === e.currentTarget) {
-              onClose();
-            }
-            backdropMouseDownRef.current = false;
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
-        >
+    <ModalPortal>
+      <AnimatePresence>
+        {open && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 6 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            onClick={(e) => e.stopPropagation()}
-            className={`glass-surface flex max-h-[88vh] w-full flex-col overflow-hidden rounded-2xl border shadow-2xl ${maxWidthClass} ${accentBorderClass}`}
+            role="dialog"
+            aria-modal="true"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            onMouseDown={(e) => {
+              backdropMouseDownRef.current = e.target === e.currentTarget;
+            }}
+            onClick={(e) => {
+              if (backdropMouseDownRef.current && e.target === e.currentTarget) {
+                onClose();
+              }
+              backdropMouseDownRef.current = false;
+            }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
           >
-            {/* Sticky Glass Header */}
-            <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4 sm:px-6">
-              <div className="min-w-0">
-                <h2 className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7]">
-                  {title}
-                </h2>
-                {subtitle && (
-                  <p className="mt-0.5 text-xs text-[#9CA3AF]">{subtitle}</p>
-                )}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 6 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className={`glass-surface flex max-h-[min(88dvh,calc(100dvh-2rem))] w-full flex-col overflow-hidden rounded-2xl border shadow-2xl ${maxWidthClass} ${accentBorderClass}`}
+            >
+              {/* Sticky Glass Header */}
+              <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-5 py-4 sm:px-6">
+                <div className="min-w-0">
+                  <h2 className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7]">
+                    {title}
+                  </h2>
+                  {subtitle && (
+                    <p className="mt-0.5 text-xs text-[#9CA3AF]">{subtitle}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label={closeAriaLabel || t('Tutup pop-up', 'Close popup')}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/12 bg-[#1A1E26]/80 text-[#9CA3AF] transition-all duration-150 hover:border-white/25 hover:text-[#F4F5F7] active:scale-95"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label={closeAriaLabel || t('Tutup pop-up', 'Close popup')}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/12 bg-[#1A1E26]/80 text-[#9CA3AF] transition-all duration-150 hover:border-white/25 hover:text-[#F4F5F7] active:scale-95"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
 
-            {/* Scrollable Body */}
-            <div className="overflow-y-auto p-5 sm:p-6">{children}</div>
+              {/* Scrollable Body */}
+              <div className="overflow-y-auto overscroll-contain p-5 sm:p-6">{children}</div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </ModalPortal>
   );
 }
 

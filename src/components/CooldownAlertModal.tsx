@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Check, Clock, ShieldAlert, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useI18n } from '../lib/i18n';
+import { ModalPortal, useBodyScrollLock } from './ModalPortal';
 
 interface CooldownAlertModalProps {
   open: boolean;
@@ -22,6 +23,8 @@ export function CooldownAlertModal({
 }: CooldownAlertModalProps) {
   const { t } = useI18n();
 
+  useBodyScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -38,27 +41,28 @@ export function CooldownAlertModal({
   const strokeDashoffset = circumference * (1 - progressRatio);
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="cooldown-modal-title"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.16 }}
-          onClick={onDismiss}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-        >
+    <ModalPortal>
+      <AnimatePresence>
+        {open && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 6 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            onClick={(e) => e.stopPropagation()}
-            className="glass-surface relative w-full max-w-md rounded-2xl border border-[#F59E0B]/45 p-6 sm:p-7"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="cooldown-modal-title"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.16 }}
+            onClick={onDismiss}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md"
           >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 6 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass-surface relative max-h-[min(90dvh,calc(100dvh-2rem))] w-full max-w-md overflow-y-auto overscroll-contain rounded-2xl border border-[#F59E0B]/45 p-6 shadow-2xl sm:p-7"
+            >
             <button
               type="button"
               onClick={onDismiss}
@@ -141,9 +145,10 @@ export function CooldownAlertModal({
                 {t('Tetap Centang (Lewati)', 'Confirm Anyway')}
               </button>
             </div>
+            </motion.div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </ModalPortal>
   );
 }

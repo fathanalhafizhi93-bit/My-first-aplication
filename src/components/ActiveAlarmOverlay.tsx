@@ -6,6 +6,7 @@ import {
   resolveExerciseTrackingMode,
   resolveTargetDurationSeconds,
 } from '../types/gym';
+import { ModalPortal, useBodyScrollLock } from './ModalPortal';
 
 interface ActiveAlarmOverlayProps {
   schedule: DaySchedule;
@@ -27,15 +28,17 @@ export function ActiveAlarmOverlay({
   onDismiss,
 }: ActiveAlarmOverlayProps) {
   const { lang, clockFormat, t } = useI18n();
+  useBodyScrollLock(true);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="alarm-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
-    >
-      <div className="glass-surface w-full max-w-lg rounded-2xl border border-pulse/40 p-6 sm:p-8">
+    <ModalPortal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="alarm-title"
+        className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
+      >
+        <div className="glass-surface max-h-[min(90dvh,calc(100dvh-2rem))] w-full max-w-lg overflow-y-auto overscroll-contain rounded-2xl border border-pulse/40 p-6 shadow-2xl sm:p-8">
         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-widest text-pulse">
           <span>
             {isTest
@@ -122,7 +125,8 @@ export function ActiveAlarmOverlay({
             {t('Matikan', 'Dismiss')}
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }

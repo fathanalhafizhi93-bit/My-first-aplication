@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { ArrowRight, UserCheck } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useI18n } from '../lib/i18n';
+import { ModalPortal, useBodyScrollLock } from './ModalPortal';
 
 interface NamePromptModalProps {
   open: boolean;
@@ -18,6 +19,8 @@ export function NamePromptModal({
   const [nameInput, setNameInput] = useState(initialName);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (open) {
@@ -49,26 +52,27 @@ export function NamePromptModal({
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="name-prompt-title"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.18 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
-        >
-          <motion.form
-            onSubmit={handleSubmit}
-            initial={{ opacity: 0, scale: 0.95, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 6 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="glass-surface w-full max-w-md rounded-2xl border border-pulse/35 p-6 sm:p-7"
+    <ModalPortal>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="name-prompt-title"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md"
           >
+            <motion.form
+              onSubmit={handleSubmit}
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 6 }}
+              transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="glass-surface max-h-[min(90dvh,calc(100dvh-2rem))] w-full max-w-md overflow-y-auto overscroll-contain rounded-2xl border border-pulse/35 p-6 shadow-2xl sm:p-7"
+            >
             {/* Friendly Circular Mascot Orb */}
             <div className="flex items-center gap-4">
               <div className="relative flex h-16 w-16 shrink-0 items-center justify-center">
@@ -163,9 +167,10 @@ export function NamePromptModal({
               </span>
               <ArrowRight className="h-4 w-4" />
             </button>
-          </motion.form>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </ModalPortal>
   );
 }
