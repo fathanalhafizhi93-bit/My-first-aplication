@@ -17,7 +17,7 @@ export function FluidClockDisplay({ timeText, meridiem }: FluidClockDisplayProps
       <time
         dateTime={timeText}
         aria-label={accessibleTime}
-        className="inline-flex items-center font-mono text-[2.625rem] sm:text-[3.75rem] lg:text-[4.5rem] font-extrabold leading-none tracking-[-0.02em] tabular-nums select-none"
+        className="inline-flex items-center font-mono text-[clamp(1.75rem,8.4vw,2.625rem)] sm:text-[3.5rem] lg:text-[4.35rem] font-extrabold leading-none tracking-[-0.02em] tabular-nums select-none"
       >
         {chars.map((char, idx) => {
           const isColon = char === ':';

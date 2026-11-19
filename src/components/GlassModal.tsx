@@ -26,7 +26,8 @@ export function GlassModal({
   closeAriaLabel,
   children,
 }: GlassModalProps) {
-  const { t } = useI18n();
+  const { t, uiTheme } = useI18n();
+  const isMaterialYou = uiTheme === 'material-you';
   const backdropMouseDownRef = useRef(false);
 
   useBodyScrollLock(open);
@@ -72,7 +73,14 @@ export function GlassModal({
               exit={{ opacity: 0, scale: 0.96, y: 6 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className={`glass-surface flex max-h-[min(88dvh,calc(100dvh-2rem))] w-full flex-col overflow-hidden rounded-2xl border shadow-2xl ${maxWidthClass} ${accentBorderClass}`}
+              className={`glass-surface flex max-h-[min(88dvh,calc(100dvh-2rem))] w-full flex-col overflow-hidden border shadow-2xl ${
+                isMaterialYou ? 'rounded-[28px]' : 'rounded-2xl'
+              } ${maxWidthClass} ${accentBorderClass}`}
+              style={
+                isMaterialYou
+                  ? { backgroundColor: 'var(--md-sys-color-surface-container-high)' }
+                  : undefined
+              }
             >
               {/* Sticky Glass Header */}
               <div className="flex shrink-0 items-start justify-between gap-3 border-b border-white/10 px-5 py-4 sm:px-6">
@@ -88,7 +96,11 @@ export function GlassModal({
                   type="button"
                   onClick={onClose}
                   aria-label={closeAriaLabel || t('Tutup pop-up', 'Close popup')}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/12 bg-[#1A1E26]/80 text-[#9CA3AF] transition-all duration-150 hover:border-white/25 hover:text-[#F4F5F7] active:scale-95"
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center border transition-all duration-150 active:scale-95 ${
+                    isMaterialYou
+                      ? 'rounded-full border-md-outline-variant bg-md-surface-highest text-md-on-surface-variant hover:border-md-outline hover:text-md-on-surface'
+                      : 'rounded-xl border-white/12 bg-[#1A1E26]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                  }`}
                 >
                   <X className="h-4 w-4" />
                 </button>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   ArrowDown,
   ArrowUp,
@@ -242,7 +242,12 @@ export function ExerciseManagerView({
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formState.name.trim()) return;
+    if (!formState.name.trim()) {
+      setFormErrorMsg(
+        t('Nama gerakan tidak boleh kosong.', 'Exercise name cannot be empty.')
+      );
+      return;
+    }
     setFormErrorMsg(null);
 
     const parsedMins = Math.max(0, Math.min(180, parseInt(formState.durationMinutes, 10) || 0));
@@ -398,7 +403,7 @@ export function ExerciseManagerView({
       )}
 
       {/* Day Tabs */}
-      <div className="glass-surface-subtle flex items-center gap-1.5 overflow-x-auto rounded-xl border border-white/12 p-1.5">
+      <div className="glass-surface-subtle no-scrollbar flex items-center gap-1.5 overflow-x-auto rounded-xl border border-white/12 p-1.5">
         {DAY_LIST.map((day) => {
           const active = selectedDayKey === day.key;
           const count = schedules[day.key]?.exercises.length || 0;
@@ -410,7 +415,7 @@ export function ExerciseManagerView({
                 if (!active) haptics.tabSwitch();
                 onSelectDayKey(day.key);
               }}
-              className={`relative min-h-[40px] flex-1 rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap shrink-0 ${
+              className={`relative isolate min-h-[40px] flex-1 rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap shrink-0 ${
                 active
                   ? 'text-pulse-fg font-bold'
                   : 'font-semibold text-[#9CA3AF] hover:text-[#F4F5F7]'
@@ -421,7 +426,7 @@ export function ExerciseManagerView({
                   layoutId={prefersReducedMotion ? undefined : SHARED_IDS.exerciseDayPill}
                   transition={TAB_INDICATOR_SPRING}
                   style={{ borderRadius: 8 }}
-                  className="absolute inset-0 bg-pulse"
+                  className="pointer-events-none absolute inset-0 z-0 bg-pulse"
                 />
               )}
               <span className="relative z-10">
@@ -802,11 +807,11 @@ export function ExerciseManagerView({
 
       {/* Scheduled Movements for Selected Day */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="min-w-0 font-display text-xl font-bold text-[#F4F5F7]">
             {t('Gerakan Terjadwal', 'Scheduled Exercises')} — {dayLabel} ({schedule.focusTitle})
           </h2>
-          <span className="font-mono text-xs tabular-nums text-[#9CA3AF]">
+          <span className="shrink-0 whitespace-nowrap font-mono text-xs tabular-nums text-[#9CA3AF]">
             {schedule.exercises.length}/30 {t('Gerakan', 'Exercises')}
           </span>
         </div>

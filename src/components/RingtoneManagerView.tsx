@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   Bell,
   BellRing,
@@ -146,6 +146,7 @@ export function RingtoneManagerView({
           : t('Gagal mengunggah file audio.', 'Failed to upload audio file.')
       );
     } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setUploading(false);
     }
   };
@@ -391,7 +392,7 @@ export function RingtoneManagerView({
 
         <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-2">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold text-[#F4F5F7]">
                 {t('Timer Istirahat Otomatis', 'Auto-Start Rest Timer')}
               </p>
@@ -407,7 +408,7 @@ export function RingtoneManagerView({
               onClick={() =>
                 onUpdateProfile({ autoStartRestTimer: !profile.autoStartRestTimer })
               }
-              className={`min-h-[38px] rounded-lg px-3.5 text-xs font-bold whitespace-nowrap ${
+              className={`min-h-[38px] shrink-0 rounded-lg px-3.5 text-xs font-bold whitespace-nowrap ${
                 profile.autoStartRestTimer
                   ? 'bg-pulse text-pulse-fg'
                   : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF]'
@@ -418,7 +419,7 @@ export function RingtoneManagerView({
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-semibold text-[#F4F5F7]">
                 {runningNativeAndroid
                   ? t('Notifikasi Perangkat', 'Device Notifications')
@@ -681,6 +682,11 @@ export function RingtoneManagerView({
         onCancel={() => setDeleteTarget(null)}
         onConfirm={async () => {
           if (!deleteTarget) return;
+          if (playingId === deleteTarget.id) {
+            audioEngine.stop();
+            isPreviewingRef.current = false;
+            setPlayingId(null);
+          }
           await onDeleteRingtone(deleteTarget.id);
         }}
       />

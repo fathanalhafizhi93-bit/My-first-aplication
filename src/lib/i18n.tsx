@@ -1,6 +1,7 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { DayKey, MuscleGroup } from '../types/gym';
 import { getStoredHapticsEnabled, setHapticsEnabledPref } from './haptics';
+import { generateMaterialYouPalette, MaterialYouPalette } from './materialYouPalette';
 
 export type AppLanguage = 'id' | 'en';
 export type ClockFormat = '12h' | '24h';
@@ -31,11 +32,13 @@ export interface ColorPresetOption {
 
 export const ACCENT_COLOR_PRESETS: ColorPresetOption[] = [
   { id: 'lime', hex: '#C8FF2E', labelId: 'Hijau Limau', labelEn: 'IronPulse Lime' },
-  { id: 'cyan', hex: '#38BDF8', labelId: 'Biru Cyan', labelEn: 'Electric Cyan' },
-  { id: 'violet', hex: '#A78BFA', labelId: 'Ungu Violet', labelEn: 'Royal Violet' },
-  { id: 'crimson', hex: '#FB7185', labelId: 'Merah Pulse', labelEn: 'Crimson Pulse' },
+  { id: 'cyan', hex: '#38BDF8', labelId: 'Biru Pixel', labelEn: 'Pixel Sky' },
+  { id: 'violet', hex: '#B69DF8', labelId: 'Lavender M3', labelEn: 'Material Lavender' },
+  { id: 'crimson', hex: '#FB7185', labelId: 'Merah Rose', labelEn: 'Crimson Rose' },
   { id: 'amber', hex: '#FBBF24', labelId: 'Emas Amber', labelEn: 'Solar Amber' },
-  { id: 'emerald', hex: '#34D399', labelId: 'Hijau Mint', labelEn: 'Emerald Mint' },
+  { id: 'emerald', hex: '#34D399', labelId: 'Hijau Sage', labelEn: 'Forest Sage' },
+  { id: 'teal', hex: '#2DD4BF', labelId: 'Teal Samudra', labelEn: 'Ocean Teal' },
+  { id: 'coral', hex: '#FB923C', labelId: 'Terakota', labelEn: 'Terracotta Clay' },
 ];
 
 export const MATERIAL_TINT_PRESETS: ColorPresetOption[] = [
@@ -127,13 +130,14 @@ export function saveStoredDayTimeMode(mode: DayTimeMode): void {
 export function getStoredUiTheme(): UiTheme {
   try {
     const val = localStorage.getItem(UI_THEME_STORAGE_KEY);
+    if (val === 'obsidian') return 'obsidian';
     if (val === 'midnight-frosted') return 'midnight-frosted';
     if (val === 'carbon-forge') return 'carbon-forge';
     if (val === 'material-you') return 'material-you';
     if (val === 'aeroglass') return 'aeroglass';
-    return 'obsidian';
+    return 'material-you';
   } catch {
-    return 'obsidian';
+    return 'material-you';
   }
 }
 
@@ -159,31 +163,80 @@ export function applyThemeTokensToDocument(
   uiTheme: UiTheme,
   accentColor: string,
   materialTintColor: string | null
-): void {
-  if (typeof document === 'undefined') return;
-  const root = document.documentElement;
+): MaterialYouPalette {
   const resolvedAccent = normalizeHex(accentColor, DEFAULT_ACCENT_COLOR);
-  const resolvedMaterial = normalizeHex(
-    materialTintColor || DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme],
-    DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]
-  );
+  const palette = generateMaterialYouPalette(resolvedAccent, materialTintColor);
+
+  if (typeof document === 'undefined') return palette;
+
+  const root = document.documentElement;
+  const resolvedMaterial =
+    uiTheme === 'material-you' && !materialTintColor
+      ? palette.surfaceContainer
+      : normalizeHex(
+          materialTintColor || DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme],
+          DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]
+        );
 
   root.dataset.uiTheme = uiTheme;
-  root.style.setProperty('--ip-accent', resolvedAccent);
-  root.style.setProperty('--ip-accent-fg', computeContrastForeground(resolvedAccent));
-  root.style.setProperty('--ip-accent-rgb', hexToRgbTuple(resolvedAccent, '200, 255, 46'));
-  root.style.setProperty('--ip-glass-rgb', hexToRgbTuple(resolvedMaterial, '22, 26, 35'));
+
+  // Material Design 3 (Material You) Dynamic System Tokens — active across the entire app
+  root.style.setProperty('--md-sys-color-primary', palette.primary);
+  root.style.setProperty('--md-sys-color-on-primary', palette.onPrimary);
+  root.style.setProperty('--md-sys-color-primary-rgb', palette.primaryRgb);
+  root.style.setProperty('--md-sys-color-primary-container', palette.primaryContainer);
+  root.style.setProperty('--md-sys-color-on-primary-container', palette.onPrimaryContainer);
+  root.style.setProperty('--md-sys-color-secondary', palette.secondary);
+  root.style.setProperty('--md-sys-color-on-secondary', palette.onSecondary);
+  root.style.setProperty('--md-sys-color-secondary-container', palette.secondaryContainer);
+  root.style.setProperty('--md-sys-color-on-secondary-container', palette.onSecondaryContainer);
+  root.style.setProperty('--md-sys-color-secondary-container-rgb', palette.secondaryContainerRgb);
+  root.style.setProperty('--md-sys-color-tertiary', palette.tertiary);
+  root.style.setProperty('--md-sys-color-on-tertiary', palette.onTertiary);
+  root.style.setProperty('--md-sys-color-tertiary-container', palette.tertiaryContainer);
+  root.style.setProperty('--md-sys-color-on-tertiary-container', palette.onTertiaryContainer);
+  root.style.setProperty('--md-sys-color-surface', palette.surface);
+  root.style.setProperty('--md-sys-color-surface-container-lowest', palette.surfaceContainerLowest);
+  root.style.setProperty('--md-sys-color-surface-container-low', palette.surfaceContainerLow);
+  root.style.setProperty('--md-sys-color-surface-container', palette.surfaceContainer);
+  root.style.setProperty('--md-sys-color-surface-container-rgb', palette.surfaceContainerRgb);
+  root.style.setProperty('--md-sys-color-surface-container-high', palette.surfaceContainerHigh);
+  root.style.setProperty('--md-sys-color-surface-container-highest', palette.surfaceContainerHighest);
+  root.style.setProperty('--md-sys-color-on-surface', palette.onSurface);
+  root.style.setProperty('--md-sys-color-on-surface-rgb', palette.onSurfaceRgb);
+  root.style.setProperty('--md-sys-color-on-surface-variant', palette.onSurfaceVariant);
+  root.style.setProperty('--md-sys-color-outline', palette.outline);
+  root.style.setProperty('--md-sys-color-outline-variant', palette.outlineVariant);
+
+  // Synced IronPulse bridge tokens so all legacy utility classes inherit the active dynamic palette
+  root.style.setProperty('--ip-accent', palette.primary);
+  root.style.setProperty('--ip-accent-fg', palette.onPrimary);
+  root.style.setProperty('--ip-accent-rgb', palette.primaryRgb);
+  root.style.setProperty(
+    '--ip-glass-rgb',
+    uiTheme === 'material-you' && !materialTintColor
+      ? palette.surfaceContainerRgb
+      : hexToRgbTuple(resolvedMaterial, palette.surfaceContainerRgb)
+  );
+
   const canvasBg =
-    uiTheme === 'midnight-frosted'
-      ? '#05070C'
-      : uiTheme === 'carbon-forge'
-        ? '#07080A'
-        : uiTheme === 'material-you'
-          ? '#111015'
+    uiTheme === 'material-you'
+      ? palette.surface
+      : uiTheme === 'midnight-frosted'
+        ? '#05070C'
+        : uiTheme === 'carbon-forge'
+          ? '#07080A'
           : uiTheme === 'aeroglass'
             ? '#06101B'
             : '#0A0B0E';
   root.style.setProperty('--ip-canvas-bg', canvasBg);
+
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeColorMeta) {
+    themeColorMeta.setAttribute('content', canvasBg);
+  }
+
+  return palette;
 }
 
 // Synchronously apply stored visual tokens before initial React render to prevent theme flash
@@ -310,12 +363,15 @@ interface I18nContextValue {
   setAccentColor: (hex: string) => void;
   materialTintColor: string | null;
   effectiveMaterialTint: string;
+  materialPalette: MaterialYouPalette;
   setMaterialTintColor: (hex: string | null) => void;
   resetThemeCustomization: () => void;
   hapticsEnabled: boolean;
   setHapticsEnabled: (enabled: boolean) => void;
   t: <T>(idText: T, enText: T) => T;
 }
+
+const DEFAULT_MATERIAL_PALETTE = generateMaterialYouPalette(DEFAULT_ACCENT_COLOR, null);
 
 const I18nContext = createContext<I18nContextValue>({
   lang: 'id',
@@ -324,12 +380,13 @@ const I18nContext = createContext<I18nContextValue>({
   setClockFormat: () => {},
   todayThemeMode: 'auto',
   setTodayThemeMode: () => {},
-  uiTheme: 'obsidian',
+  uiTheme: 'material-you',
   setUiTheme: () => {},
   accentColor: DEFAULT_ACCENT_COLOR,
   setAccentColor: () => {},
   materialTintColor: null,
-  effectiveMaterialTint: DEFAULT_MATERIAL_TINT_BY_THEME.obsidian,
+  effectiveMaterialTint: DEFAULT_MATERIAL_PALETTE.surfaceContainer,
+  materialPalette: DEFAULT_MATERIAL_PALETTE,
   setMaterialTintColor: () => {},
   resetThemeCustomization: () => {},
   hapticsEnabled: true,
@@ -348,8 +405,16 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   );
   const [hapticsEnabled, setHapticsEnabledState] = useState<boolean>(getStoredHapticsEnabled);
 
+  const materialPalette = useMemo(
+    () => generateMaterialYouPalette(accentColor, materialTintColor),
+    [accentColor, materialTintColor]
+  );
+
   const effectiveMaterialTint =
-    materialTintColor || DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme];
+    materialTintColor ||
+    (uiTheme === 'material-you'
+      ? materialPalette.surfaceContainer
+      : DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]);
 
   useEffect(() => {
     applyThemeTokensToDocument(uiTheme, accentColor, materialTintColor);
@@ -446,6 +511,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         setAccentColor,
         materialTintColor,
         effectiveMaterialTint,
+        materialPalette,
         setMaterialTintColor,
         resetThemeCustomization,
         hapticsEnabled,

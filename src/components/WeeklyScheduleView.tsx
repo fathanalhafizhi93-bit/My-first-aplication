@@ -1,4 +1,4 @@
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion, useReducedMotion } from 'motion/react';
 import { Bell, BellOff, ChevronRight } from 'lucide-react';
 import { BUILTIN_RINGTONES } from '../lib/audioEngine';
 import { formatAlarmTime } from '../lib/dateUtils';

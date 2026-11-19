@@ -41,12 +41,12 @@ export function MobileBottomNav({
       aria-label={t('Navigasi Mobile', 'Mobile Navigation')}
       className={
         isFrosted
-          ? 'glass-bar fixed bottom-3 left-3 right-3 z-40 rounded-[28px] border border-white/22 px-1.5 py-1 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.78)] transition-all duration-300 md:hidden'
-          : `glass-bar fixed bottom-0 left-0 right-0 z-40 border-t transition-colors duration-500 md:hidden ${
+          ? 'glass-bar fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-40 rounded-[28px] border border-white/22 px-1.5 py-1 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.78)] transition-all duration-300 md:hidden'
+          : `glass-bar fixed bottom-0 left-0 right-0 z-40 border-t pb-[env(safe-area-inset-bottom)] transition-colors duration-500 md:hidden ${
               isAero
                 ? 'border-sky-200/35 px-1'
                 : isMaterialYou
-                  ? 'border-pulse/15'
+                  ? 'border-md-outline-variant'
                   : isCarbon
                     ? 'border-white/12'
                     : phaseToken.headerTint
@@ -56,12 +56,13 @@ export function MobileBottomNav({
       <div className={`grid items-center ${isFrosted ? 'h-14 grid-cols-5 gap-1' : 'h-16 grid-cols-5'}`}>
         {tabs.map(({ id, label, Icon }) => {
           const active = activeTab === id || (id === 'today' && activeTab === 'workout');
+          const showCompactRest = id === 'today' && restRunning && activeTab !== 'workout';
           return (
             <button
               key={id}
               type="button"
               onClick={() => onSelectTab(id)}
-              className={`relative flex flex-col items-center justify-center gap-0.5 transition-all duration-150 active:scale-95 ${
+              className={`relative isolate flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 transition-all duration-150 active:scale-95 ${
                 isFrosted
                   ? 'min-h-[48px] rounded-[22px]'
                   : isAero
@@ -71,54 +72,70 @@ export function MobileBottomNav({
                       : isCarbon
                         ? 'min-h-[48px] gap-1 rounded-md'
                         : 'min-h-[48px] gap-1'
-              } ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`}
+              } ${
+                active
+                  ? isMaterialYou
+                    ? 'text-md-on-surface'
+                    : 'text-pulse'
+                  : isMaterialYou
+                    ? 'text-md-on-surface-variant'
+                    : 'text-[#9CA3AF]'
+              }`}
             >
               {active && isAero && (
                 <motion.span
                   layoutId={prefersReducedMotion ? undefined : 'mobile-nav-aero-pill'}
                   transition={TAB_INDICATOR_SPRING}
-                  className="absolute inset-0 -z-10 rounded-xl border border-sky-200/40 bg-gradient-to-b from-white/22 via-white/8 to-sky-400/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_2px_12px_rgba(56,189,248,0.22)]"
+                  className="pointer-events-none absolute inset-0 z-0 rounded-xl border border-sky-200/40 bg-gradient-to-b from-white/22 via-white/8 to-sky-400/12 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_2px_12px_rgba(56,189,248,0.22)]"
                 />
               )}
               {active && isFrosted && (
                 <motion.span
                   layoutId={prefersReducedMotion ? undefined : 'mobile-nav-frosted-pill'}
                   transition={TAB_INDICATOR_SPRING}
-                  className="absolute inset-0 -z-10 rounded-[22px] border border-white/18 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+                  className="pointer-events-none absolute inset-0 z-0 rounded-[22px] border border-white/18 bg-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
                 />
               )}
               {active && !isFrosted && !isMaterialYou && !isAero && (
                 <motion.span
                   layoutId={prefersReducedMotion ? undefined : 'mobile-nav-indicator'}
                   transition={TAB_INDICATOR_SPRING}
-                  className={`absolute top-0 bg-pulse ${
+                  className={`pointer-events-none absolute top-0 z-10 bg-pulse ${
                     isCarbon
                       ? 'h-[2.5px] w-9 rounded-none shadow-[0_0_10px_rgba(var(--ip-accent-rgb),0.6)]'
                       : 'h-0.5 w-8 rounded-full'
                   }`}
                 />
               )}
-              <span className="relative flex h-7 w-14 items-center justify-center">
+              <span className="relative z-10 flex h-7 w-14 items-center justify-center">
                 {active && isMaterialYou && (
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'mobile-nav-m3-capsule'}
                     transition={TAB_INDICATOR_SPRING}
-                    className="absolute inset-0 rounded-full bg-pulse/22"
+                    className="pointer-events-none absolute inset-0 rounded-full bg-md-secondary-container"
                   />
                 )}
                 <Icon
-                  className={`relative h-5 w-5 transition-transform duration-150 ${active ? 'scale-105' : ''}`}
+                  className={`relative h-5 w-5 transition-transform duration-150 ${
+                    active ? 'scale-105' : ''
+                  } ${active && isMaterialYou ? 'text-md-on-secondary-container' : ''}`}
                   strokeWidth={active ? 2.4 : 1.8}
                 />
               </span>
               <span
-                className={`text-[11px] tracking-tight whitespace-nowrap ${
-                  active && isMaterialYou ? 'font-bold' : 'font-medium'
+                className={`relative z-10 max-w-full truncate text-[10.5px] tracking-tight whitespace-nowrap ${
+                  showCompactRest
+                    ? 'inline-flex items-center gap-1 font-mono font-bold tabular-nums text-pulse'
+                    : active && isMaterialYou
+                      ? 'font-bold text-md-on-surface'
+                      : 'font-medium'
                 }`}
               >
-                {id === 'today' && restRunning
-                  ? `${t('Istirahat', 'Rest')} ${formatRestDuration(restRemaining)}`
-                  : label}
+                {showCompactRest ? (
+                  <span>{formatRestDuration(restRemaining)}</span>
+                ) : (
+                  label
+                )}
               </span>
             </button>
           );

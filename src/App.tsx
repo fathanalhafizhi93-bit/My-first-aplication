@@ -176,6 +176,7 @@ function AppContent() {
   const [tutorialStartWithLang, setTutorialStartWithLang] = useState(true);
   const [isOpeningGreeting, setIsOpeningGreeting] = useState(true);
   const [exerciseDayKey, setExerciseDayKey] = useState<DayKey>(todayDayKey);
+  const [focusedWorkoutExerciseId, setFocusedWorkoutExerciseId] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const timePhase = resolveDayTimePhase(todayThemeMode, now);
@@ -532,6 +533,12 @@ function AppContent() {
       setExerciseTimers((prev) => {
         const cur = prev[exerciseId];
         if (!cur) return prev;
+        const nextTargetSeconds =
+          nextIncomplete &&
+          typeof nextIncomplete.durationSeconds === 'number' &&
+          nextIncomplete.durationSeconds > 0
+            ? nextIncomplete.durationSeconds
+            : cur.targetSeconds;
         return {
           ...prev,
           [exerciseId]: {
@@ -539,6 +546,7 @@ function AppContent() {
             elapsedSeconds: 0,
             running: false,
             activeSetNumber: nextIncomplete ? nextIncomplete.setNumber : setNumber,
+            targetSeconds: nextTargetSeconds,
           },
         };
       });
@@ -824,6 +832,9 @@ function AppContent() {
       haptics.timerAdjust();
       lastRestTickHapticRef.current = null;
       const nextRemaining = Math.max(0, Math.min(600, restRemaining + delta));
+      if (nextRemaining === 0) {
+        restShouldChimeRef.current = false;
+      }
       setRestRemaining(nextRemaining);
       setRestTotalSeconds((prev) =>
         Math.max(15, Math.min(600, Math.max(nextRemaining, prev + delta)))
@@ -1214,12 +1225,9 @@ function AppContent() {
 
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.985 }}
-        animate={{
-          opacity: showIntro ? 0.72 : 1,
-          scale: showIntro ? 0.978 : 1,
-        }}
-        transition={{ duration: 0.46, ease: [0.16, 1, 0.3, 1] }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: showIntro ? 0.78 : 1 }}
+        transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
         className="relative min-h-screen bg-[var(--ip-canvas-bg)] text-[#F4F5F7]"
       >
         {/* Lightweight Fixed Atmospheric Time-of-Day Ambient Glow & Glass Refraction Orbs */}
@@ -1248,9 +1256,11 @@ function AppContent() {
           style={{
             backgroundImage: isAero
               ? 'radial-gradient(circle, rgba(125, 211, 252, 0.42) 0%, rgba(14, 165, 233, 0.22) 45%, transparent 74%)'
-              : isFrosted
-                ? `radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.72) 0%, ${phaseToken.accent}52 42%, transparent 74%)`
-                : `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
+              : isMaterialYou
+                ? 'radial-gradient(circle, rgba(var(--md-sys-color-primary-rgb), 0.28) 0%, transparent 72%)'
+                : isFrosted
+                  ? `radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.72) 0%, ${phaseToken.accent}52 42%, transparent 74%)`
+                  : `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
           }}
         />
         <div
@@ -1260,16 +1270,20 @@ function AppContent() {
               ? 'h-[28rem] w-[28rem] opacity-42'
               : isFrosted
                 ? 'h-[28rem] w-[28rem] opacity-35'
-                : isCarbon || isMaterialYou
-                  ? 'h-80 w-80 opacity-8'
-                  : 'h-96 w-96 opacity-20'
+                : isMaterialYou
+                  ? 'h-96 w-96 opacity-16'
+                  : isCarbon
+                    ? 'h-80 w-80 opacity-8'
+                    : 'h-96 w-96 opacity-20'
           }`}
           style={{
             backgroundImage: isAero
               ? 'radial-gradient(circle, rgba(56, 189, 248, 0.32) 0%, rgba(var(--ip-accent-rgb), 0.16) 44%, transparent 74%)'
-              : isFrosted
-                ? `radial-gradient(circle, rgba(var(--ip-accent-rgb), 0.24) 0%, ${phaseToken.accentBright}35 44%, transparent 74%)`
-                : `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
+              : isMaterialYou
+                ? 'radial-gradient(circle, rgba(var(--md-sys-color-secondary-container-rgb), 0.55) 0%, rgba(var(--md-sys-color-primary-rgb), 0.14) 48%, transparent 74%)'
+                : isFrosted
+                  ? `radial-gradient(circle, rgba(var(--ip-accent-rgb), 0.24) 0%, ${phaseToken.accentBright}35 44%, transparent 74%)`
+                  : `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
           }}
         />
         {(isFrosted || isAero) && (
@@ -1306,7 +1320,7 @@ function AppContent() {
           </div>
         )}
 
-        <main className="relative z-10 mx-auto max-w-7xl px-4 pb-24 pt-6 sm:px-6 md:pb-12 lg:px-8">
+        <main className="relative z-10 mx-auto max-w-7xl px-4 pb-[calc(6.75rem+env(safe-area-inset-bottom))] pt-6 sm:px-6 md:pb-12 lg:px-8">
           <div className="mb-5 lg:hidden">
             <PWAInstallCard />
           </div>
@@ -1335,7 +1349,7 @@ function AppContent() {
                           opacity: { duration: 0.18, ease: 'easeOut' },
                         }
                 }
-                className="w-full will-change-transform"
+                className="w-full"
               >
                 {activeTab === 'today' && (
                   <TodayWorkoutView
@@ -1358,7 +1372,8 @@ function AppContent() {
                     onResetRest={handleResetRest}
                     onAdjustRest={handleAdjustRest}
                     onStartRestTimer={startRestTimer}
-                    onStartWorkout={() => {
+                    onStartWorkout={(exerciseId) => {
+                      setFocusedWorkoutExerciseId(exerciseId || null);
                       navigateToTab('workout');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
@@ -1376,6 +1391,8 @@ function AppContent() {
                     todayDayKey={todayDayKey}
                     schedules={schedules}
                     todayEntries={effectiveTodayEntries}
+                    initialExerciseId={focusedWorkoutExerciseId}
+                    restTotalSeconds={restTotalSeconds}
                     restRemaining={restRemaining}
                     restRunning={restRunning}
                     restExerciseLabel={restExerciseLabel}

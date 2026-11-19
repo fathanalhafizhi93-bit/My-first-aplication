@@ -93,6 +93,7 @@ export function SettingsView({
     setAccentColor,
     materialTintColor,
     effectiveMaterialTint,
+    materialPalette,
     setMaterialTintColor,
     resetThemeCustomization,
     hapticsEnabled,
@@ -309,6 +310,14 @@ export function SettingsView({
     perfNoteEn?: string;
   }[] = [
     {
+      id: 'material-you',
+      name: 'Material You',
+      badgeId: 'Tonal Dinamis Android M3 · Default',
+      badgeEn: 'Android M3 Dynamic Tonal · Default',
+      descId: 'Palet tonal gelap otomatis mengikuti warna aksen pilihanmu: permukaan bertingkat, tombol pil penuh, kapsul navigasi tonal & ringan tanpa blur.',
+      descEn: 'Dynamic dark tonal palette derived from your accent seed: layered containers, full pill buttons, tonal nav capsules & zero-blur speed.',
+    },
+    {
       id: 'obsidian',
       name: 'Obsidian Glass',
       badgeId: 'Kaca Gelap Matte',
@@ -333,14 +342,6 @@ export function SettingsView({
       badgeEn: 'Matte Carbon Forge',
       descId: 'Tekstur micro-weave matte, sudut tajam presisi & aksen garis laser.',
       descEn: 'Matte micro-weave carbon weave, crisp corners & laser trim.',
-    },
-    {
-      id: 'material-you',
-      name: 'Material You',
-      badgeId: 'Tonal Dinamis M3',
-      badgeEn: 'Dynamic Tonal M3',
-      descId: 'Permukaan tonal adaptif mengikuti warna aksen, sudut membulat ekspresif, tombol pil penuh & ringan tanpa blur.',
-      descEn: 'Adaptive tonal surfaces tinted by your accent color, expressive curves, pill buttons & smooth zero-blur performance.',
     },
     {
       id: 'aeroglass',
@@ -407,7 +408,7 @@ export function SettingsView({
               aria-selected={isActive}
               data-haptic="none"
               onClick={() => handleSelectSection(id)}
-              className={`relative flex min-h-[44px] items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-bold transition-colors sm:gap-2 sm:px-3 sm:text-xs whitespace-nowrap ${
+              className={`relative isolate flex min-h-[48px] sm:min-h-[44px] flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 px-1.5 py-1.5 sm:px-3 sm:py-2 text-[11px] font-bold transition-colors sm:text-xs whitespace-nowrap ${
                 isMaterialYouTheme
                   ? 'rounded-full'
                   : isCarbonTheme
@@ -418,9 +419,11 @@ export function SettingsView({
                   ? isAeroTheme
                     ? 'text-[#F0F9FF]'
                     : isMaterialYouTheme
-                      ? 'text-pulse'
+                      ? 'text-md-on-secondary-container'
                       : 'text-pulse-fg'
-                  : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+                  : isMaterialYouTheme
+                    ? 'text-md-on-surface-variant hover:text-md-on-surface'
+                    : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
               }`}
             >
               {isActive && (
@@ -428,9 +431,9 @@ export function SettingsView({
                   layoutId={prefersReducedMotion ? undefined : SHARED_IDS.settingsSubTabPill}
                   transition={TAB_INDICATOR_SPRING}
                   aria-hidden="true"
-                  className={`pointer-events-none absolute inset-0 ${
+                  className={`pointer-events-none absolute inset-0 z-0 ${
                     isMaterialYouTheme
-                      ? 'rounded-full bg-pulse/22 border border-pulse/35'
+                      ? 'rounded-full bg-md-secondary-container'
                       : isAeroTheme
                         ? 'rounded-xl border border-sky-100/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_4px_14px_rgba(14,165,233,0.28)]'
                         : isFrostedTheme
@@ -450,8 +453,8 @@ export function SettingsView({
                   }
                 />
               )}
-              <Icon className="relative z-10 h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-              <span className="relative z-10 truncate">{t(labelId, labelEn)}</span>
+              <Icon className="relative z-10 h-4 w-4 shrink-0" />
+              <span className="relative z-10">{t(labelId, labelEn)}</span>
             </button>
           );
         })}
@@ -599,18 +602,22 @@ export function SettingsView({
 
                 {/* Five Visual Material Theme Cards */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {uiThemeOptions.map((item) => {
+                  {uiThemeOptions.map((item, idx) => {
                     const active = uiTheme === item.id;
                     const isFrosted = item.id === 'midnight-frosted';
                     const isCarbon = item.id === 'carbon-forge';
                     const isMaterialYou = item.id === 'material-you';
                     const isAero = item.id === 'aeroglass';
+                    const isFullSpanLast =
+                      idx === uiThemeOptions.length - 1 && uiThemeOptions.length % 2 === 1;
                     return (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => setUiTheme(item.id)}
                         className={`group flex flex-col justify-start rounded-2xl border p-3.5 text-left transition-all ${
+                          isFullSpanLast ? 'sm:col-span-2 sm:flex-row sm:items-center sm:gap-4' : ''
+                        } ${
                           active
                             ? 'border-pulse bg-pulse/10 shadow-[0_0_0_1px_rgba(var(--ip-accent-rgb),0.25)]'
                             : 'border-white/12 bg-[#0A0B0E]/70 hover:border-white/25'
@@ -618,9 +625,12 @@ export function SettingsView({
                       >
                         {/* Live Miniature Material Preview */}
                         <div
+                          data-theme-preview="true"
                           className={`relative mb-3 h-24 w-full overflow-hidden border p-2.5 ${
+                            isFullSpanLast ? 'sm:mb-0 sm:w-52 sm:shrink-0' : ''
+                          } ${
                             isMaterialYou
-                              ? 'rounded-[20px] border-white/10'
+                              ? 'rounded-[20px]'
                               : isAero
                                 ? 'rounded-xl border-sky-200/30'
                                 : isCarbon
@@ -628,8 +638,9 @@ export function SettingsView({
                                   : 'rounded-xl border-white/10'
                           }`}
                           style={{
+                            borderColor: isMaterialYou ? materialPalette.outlineVariant : undefined,
                             backgroundColor: isMaterialYou
-                              ? '#111015'
+                              ? materialPalette.surface
                               : isAero
                                 ? '#06101B'
                                 : isFrosted
@@ -681,7 +692,7 @@ export function SettingsView({
                               backgroundColor: isCarbon
                                 ? `${effectiveMaterialTint}EE`
                                 : isMaterialYou
-                                  ? effectiveMaterialTint
+                                  ? materialPalette.surfaceContainer
                                   : isAero
                                     ? `${effectiveMaterialTint}8A`
                                     : isFrosted
@@ -690,7 +701,7 @@ export function SettingsView({
                               backgroundImage: isCarbon
                                 ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 4px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 4px)'
                                 : isMaterialYou
-                                  ? 'linear-gradient(180deg, rgba(var(--ip-accent-rgb), 0.12), rgba(var(--ip-accent-rgb), 0.06))'
+                                  ? 'none'
                                   : isAero
                                     ? 'linear-gradient(180deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.02) 47%, rgba(56,189,248,0.12) 100%)'
                                     : isFrosted
@@ -704,7 +715,7 @@ export function SettingsView({
                                     ? 'none'
                                     : 'blur(10px)',
                               boxShadow: isMaterialYou
-                                ? 'inset 0 1px 0 rgba(255,255,255,0.06)'
+                                ? 'none'
                                 : isAero
                                   ? 'inset 0 1px 0 rgba(255,255,255,0.62), inset 0 0 0 1px rgba(255,255,255,0.18), 0 6px 14px rgba(0,8,20,0.45)'
                                   : isFrosted
@@ -713,7 +724,7 @@ export function SettingsView({
                                       ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.5)'
                                       : 'inset 0 1px 0 rgba(255,255,255,0.1)',
                               border: isMaterialYou
-                                ? '1px solid rgba(var(--ip-accent-rgb), 0.24)'
+                                ? `1px solid ${materialPalette.outlineVariant}`
                                 : isAero
                                   ? '1px solid rgba(186,230,253,0.45)'
                                   : isFrosted
@@ -725,9 +736,14 @@ export function SettingsView({
                           >
                             <div className="flex items-center justify-between">
                               <span
-                                className={`h-2 w-10 rounded-full ${
-                                  isAero ? 'bg-sky-100/45' : 'bg-white/25'
-                                }`}
+                                className="h-2 w-10 rounded-full"
+                                style={{
+                                  backgroundColor: isMaterialYou
+                                    ? materialPalette.onSurfaceVariant
+                                    : isAero
+                                      ? 'rgba(224, 242, 254, 0.45)'
+                                      : 'rgba(255, 255, 255, 0.25)',
+                                }}
                               />
                               <span
                                 className={`px-2 py-0.5 text-[9px] font-extrabold ${
@@ -740,11 +756,11 @@ export function SettingsView({
                                         : 'rounded-md'
                                 }`}
                                 style={{
-                                  backgroundColor: accentColor,
+                                  backgroundColor: isMaterialYou ? materialPalette.primary : accentColor,
                                   backgroundImage: isAero
                                     ? 'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.12) 48%, rgba(0,0,0,0.1) 50%, rgba(255,255,255,0.06) 100%)'
                                     : 'none',
-                                  color: previewContrastFg,
+                                  color: isMaterialYou ? materialPalette.onPrimary : previewContrastFg,
                                 }}
                               >
                                 {t('Aksi', 'Action')}
@@ -755,7 +771,7 @@ export function SettingsView({
                             <div
                               className={`flex items-center justify-around px-2 py-1 ${
                                 isMaterialYou
-                                  ? 'rounded-full border border-pulse/20 bg-pulse/[0.08]'
+                                  ? 'rounded-full border'
                                   : isAero
                                     ? 'rounded-lg border border-sky-200/35 bg-sky-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.42)]'
                                     : isFrosted
@@ -764,15 +780,23 @@ export function SettingsView({
                                         ? 'rounded-[4px] border border-white/12 bg-black/55'
                                         : 'rounded-lg border border-white/10 bg-black/35'
                               }`}
+                              style={
+                                isMaterialYou
+                                  ? {
+                                      backgroundColor: materialPalette.surfaceContainerLow,
+                                      borderColor: materialPalette.outlineVariant,
+                                    }
+                                  : undefined
+                              }
                             >
                               {isMaterialYou ? (
                                 <span
                                   className="flex h-2.5 w-7 items-center justify-center rounded-full"
-                                  style={{ backgroundColor: 'rgba(var(--ip-accent-rgb), 0.28)' }}
+                                  style={{ backgroundColor: materialPalette.secondaryContainer }}
                                 >
                                   <span
                                     className="h-1 w-3 rounded-full"
-                                    style={{ backgroundColor: accentColor }}
+                                    style={{ backgroundColor: materialPalette.onSecondaryContainer }}
                                   />
                                 </span>
                               ) : isAero ? (
@@ -892,27 +916,46 @@ export function SettingsView({
                       </label>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 pt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                       <span className="text-[11px] text-[#9CA3AF]">
                         {t('Pratinjau tombol:', 'Button preview:')}
                       </span>
-                      <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg bg-pulse px-3 py-1 text-xs font-bold text-pulse-fg">
-                        <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
-                        {t('Mulai Latihan', 'Start Workout')}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`inline-flex min-h-[34px] items-center gap-1.5 px-3 py-1 text-xs font-bold ${
+                            isMaterialYouTheme ? 'rounded-full' : 'rounded-lg'
+                          } bg-md-secondary-container text-md-on-secondary-container`}
+                        >
+                          {t('Tonal', 'Tonal')}
+                        </span>
+                        <span
+                          className={`inline-flex min-h-[34px] items-center gap-1.5 px-3 py-1 text-xs font-bold ${
+                            isMaterialYouTheme ? 'rounded-full' : 'rounded-lg'
+                          } bg-pulse text-pulse-fg`}
+                        >
+                          <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
+                          {t('Mulai Latihan', 'Start Workout')}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Glass Material Tint Picker */}
+                  {/* Surface / Glass Material Tint Picker */}
                   <div className="space-y-3 rounded-xl border border-white/10 bg-[#0A0B0E]/75 p-4">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
                         <Layers className="h-4 w-4 text-pulse" />
-                        <span>{t('Warna Material Kaca', 'Glass Material Tint')}</span>
+                        <span>
+                          {isMaterialYouTheme
+                            ? t('Rona Permukaan Tonal (Opsional)', 'Tonal Surface Hue (Optional)')
+                            : t('Warna Material Kaca', 'Glass Material Tint')}
+                        </span>
                       </div>
                       <span className="font-mono text-[11px] font-bold uppercase text-[#D1D5DB]">
                         {effectiveMaterialTint}
-                        {materialTintColor === null ? ` · ${t('Default', 'Default')}` : ''}
+                        {materialTintColor === null
+                          ? ` · ${isMaterialYouTheme ? t('Auto Seed', 'Auto Seed') : t('Default', 'Default')}`
+                          : ''}
                       </span>
                     </div>
 
@@ -959,10 +1002,15 @@ export function SettingsView({
 
                     <div className="flex items-center justify-between gap-2 pt-1">
                       <span className="text-[11px] text-[#9CA3AF]">
-                        {t(
-                          `Default tema: ${DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]}`,
-                          `Theme default: ${DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]}`
-                        )}
+                        {isMaterialYouTheme
+                          ? t(
+                              `Otomatis dari seed aksen (${materialPalette.surfaceContainer})`,
+                              `Auto-derived from accent seed (${materialPalette.surfaceContainer})`
+                            )
+                          : t(
+                              `Default tema: ${DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]}`,
+                              `Theme default: ${DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]}`
+                            )}
                       </span>
                       {materialTintColor !== null && (
                         <button
@@ -970,10 +1018,83 @@ export function SettingsView({
                           onClick={() => setMaterialTintColor(null)}
                           className="text-[11px] font-semibold text-pulse hover:underline"
                         >
-                          {t('Ikuti Default Tema', 'Use Theme Default')}
+                          {isMaterialYouTheme
+                            ? t('Ikuti Seed Aksen', 'Follow Accent Seed')
+                            : t('Ikuti Default Tema', 'Use Theme Default')}
                         </button>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                {/* Live Derived Material You Tonal Palette Preview Strip */}
+                <div
+                  data-theme-preview="true"
+                  className="space-y-2.5 rounded-xl border p-4"
+                  style={{
+                    backgroundColor: materialPalette.surfaceContainerLow,
+                    borderColor: materialPalette.outlineVariant,
+                  }}
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="text-xs font-semibold text-md-on-surface">
+                      {t('Palet Tonal Dinamis Material You', 'Dynamic Material You Tonal Palette')}
+                    </p>
+                    <p className="font-mono text-[11px] text-md-on-surface-variant">
+                      {t('Seed Aktif', 'Active Seed')} · {materialPalette.seed}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                    {[
+                      {
+                        label: 'Primary',
+                        bg: materialPalette.primary,
+                        fg: materialPalette.onPrimary,
+                      },
+                      {
+                        label: 'Primary Ctn',
+                        bg: materialPalette.primaryContainer,
+                        fg: materialPalette.onPrimaryContainer,
+                      },
+                      {
+                        label: 'Secondary Ctn',
+                        bg: materialPalette.secondaryContainer,
+                        fg: materialPalette.onSecondaryContainer,
+                      },
+                      {
+                        label: 'Tertiary',
+                        bg: materialPalette.tertiary,
+                        fg: materialPalette.onTertiary,
+                      },
+                      {
+                        label: 'Surface',
+                        bg: materialPalette.surface,
+                        fg: materialPalette.onSurface,
+                      },
+                      {
+                        label: 'Surface High',
+                        bg: materialPalette.surfaceContainerHigh,
+                        fg: materialPalette.onSurface,
+                      },
+                    ].map((swatch) => (
+                      <div
+                        key={swatch.label}
+                        className="flex flex-col justify-between rounded-xl border p-2"
+                        style={{
+                          backgroundColor: swatch.bg,
+                          color: swatch.fg,
+                          borderColor: materialPalette.outlineVariant,
+                        }}
+                      >
+                        <span className="truncate text-[10px] font-bold leading-tight">
+                          {swatch.label}
+                        </span>
+                        <span className="mt-2 font-mono text-[10px] opacity-85">
+                          {swatch.bg}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </section>

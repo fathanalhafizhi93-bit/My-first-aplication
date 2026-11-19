@@ -142,8 +142,39 @@ export function useGymData() {
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
-  const todayDayKey = getTodayDayKey();
-  const todayDateKey = formatLocalDateKey();
+  const [dateClock, setDateClock] = useState<{ dayKey: DayKey; dateKey: string }>(() => ({
+    dayKey: getTodayDayKey(),
+    dateKey: formatLocalDateKey(),
+  }));
+
+  useEffect(() => {
+    const syncDateClock = () => {
+      const nextDateKey = formatLocalDateKey();
+      const nextDayKey = getTodayDayKey();
+      setDateClock((prev) =>
+        prev.dateKey === nextDateKey && prev.dayKey === nextDayKey
+          ? prev
+          : { dayKey: nextDayKey, dateKey: nextDateKey }
+      );
+    };
+
+    const interval = window.setInterval(syncDateClock, 30_000);
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncDateClock();
+      }
+    };
+    window.addEventListener('focus', syncDateClock);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', syncDateClock);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
+
+  const todayDayKey = dateClock.dayKey;
+  const todayDateKey = dateClock.dateKey;
 
   const schedulesRef = useRef(schedules);
   const todayLogRef = useRef(todayLog);

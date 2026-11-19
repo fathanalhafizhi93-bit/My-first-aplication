@@ -21,7 +21,8 @@ export function CooldownAlertModal({
   onBypass,
   onDismiss,
 }: CooldownAlertModalProps) {
-  const { t } = useI18n();
+  const { t, uiTheme } = useI18n();
+  const isMaterialYou = uiTheme === 'material-you';
 
   useBodyScrollLock(open);
 
@@ -61,13 +62,24 @@ export function CooldownAlertModal({
               exit={{ opacity: 0, scale: 0.96, y: 6 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
-              className="glass-surface relative max-h-[min(90dvh,calc(100dvh-2rem))] w-full max-w-md overflow-y-auto overscroll-contain rounded-2xl border border-[#F59E0B]/45 p-6 shadow-2xl sm:p-7"
+              className={`glass-surface relative max-h-[min(90dvh,calc(100dvh-2rem))] w-full max-w-md overflow-y-auto overscroll-contain border border-[#F59E0B]/45 p-6 shadow-2xl sm:p-7 ${
+                isMaterialYou ? 'rounded-[28px]' : 'rounded-2xl'
+              }`}
+              style={
+                isMaterialYou
+                  ? { backgroundColor: 'var(--md-sys-color-surface-container-high)' }
+                  : undefined
+              }
             >
             <button
               type="button"
               onClick={onDismiss}
               aria-label={t('Tutup peringatan cooldown', 'Close cooldown alert')}
-              className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#1A1E26] text-[#9CA3AF] transition-colors hover:text-[#F4F5F7]"
+              className={`absolute right-4 top-4 flex h-11 w-11 items-center justify-center border transition-colors ${
+                isMaterialYou
+                  ? 'rounded-full border-md-outline-variant bg-md-surface-highest text-md-on-surface-variant hover:text-md-on-surface'
+                  : 'rounded-xl border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]'
+              }`}
             >
               <X className="h-4 w-4" />
             </button>
@@ -118,8 +130,8 @@ export function CooldownAlertModal({
 
               <p className="mt-2 text-sm leading-relaxed text-[#D1D5DB]">
                 {t(
-                  `Jeda 30 detik mencegah klik ganda atau ketukan tidak sengaja pada "${exerciseName}" Set #${setNumber}. Untuk waktu istirahat otot, gunakan Timer Istirahat di bawah hero.`,
-                  `This 30s guard prevents accidental taps on "${exerciseName}" Set #${setNumber}. Use the Rest Timer below the hero to track set recovery.`
+                  `Jeda 30 detik mencegah klik ganda atau ketukan tidak sengaja pada "${exerciseName}" Set #${setNumber}. Untuk waktu istirahat otot, gunakan Timer Istirahat yang tersedia.`,
+                  `This 30s guard prevents accidental taps on "${exerciseName}" Set #${setNumber}. Use the Rest Timer to track your between-set recovery.`
                 )}
               </p>
             </div>
@@ -128,7 +140,11 @@ export function CooldownAlertModal({
               <button
                 type="button"
                 onClick={onDismiss}
-                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#1A1E26] px-4 py-2.5 text-xs font-bold text-[#F4F5F7] transition-colors hover:bg-[#232935] whitespace-nowrap"
+                className={`inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 border px-4 py-2.5 text-xs font-bold transition-colors whitespace-nowrap ${
+                  isMaterialYou
+                    ? 'rounded-full border-md-outline-variant bg-md-surface-highest text-md-on-surface hover:brightness-110'
+                    : 'rounded-xl border-white/15 bg-[#1A1E26] text-[#F4F5F7] hover:bg-[#232935]'
+                }`}
               >
                 <Clock className="h-4 w-4 text-[#38BDF8]" />
                 {t('Tutup', 'Dismiss')}
@@ -139,7 +155,9 @@ export function CooldownAlertModal({
                 onClick={() => {
                   void onBypass();
                 }}
-                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2.5 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] whitespace-nowrap"
+                className={`inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 bg-pulse px-4 py-2.5 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] whitespace-nowrap ${
+                  isMaterialYou ? 'rounded-full' : 'rounded-xl'
+                }`}
               >
                 <Check className="h-4 w-4" strokeWidth={2.5} />
                 {t('Tetap Centang (Lewati)', 'Confirm Anyway')}

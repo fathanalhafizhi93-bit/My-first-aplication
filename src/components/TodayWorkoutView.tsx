@@ -31,6 +31,7 @@ import {
   DayKey,
   DaySchedule,
   resolveExerciseTrackingMode,
+  resolveExerciseUsesWeight,
   resolveTargetDurationSeconds,
   TimerDirection,
   WorkoutLogEntry,
@@ -74,7 +75,7 @@ interface TodayWorkoutViewProps {
   onResetRest: () => void;
   onAdjustRest: (deltaSeconds: number) => void;
   onStartRestTimer: (seconds: number, exerciseName?: string) => void;
-  onStartWorkout: () => void;
+  onStartWorkout: (exerciseId?: string) => void;
   onOpenExerciseManager: (dayKey: DayKey) => void;
   onOpenScheduleManager: () => void;
 }
@@ -122,15 +123,25 @@ export function TodayWorkoutView({
   );
   const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
 
-  const totalVolumeKg = todayEntries.reduce((acc, e) => {
-    if (resolveExerciseTrackingMode(e) === 'timer') return acc;
-    return (
-      acc +
-      e.sets
-        .filter((s) => s.completed)
-        .reduce((sAcc, s) => sAcc + s.weightKg * s.reps, 0)
-    );
-  }, 0);
+  const totalVolumeKg = Math.round(
+    todayEntries.reduce((acc, e) => {
+      const spec = activeSchedule.exercises.find((ex) => ex.id === e.exerciseId);
+      const mode = resolveExerciseTrackingMode(spec || e);
+      const usesWeight = resolveExerciseUsesWeight({
+        usesWeight: e.usesWeight ?? spec?.usesWeight,
+        trackingMode: mode,
+        targetWeightKg: spec?.targetWeightKg ?? e.sets[0]?.weightKg ?? 0,
+        equipment: spec?.equipment,
+      });
+      if (mode === 'timer' || !usesWeight) return acc;
+      return (
+        acc +
+        e.sets
+          .filter((s) => s.completed)
+          .reduce((sAcc, s) => sAcc + Math.max(0, s.weightKg) * Math.max(0, s.reps), 0)
+      );
+    }, 0)
+  );
 
   const totalTimedSeconds = todayEntries.reduce((acc, e) => {
     if (resolveExerciseTrackingMode(e) !== 'timer') return acc;
@@ -439,11 +450,11 @@ export function TodayWorkoutView({
                 ))}
               </div>
 
-              <div className="flex items-center gap-2 w-full">
+              <div className="flex items-center gap-1.5 sm:gap-2 w-full">
                 <button
                   type="button"
                   onClick={() => onAdjustRest(-15)}
-                  className="min-h-[42px] rounded-xl border border-white/10 bg-[#1A1E26] px-3 font-mono text-xs font-bold text-[#D1D5DB] hover:bg-[#242B37] whitespace-nowrap"
+                  className="min-h-[42px] shrink-0 rounded-xl border border-white/10 bg-[#1A1E26] px-2.5 sm:px-3 font-mono text-xs font-bold text-[#D1D5DB] hover:bg-[#242B37] whitespace-nowrap"
                 >
                   -15{secUnit}
                 </button>
@@ -451,16 +462,16 @@ export function TodayWorkoutView({
                 <button
                   type="button"
                   onClick={onToggleRestPause}
-                  className="flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-xl bg-pulse px-4 text-xs font-bold text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
+                  className="flex min-h-[42px] min-w-0 flex-1 items-center justify-center gap-1.5 sm:gap-2 rounded-xl bg-pulse px-3 sm:px-4 text-xs font-bold text-pulse-fg transition-transform duration-150 hover:brightness-105 active:scale-[0.97] whitespace-nowrap"
                 >
                   {restRunning ? (
                     <>
-                      <Pause className="h-4 w-4 fill-current" />
+                      <Pause className="h-4 w-4 shrink-0 fill-current" />
                       {t('Jeda', 'Pause')}
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 fill-current" />
+                      <Play className="h-4 w-4 shrink-0 fill-current" />
                       {restRemaining > 0 ? t('Mulai', 'Start') : t('Ulangi', 'Restart')}
                     </>
                   )}
@@ -469,7 +480,7 @@ export function TodayWorkoutView({
                 <button
                   type="button"
                   onClick={() => onAdjustRest(15)}
-                  className="min-h-[42px] rounded-xl border border-white/10 bg-[#1A1E26] px-3 font-mono text-xs font-bold text-[#D1D5DB] hover:bg-[#242B37] whitespace-nowrap"
+                  className="min-h-[42px] shrink-0 rounded-xl border border-white/10 bg-[#1A1E26] px-2.5 sm:px-3 font-mono text-xs font-bold text-[#D1D5DB] hover:bg-[#242B37] whitespace-nowrap"
                 >
                   +15{secUnit}
                 </button>
@@ -478,7 +489,7 @@ export function TodayWorkoutView({
                   type="button"
                   aria-label={t('Reset timer istirahat', 'Reset rest timer')}
                   onClick={onResetRest}
-                  className="flex min-h-[42px] min-w-[42px] items-center justify-center rounded-xl border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]"
+                  className="flex min-h-[42px] min-w-[42px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]"
                 >
                   <RotateCcw className="h-4 w-4" />
                 </button>
@@ -491,7 +502,7 @@ export function TodayWorkoutView({
         {activeSchedule.isGymDay && todayEntries.length > 0 && (
           <button
             type="button"
-            onClick={onStartWorkout}
+            onClick={() => onStartWorkout()}
             className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-2xl bg-pulse px-5 py-3.5 text-left text-pulse-fg shadow-lg shadow-pulse/10 transition-transform duration-150 hover:brightness-105 active:scale-[0.98]"
           >
             <span className="flex items-center gap-3 min-w-0">
@@ -601,7 +612,7 @@ export function TodayWorkoutView({
                   <button
                     key={entry.exerciseId}
                     type="button"
-                    onClick={onStartWorkout}
+                    onClick={() => onStartWorkout(entry.exerciseId)}
                     className="flex min-h-[56px] w-[calc(100%+1rem)] -mx-2 items-center justify-between gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-white/[0.03] first:pt-2 last:pb-2"
                   >
                     <div className="min-w-0">

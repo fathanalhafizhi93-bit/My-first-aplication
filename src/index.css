@@ -7,32 +7,87 @@
 }
 
 @theme inline {
-  --color-pulse: var(--ip-accent);
-  --color-pulse-fg: var(--ip-accent-fg);
+  --color-pulse: var(--md-sys-color-primary);
+  --color-pulse-fg: var(--md-sys-color-on-primary);
+  --color-md-primary: var(--md-sys-color-primary);
+  --color-md-on-primary: var(--md-sys-color-on-primary);
+  --color-md-primary-container: var(--md-sys-color-primary-container);
+  --color-md-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-md-secondary: var(--md-sys-color-secondary);
+  --color-md-on-secondary: var(--md-sys-color-on-secondary);
+  --color-md-secondary-container: var(--md-sys-color-secondary-container);
+  --color-md-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --color-md-tertiary: var(--md-sys-color-tertiary);
+  --color-md-tertiary-container: var(--md-sys-color-tertiary-container);
+  --color-md-on-tertiary-container: var(--md-sys-color-on-tertiary-container);
+  --color-md-surface: var(--md-sys-color-surface);
+  --color-md-surface-lowest: var(--md-sys-color-surface-container-lowest);
+  --color-md-surface-low: var(--md-sys-color-surface-container-low);
+  --color-md-surface-container: var(--md-sys-color-surface-container);
+  --color-md-surface-high: var(--md-sys-color-surface-container-high);
+  --color-md-surface-highest: var(--md-sys-color-surface-container-highest);
+  --color-md-on-surface: var(--md-sys-color-on-surface);
+  --color-md-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --color-md-outline: var(--md-sys-color-outline);
+  --color-md-outline-variant: var(--md-sys-color-outline-variant);
 }
 
 :root {
-  --ip-accent: #C8FF2E;
-  --ip-accent-fg: #0A0B0E;
-  --ip-accent-rgb: 200, 255, 46;
-  --ip-glass-rgb: 22, 26, 35;
-  --ip-canvas-bg: #0A0B0E;
+  /* Material You (M3) Dynamic Tonal System Tokens (Default Seed: #C8FF2E) */
+  --md-sys-color-primary: #C8FF2E;
+  --md-sys-color-on-primary: #141A0C;
+  --md-sys-color-primary-rgb: 200, 255, 46;
+  --md-sys-color-primary-container: #394A1B;
+  --md-sys-color-on-primary-container: #E8F9BE;
+  --md-sys-color-secondary: #C5D0B1;
+  --md-sys-color-on-secondary: #1E2414;
+  --md-sys-color-secondary-container: #3B462B;
+  --md-sys-color-on-secondary-container: #E7F0D6;
+  --md-sys-color-secondary-container-rgb: 59, 70, 43;
+  --md-sys-color-tertiary: #A4DCBC;
+  --md-sys-color-on-tertiary: #11261B;
+  --md-sys-color-tertiary-container: #224433;
+  --md-sys-color-on-tertiary-container: #D3F5E2;
+  --md-sys-color-surface: #12140F;
+  --md-sys-color-surface-container-lowest: #0C0D0A;
+  --md-sys-color-surface-container-low: #181B14;
+  --md-sys-color-surface-container: #1F231A;
+  --md-sys-color-surface-container-rgb: 31, 35, 26;
+  --md-sys-color-surface-container-high: #272D21;
+  --md-sys-color-surface-container-highest: #313829;
+  --md-sys-color-on-surface: #EFEFE9;
+  --md-sys-color-on-surface-rgb: 239, 239, 233;
+  --md-sys-color-on-surface-variant: #C2C5B8;
+  --md-sys-color-outline: #797F6E;
+  --md-sys-color-outline-variant: #41453B;
+
+  /* Bridge Tokens for Cross-Theme Compatibility */
+  --ip-accent: var(--md-sys-color-primary);
+  --ip-accent-fg: var(--md-sys-color-on-primary);
+  --ip-accent-rgb: var(--md-sys-color-primary-rgb);
+  --ip-glass-rgb: var(--md-sys-color-surface-container-rgb);
+  --ip-canvas-bg: var(--md-sys-color-surface);
 }
 
 @layer base {
   html {
     font-family: var(--font-sans);
     background-color: var(--ip-canvas-bg);
-    color: #F4F5F7;
+    color: var(--md-sys-color-on-surface);
     scroll-behavior: smooth;
     -webkit-tap-highlight-color: transparent;
   }
 
   body {
     background-color: var(--ip-canvas-bg);
-    color: #F4F5F7;
-    overflow-x: hidden;
-    transition: background-color 280ms ease;
+    color: var(--md-sys-color-on-surface);
+    overflow-x: clip;
+    transition: background-color 280ms ease, color 220ms ease;
+  }
+
+  ::selection {
+    background-color: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
   }
 
   input[type="number"]::-webkit-inner-spin-button,
@@ -57,6 +112,78 @@
 
 .font-display {
   font-family: var(--font-display);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.edge-fade-mask-right {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 1) 0px,
+    rgba(0, 0, 0, 1) calc(100% - 56px),
+    rgba(0, 0, 0, 0.72) calc(100% - 34px),
+    rgba(0, 0, 0, 0.24) calc(100% - 14px),
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 1) 0px,
+    rgba(0, 0, 0, 1) calc(100% - 56px),
+    rgba(0, 0, 0, 0.72) calc(100% - 34px),
+    rgba(0, 0, 0, 0.24) calc(100% - 14px),
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.edge-fade-mask-left {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0.24) 14px,
+    rgba(0, 0, 0, 0.72) 34px,
+    rgba(0, 0, 0, 1) 56px,
+    rgba(0, 0, 0, 1) 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0.24) 14px,
+    rgba(0, 0, 0, 0.72) 34px,
+    rgba(0, 0, 0, 1) 56px,
+    rgba(0, 0, 0, 1) 100%
+  );
+}
+
+.edge-fade-mask-both {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0.24) 12px,
+    rgba(0, 0, 0, 0.72) 28px,
+    rgba(0, 0, 0, 1) 48px,
+    rgba(0, 0, 0, 1) calc(100% - 48px),
+    rgba(0, 0, 0, 0.72) calc(100% - 28px),
+    rgba(0, 0, 0, 0.24) calc(100% - 12px),
+    rgba(0, 0, 0, 0) 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0.24) 12px,
+    rgba(0, 0, 0, 0.72) 28px,
+    rgba(0, 0, 0, 1) 48px,
+    rgba(0, 0, 0, 1) calc(100% - 48px),
+    rgba(0, 0, 0, 0.72) calc(100% - 28px),
+    rgba(0, 0, 0, 0.24) calc(100% - 12px),
+    rgba(0, 0, 0, 0) 100%
+  );
 }
 
 /* ============================================================================
@@ -164,7 +291,7 @@ html[data-ui-theme="midnight-frosted"] button.bg-pulse {
 }
 
 /* Soften recessed controls inside Midnight Frosted so nothing feels opaque-matte */
-html[data-ui-theme="midnight-frosted"] .glass-surface input:not([type="range"]):not([type="color"]),
+html[data-ui-theme="midnight-frosted"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]),
 html[data-ui-theme="midnight-frosted"] .glass-surface select,
 html[data-ui-theme="midnight-frosted"] .glass-surface textarea {
   background-color: rgba(var(--ip-glass-rgb), 0.45);
@@ -273,7 +400,7 @@ html[data-ui-theme="carbon-forge"] button.bg-pulse {
     0 6px 18px -8px rgba(var(--ip-accent-rgb), 0.38);
 }
 
-html[data-ui-theme="carbon-forge"] .glass-surface input:not([type="range"]):not([type="color"]),
+html[data-ui-theme="carbon-forge"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]),
 html[data-ui-theme="carbon-forge"] .glass-surface select,
 html[data-ui-theme="carbon-forge"] .glass-surface textarea {
   background-color: rgba(8, 10, 13, 0.92);
@@ -283,47 +410,42 @@ html[data-ui-theme="carbon-forge"] .glass-surface textarea {
 }
 
 /* ============================================================================
-   Theme 4: Material You (Dynamic Tonal Surfaces, Expressive Curves, Zero Blur)
+   Theme 4: Material You (Android 14/15 Dark Tonal M3 Dynamic Color Engine)
    ============================================================================ */
 html[data-ui-theme="material-you"] body {
-  background-image: radial-gradient(
-    ellipse 85% 55% at 50% -8%,
-    rgba(var(--ip-accent-rgb), 0.085),
-    transparent 70%
-  );
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  background-image:
+    radial-gradient(
+      ellipse 88% 52% at 50% -10%,
+      rgba(var(--md-sys-color-primary-rgb), 0.1),
+      transparent 68%
+    );
 }
 
+/* Primary M3 Cards & Sheets — Tonal Elevation Level 2 (Surface Container) */
 html[data-ui-theme="material-you"] .glass-surface {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(var(--ip-accent-rgb), 0.075) 0%,
-      rgba(var(--ip-accent-rgb), 0.04) 100%
-    ),
-    rgba(var(--ip-glass-rgb), 0.96);
+  background-color: var(--md-sys-color-surface-container);
+  background-image: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-color: rgba(var(--ip-accent-rgb), 0.16);
+  border-color: var(--md-sys-color-outline-variant);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 6px 20px -12px rgba(0, 0, 0, 0.55);
+    0 1px 2px rgba(0, 0, 0, 0.28),
+    0 6px 20px -14px rgba(0, 0, 0, 0.48);
 }
 
 html[data-ui-theme="material-you"] .glass-surface.rounded-2xl {
   border-radius: 1.75rem;
 }
 
+/* Nested Elevated Tonal Containers — Level 3 (Surface Container High) */
 html[data-ui-theme="material-you"] .glass-surface-subtle {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(var(--ip-accent-rgb), 0.11) 0%,
-      rgba(var(--ip-accent-rgb), 0.07) 100%
-    ),
-    rgba(var(--ip-glass-rgb), 0.92);
+  background-color: var(--md-sys-color-surface-container-high);
+  background-image: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-color: rgba(var(--ip-accent-rgb), 0.18);
+  border-color: var(--md-sys-color-outline-variant);
   box-shadow: none;
 }
 
@@ -332,63 +454,126 @@ html[data-ui-theme="material-you"] .glass-surface-subtle.rounded-2xl {
 }
 
 html[data-ui-theme="material-you"] .glass-surface-subtle.rounded-xl {
-  border-radius: 1.125rem;
+  border-radius: 1.25rem;
 }
 
+/* M3 Top App Bar & Bottom Navigation Bar — Level 1 (Surface Container Low) */
 html[data-ui-theme="material-you"] .glass-bar {
-  background:
-    linear-gradient(
-      180deg,
-      rgba(var(--ip-accent-rgb), 0.08) 0%,
-      rgba(var(--ip-accent-rgb), 0.05) 100%
-    ),
-    rgba(var(--ip-glass-rgb), 0.97);
+  background-color: var(--md-sys-color-surface-container-low);
+  background-image: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border-color: rgba(var(--ip-accent-rgb), 0.14);
-  box-shadow: 0 4px 16px -10px rgba(0, 0, 0, 0.45);
+  border-color: var(--md-sys-color-outline-variant);
+  box-shadow: 0 2px 12px -8px rgba(0, 0, 0, 0.42);
 }
 
-/* Expressive Material 3 pill primary actions & tonal filled controls */
-html[data-ui-theme="material-you"] button.bg-pulse {
+/* Harmonize Recessed Dark Wells Across All Screens to Dynamic M3 Tonal Surfaces
+   (Excludes isolated miniature theme cards marked with [data-theme-preview]) */
+html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#0A0B0E"] {
+  background-color: var(--md-sys-color-surface-container-low);
+}
+
+html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#13161C"] {
+  background-color: var(--md-sys-color-surface-container);
+}
+
+html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#1A1E26"] {
+  background-color: var(--md-sys-color-surface-container-high);
+}
+
+html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="border-white/10"],
+html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="border-white/12"],
+html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="border-white/15"] {
+  border-color: var(--md-sys-color-outline-variant);
+}
+
+html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="text-[#9CA3AF]"] {
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Authentic Material 3 Primary Filled Pill Actions + State-Layer Feedback */
+html[data-ui-theme="material-you"] button.bg-pulse,
+html[data-ui-theme="material-you"] a.bg-pulse,
+html[data-ui-theme="material-you"] label.bg-pulse {
   border-radius: 9999px;
-  box-shadow: 0 4px 14px -6px rgba(var(--ip-accent-rgb), 0.45);
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: 0 3px 12px -6px rgba(var(--md-sys-color-primary-rgb), 0.45);
+  transition: transform 150ms cubic-bezier(0.2, 0, 0, 1), filter 150ms ease, box-shadow 180ms ease;
 }
 
-html[data-ui-theme="material-you"] .glass-surface input:not([type="range"]):not([type="color"]),
+html[data-ui-theme="material-you"] button.bg-pulse:hover:not(:disabled),
+html[data-ui-theme="material-you"] a.bg-pulse:hover,
+html[data-ui-theme="material-you"] label.bg-pulse:hover {
+  box-shadow: 0 6px 18px -6px rgba(var(--md-sys-color-primary-rgb), 0.52);
+}
+
+/* Material 3 State-Layer Hover & Press for Tonal / Outlined Interactive Buttons */
+html[data-ui-theme="material-you"] .glass-surface button:not(.bg-pulse):not([data-theme-preview] *):not([role="tab"]):not(:disabled):hover {
+  background-image: linear-gradient(
+    0deg,
+    rgba(var(--md-sys-color-on-surface-rgb), 0.08),
+    rgba(var(--md-sys-color-on-surface-rgb), 0.08)
+  );
+}
+
+html[data-ui-theme="material-you"] .glass-surface button:not(.bg-pulse):not([data-theme-preview] *):not([role="tab"]):not(:disabled):active {
+  background-image: linear-gradient(
+    0deg,
+    rgba(var(--md-sys-color-on-surface-rgb), 0.13),
+    rgba(var(--md-sys-color-on-surface-rgb), 0.13)
+  );
+}
+
+/* Authentic M3 Pill Switches (role="switch") */
+html[data-ui-theme="material-you"] button[role="switch"] {
+  border-radius: 9999px;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 140ms ease;
+}
+
+html[data-ui-theme="material-you"] button[role="switch"][aria-checked="false"] {
+  background-color: var(--md-sys-color-surface-container-highest);
+  border-color: var(--md-sys-color-outline);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+/* Material 3 Filled Tonal Input Fields */
+html[data-ui-theme="material-you"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]),
 html[data-ui-theme="material-you"] .glass-surface select,
 html[data-ui-theme="material-you"] .glass-surface textarea {
-  background-color: rgba(var(--ip-accent-rgb), 0.06);
-  border-color: rgba(var(--ip-accent-rgb), 0.2);
+  background-color: var(--md-sys-color-surface-container-highest);
+  border-color: var(--md-sys-color-outline-variant);
+  color: var(--md-sys-color-on-surface);
   border-radius: 1rem;
   backdrop-filter: none;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
 }
 
-html[data-ui-theme="material-you"] .glass-surface input:not([type="range"]):not([type="color"]):focus,
+html[data-ui-theme="material-you"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]):focus,
 html[data-ui-theme="material-you"] .glass-surface select:focus,
 html[data-ui-theme="material-you"] .glass-surface textarea:focus {
-  border-color: var(--ip-accent);
-  background-color: rgba(var(--ip-accent-rgb), 0.09);
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 2px rgba(var(--md-sys-color-primary-rgb), 0.22);
+}
+
+/* Expressive M3 Tonal Range Slider Track */
+html[data-ui-theme="material-you"] input[type="range"] {
+  accent-color: var(--md-sys-color-primary);
 }
 
 /* ============================================================================
    Theme 5: AeroGlass (Modern Windows Vista / 7 Glossy Translucent Glass)
    ============================================================================ */
 html[data-ui-theme="aeroglass"] body {
+  background-color: #06101B;
   background-image:
     radial-gradient(
       ellipse 95% 60% at 18% -10%,
-      rgba(56, 189, 248, 0.24),
-      rgba(14, 165, 233, 0.06) 52%,
+      rgba(56, 189, 248, 0.2),
+      rgba(14, 165, 233, 0.05) 52%,
       transparent 78%
     ),
-    radial-gradient(
-      ellipse 80% 55% at 88% 12%,
-      rgba(125, 211, 252, 0.16),
-      transparent 72%
-    ),
     linear-gradient(180deg, #071525 0%, #06101B 48%, #040B14 100%);
-  background-attachment: fixed;
 }
 
 html[data-ui-theme="aeroglass"] .glass-surface {
@@ -475,7 +660,6 @@ html[data-ui-theme="aeroglass"] button.bg-pulse {
     rgba(0, 0, 0, 0.08) 50%,
     rgba(255, 255, 255, 0.12) 100%
   );
-  border-radius: 0.75rem;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 -1px 0 rgba(0, 0, 0, 0.22),
@@ -483,7 +667,11 @@ html[data-ui-theme="aeroglass"] button.bg-pulse {
     0 0 0 1px rgba(255, 255, 255, 0.24);
 }
 
-html[data-ui-theme="aeroglass"] .glass-surface input:not([type="range"]):not([type="color"]),
+html[data-ui-theme="aeroglass"] button.bg-pulse:not(.rounded-full) {
+  border-radius: 0.75rem;
+}
+
+html[data-ui-theme="aeroglass"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]),
 html[data-ui-theme="aeroglass"] .glass-surface select,
 html[data-ui-theme="aeroglass"] .glass-surface textarea {
   background-color: rgba(7, 20, 35, 0.56);
@@ -493,7 +681,7 @@ html[data-ui-theme="aeroglass"] .glass-surface textarea {
   backdrop-filter: blur(12px);
 }
 
-html[data-ui-theme="aeroglass"] .glass-surface input:not([type="range"]):not([type="color"]):focus,
+html[data-ui-theme="aeroglass"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]):focus,
 html[data-ui-theme="aeroglass"] .glass-surface select:focus,
 html[data-ui-theme="aeroglass"] .glass-surface textarea:focus {
   border-color: rgba(125, 211, 252, 0.75);
@@ -504,6 +692,6 @@ html[data-ui-theme="aeroglass"] .glass-surface textarea:focus {
 
 select option,
 select optgroup {
-  background-color: #13161C;
-  color: #F4F5F7;
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
 }

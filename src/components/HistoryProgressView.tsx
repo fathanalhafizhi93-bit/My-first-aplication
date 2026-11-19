@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   CalendarDays,
   ChevronLeft,
@@ -46,13 +46,18 @@ function getLogStats(log: WorkoutLog) {
 
   for (const entry of log.entries) {
     const mode = resolveExerciseTrackingMode(entry);
+    const usesWeight = resolveExerciseUsesWeight({
+      usesWeight: entry.usesWeight,
+      trackingMode: mode,
+      targetWeightKg: entry.sets[0]?.weightKg ?? 0,
+    });
     for (const set of entry.sets) {
       totalSets += 1;
       if (set.completed) {
         completedSets += 1;
         if (mode === 'timer') {
           totalTimedSeconds += Math.max(0, set.durationSeconds || 0);
-        } else {
+        } else if (usesWeight) {
           totalVolume += Math.max(0, set.weightKg) * Math.max(0, set.reps);
         }
       }
@@ -85,6 +90,15 @@ export function HistoryProgressView({
     () => new Date(today.getFullYear(), today.getMonth(), 1)
   );
   const [selectedDateKey, setSelectedDateKey] = useState<string>(todayKey);
+  const prevTodayKeyRef = useRef<string>(todayKey);
+
+  useEffect(() => {
+    if (prevTodayKeyRef.current !== todayKey) {
+      const oldToday = prevTodayKeyRef.current;
+      prevTodayKeyRef.current = todayKey;
+      setSelectedDateKey((curr) => (curr === oldToday ? todayKey : curr));
+    }
+  }, [todayKey]);
 
   const monthFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }),
@@ -278,7 +292,7 @@ export function HistoryProgressView({
       </div>
 
       {/* Monthly Interactive Calendar */}
-      <section className="glass-surface rounded-2xl border border-white/12 p-5">
+      <section className="glass-surface rounded-2xl border border-white/12 p-3.5 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
           <h2 className="font-display text-xl font-bold capitalize text-[#F4F5F7]">
             {monthFormatter.format(viewMonthDate)}
@@ -314,7 +328,7 @@ export function HistoryProgressView({
         </div>
 
         {/* Day Labels (MON - SUN) */}
-        <div className="mt-4 grid grid-cols-7 gap-1.5 text-center">
+        <div className="mt-4 grid grid-cols-7 gap-1 text-center sm:gap-1.5">
           {DAY_LIST.map((d) => (
             <div
               key={d.key}
@@ -326,7 +340,7 @@ export function HistoryProgressView({
         </div>
 
         {/* Calendar Grid */}
-        <div className="mt-1 grid grid-cols-7 gap-1.5">
+        <div className="mt-1 grid grid-cols-7 gap-1 sm:gap-1.5">
           {calendarCells.map((cell) => {
             if (!cell.dateKey || cell.dayNumber === null) {
               return <div key={cell.key} className="min-h-[46px]" />;
@@ -406,7 +420,7 @@ export function HistoryProgressView({
           </div>
 
           {selectedLog && selectedLogStats && (
-            <div className="text-right font-mono text-xs tabular-nums">
+            <div className="font-mono text-xs tabular-nums sm:text-right">
               <p className="font-bold text-[#F4F5F7]">
                 {selectedLogStats.completedSets}/{selectedLogStats.totalSets}{' '}
                 {t('Set Selesai', 'Sets Done')}
@@ -446,8 +460,8 @@ export function HistoryProgressView({
                 return (
                   <li key={entry.exerciseId} className="py-3 first:pt-1 last:pb-0">
                     <div className="flex items-baseline justify-between gap-3">
-                      <p className="text-sm font-bold text-[#F4F5F7]">{entry.name}</p>
-                      <span className="font-mono text-xs text-[#9CA3AF] tabular-nums">
+                      <p className="min-w-0 truncate text-sm font-bold text-[#F4F5F7]">{entry.name}</p>
+                      <span className="shrink-0 whitespace-nowrap font-mono text-xs text-[#9CA3AF] tabular-nums">
                         {doneSets.length}/{entry.sets.length} {t('set', 'sets')} · {muscleLabel}
                       </span>
                     </div>

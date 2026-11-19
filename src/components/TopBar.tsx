@@ -44,11 +44,11 @@ export function TopBar({
 
   return (
     <header
-      className={`glass-bar sticky top-0 z-30 border-b transition-colors duration-500 ${
+      className={`glass-bar sticky top-0 z-30 border-b pt-[env(safe-area-inset-top)] transition-colors duration-500 ${
         isAero
           ? 'border-sky-200/30'
           : isMaterialYou
-            ? 'border-pulse/15'
+            ? 'border-md-outline-variant'
             : isFrosted
               ? 'border-white/15'
               : isCarbon
@@ -57,13 +57,27 @@ export function TopBar({
       }`}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:gap-8 lg:px-8">
-        {/* Zone 1: Single-line brand wordmark */}
+        {/* Zone 1: Single-line dual-tone brand wordmark */}
         <button
           type="button"
           onClick={() => onSelectTab('today')}
-          className="font-display text-2xl font-extrabold tracking-tight text-[#F4F5F7] transition-transform active:scale-95 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-pulse"
+          className="group inline-flex items-baseline font-display text-[1.55rem] font-extrabold tracking-[-0.03em] transition-transform duration-150 active:scale-95 whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-pulse"
         >
-          IronPulse
+          <span className="bg-gradient-to-b from-white via-[#F4F5F7] to-[#CBD5E1] bg-clip-text text-transparent">
+            Iron
+          </span>
+          <span
+            className="relative text-pulse transition-all duration-200 group-hover:brightness-110"
+            style={{
+              textShadow: '0 0 18px rgba(var(--ip-accent-rgb), 0.32)',
+            }}
+          >
+            Pulse
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 -bottom-0.5 h-[2px] origin-left scale-x-0 rounded-full bg-pulse transition-transform duration-200 group-hover:scale-x-100"
+            />
+          </span>
         </button>
 
         {/* Zone 2: 5 core single-line workspace nav links */}
@@ -72,7 +86,7 @@ export function TopBar({
             isAero
               ? 'gap-1.5 rounded-xl border border-sky-200/25 bg-white/[0.06] px-1.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.34)]'
               : isMaterialYou
-                ? 'gap-1.5 rounded-full bg-pulse/[0.06] px-1.5 py-1'
+                ? 'gap-1 rounded-full border border-md-outline-variant bg-md-surface-container px-1.5 py-1'
                 : isFrosted
                   ? 'gap-2 rounded-full border border-white/12 bg-white/[0.04] px-2 py-1'
                   : 'gap-5 lg:gap-7'
@@ -88,7 +102,7 @@ export function TopBar({
                 key={item.id}
                 type="button"
                 onClick={() => onSelectTab(item.id)}
-                className={`relative whitespace-nowrap shrink-0 text-sm transition-colors duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-pulse ${
+                className={`relative isolate whitespace-nowrap shrink-0 text-sm transition-colors duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-pulse ${
                   isCarbon || isMaterialYou || isAero ? 'font-semibold tracking-wide' : 'font-medium'
                 } ${
                   isAero
@@ -98,32 +112,36 @@ export function TopBar({
                       : 'py-2'
                 } ${
                   isActive
-                    ? 'text-pulse'
-                    : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+                    ? isMaterialYou
+                      ? 'text-md-on-secondary-container'
+                      : 'text-pulse'
+                    : isMaterialYou
+                      ? 'text-md-on-surface-variant hover:text-md-on-surface'
+                      : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
                 }`}
               >
                 {isActive && isAero && (
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'desktop-nav-aero-pill'}
                     transition={TAB_INDICATOR_SPRING}
-                    className="absolute inset-0 -z-10 rounded-lg border border-sky-200/40 bg-gradient-to-b from-white/22 via-white/10 to-sky-400/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_2px_10px_rgba(56,189,248,0.22)]"
+                    className="pointer-events-none absolute inset-0 z-0 rounded-lg border border-sky-200/40 bg-gradient-to-b from-white/22 via-white/10 to-sky-400/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_2px_10px_rgba(56,189,248,0.22)]"
                   />
                 )}
                 {isActive && isMaterialYou && (
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'desktop-nav-m3-pill'}
                     transition={TAB_INDICATOR_SPRING}
-                    className="absolute inset-0 -z-10 rounded-full bg-pulse/18 border border-pulse/28"
+                    className="pointer-events-none absolute inset-0 z-0 rounded-full bg-md-secondary-container"
                   />
                 )}
                 {isActive && isFrosted && (
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'desktop-nav-capsule'}
                     transition={TAB_INDICATOR_SPRING}
-                    className="absolute inset-0 -z-10 rounded-full border border-white/20 bg-white/[0.11] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+                    className="pointer-events-none absolute inset-0 z-0 rounded-full border border-white/20 bg-white/[0.11] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
                   />
                 )}
-                {item.label}
+                <span className="relative z-10">{item.label}</span>
                 {isActive && !isFrosted && !isMaterialYou && !isAero && (
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'desktop-nav-underline'}
@@ -151,11 +169,13 @@ export function TopBar({
               isFrosted || isMaterialYou ? 'rounded-full' : isAero ? 'rounded-lg' : isCarbon ? 'rounded-md' : 'rounded-lg'
             } ${
               settingsActive
-                ? 'border-pulse/60 bg-pulse/18 text-pulse'
+                ? isMaterialYou
+                  ? 'border-md-secondary-container bg-md-secondary-container text-md-on-secondary-container'
+                  : 'border-pulse/60 bg-pulse/18 text-pulse'
                 : isAero
                   ? 'border-sky-200/32 bg-gradient-to-b from-white/18 via-white/8 to-sky-400/10 text-[#E5E7EB] shadow-[inset_0_1px_0_rgba(255,255,255,0.48)] hover:border-sky-200/55 hover:text-white'
                   : isMaterialYou
-                    ? 'border-pulse/18 bg-pulse/[0.08] text-[#D1D5DB] hover:border-pulse/35 hover:text-[#F4F5F7]'
+                    ? 'border-md-outline-variant bg-md-surface-high text-md-on-surface-variant hover:border-md-outline hover:text-md-on-surface'
                     : isFrosted
                       ? 'border-white/18 bg-white/[0.08] text-[#D1D5DB] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:border-white/30 hover:text-[#F4F5F7]'
                       : isCarbon
@@ -174,11 +194,13 @@ export function TopBar({
               isFrosted || isMaterialYou ? 'rounded-full' : isAero ? 'rounded-lg' : isCarbon ? 'rounded-md' : 'rounded-lg'
             } ${
               aboutActive
-                ? 'border-pulse/60 bg-pulse/18 text-pulse'
+                ? isMaterialYou
+                  ? 'border-md-secondary-container bg-md-secondary-container text-md-on-secondary-container'
+                  : 'border-pulse/60 bg-pulse/18 text-pulse'
                 : isAero
                   ? 'border-sky-200/32 bg-gradient-to-b from-white/18 via-white/8 to-sky-400/10 text-[#E5E7EB] shadow-[inset_0_1px_0_rgba(255,255,255,0.48)] hover:border-sky-200/55 hover:text-white'
                   : isMaterialYou
-                    ? 'border-pulse/18 bg-pulse/[0.08] text-[#D1D5DB] hover:border-pulse/35 hover:text-[#F4F5F7]'
+                    ? 'border-md-outline-variant bg-md-surface-high text-md-on-surface-variant hover:border-md-outline hover:text-md-on-surface'
                     : isFrosted
                       ? 'border-white/18 bg-white/[0.08] text-[#D1D5DB] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:border-white/30 hover:text-[#F4F5F7]'
                       : isCarbon

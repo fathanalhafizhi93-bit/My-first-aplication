@@ -38,8 +38,8 @@ const DRAG_THRESHOLD_PX = 8;
 const AUTO_BUBBLE_COOLDOWN_MS = 45_000;
 
 function getBottomSafe(): number {
-  if (typeof window === 'undefined') return 96;
-  return window.innerWidth < 768 ? 96 : 24;
+  if (typeof window === 'undefined') return 106;
+  return window.innerWidth < 768 ? 106 : 24;
 }
 
 function getSafeBounds() {
@@ -525,7 +525,7 @@ export function FloatingMascotDock({
   const bubbleSurfaceClass = isAero
     ? 'rounded-[14px] border border-sky-200/35 bg-gradient-to-b from-[#234361]/85 via-[#132940]/88 to-[#091624]/92 backdrop-blur-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.52),inset_0_0_0_1px_rgba(255,255,255,0.12),0_18px_42px_-12px_rgba(0,0,0,0.82)]'
     : isMaterialYou
-      ? 'rounded-[22px] border border-pulse/22 bg-[#1D1C24] shadow-[0_14px_34px_-12px_rgba(0,0,0,0.72)]'
+      ? 'rounded-[24px] border border-md-outline-variant bg-md-surface-high shadow-[0_14px_34px_-12px_rgba(0,0,0,0.68)]'
       : isFrosted
         ? 'rounded-[22px] border border-white/22 bg-[#101829]/82 backdrop-blur-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_20px_48px_-14px_rgba(0,0,0,0.8)]'
         : isCarbon
@@ -535,7 +535,7 @@ export function FloatingMascotDock({
   const orbBackdropClass = isAero
     ? 'bg-[#132940]/80 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.48),0_12px_30px_-8px_rgba(0,0,0,0.8)]'
     : isMaterialYou
-      ? 'bg-[#1D1C24] shadow-[0_10px_28px_-8px_rgba(0,0,0,0.75)]'
+      ? 'bg-md-surface-high ring-1 ring-md-outline-variant shadow-[0_10px_28px_-8px_rgba(0,0,0,0.72)]'
       : isFrosted
         ? 'bg-[#101829]/78 backdrop-blur-xl shadow-[0_12px_32px_-8px_rgba(0,0,0,0.78)]'
         : 'bg-[#10131B]/90 backdrop-blur-md shadow-[0_12px_30px_-8px_rgba(0,0,0,0.78)]';
@@ -635,11 +635,15 @@ export function FloatingMascotDock({
                 <span
                   aria-hidden="true"
                   className={`absolute h-2.5 w-2.5 rotate-45 ${
-                    isMaterialYou
-                      ? 'bg-[#1D1C24] border-pulse/22'
-                      : isCarbon
-                        ? 'bg-[#11141A] border-white/16'
-                        : 'bg-[#121620] border-white/15'
+                    isAero
+                      ? 'bg-[#132940] border-sky-200/35'
+                      : isFrosted
+                        ? 'bg-[#101829] border-white/22'
+                        : isMaterialYou
+                          ? 'bg-md-surface-high border-md-outline-variant'
+                          : isCarbon
+                            ? 'bg-[#11141A] border-white/16'
+                            : 'bg-[#121620] border-white/15'
                   } ${
                     dockedSide === 'right'
                       ? '-right-[6px] border-r border-t'

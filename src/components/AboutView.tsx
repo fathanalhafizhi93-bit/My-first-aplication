@@ -31,7 +31,22 @@ export function AboutView({ embeddedInModal = false }: AboutViewProps) {
           className="mt-4 font-display text-2xl font-bold leading-snug tracking-tight text-[#F4F5F7] sm:text-3xl"
           style={{ textWrap: 'balance' }}
         >
-          Yah gw di kacangin hiks hiks 😭
+          <span>Hello </span>
+          <del className="relative mx-0.5 inline-block px-0.5 text-[#9CA3AF]/75 no-underline">
+            <span>world</span>
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute -left-0.5 -right-0.5 top-1/2 h-[3px] -translate-y-1/2 -rotate-[5deg] rounded-full bg-pulse shadow-[0_0_12px_rgba(var(--ip-accent-rgb),0.65)]"
+            />
+          </del>{' '}
+          <span
+            className="text-pulse"
+            style={{
+              textShadow: '0 0 22px rgba(var(--ip-accent-rgb), 0.36)',
+            }}
+          >
+            Artificial Intelligence
+          </span>
         </p>
 
         <div className="mt-6 grid grid-cols-1 gap-4 border-t border-white/10 pt-6 sm:grid-cols-3">
