@@ -100,6 +100,7 @@ export function FloatingMascotDock({
   const isFrosted = uiTheme === 'midnight-frosted';
   const isCarbon = uiTheme === 'carbon-forge';
   const isAero = uiTheme === 'aeroglass';
+  const isYaru = uiTheme === 'ubuntu-yaru';
 
   const anchorRef = useRef<DockAnchor>(loadStoredAnchor());
   const [dockedSide, setDockedSide] = useState<'left' | 'right'>(anchorRef.current.side);
@@ -364,33 +365,31 @@ export function FloatingMascotDock({
     orbOpacity,
   ]);
 
-  // Calm automatic speech bubble: urgent events always show, routine auto-greetings obey a 45s cooldown
+  // Sync floating speech bubble cleanly whenever a new locked dialogue event fires
   useEffect(() => {
     if (flightPhase !== 'floating' || suppressed || isDragging) return;
 
     const nowTs = Date.now();
-    const cooldownElapsed = nowTs - lastAutoBubbleAtRef.current >= AUTO_BUBBLE_COOLDOWN_MS;
     const hasNewSpeech = companion.speechEventId !== lastHandledSpeechEventRef.current;
 
     if (hasNewSpeech) {
       lastHandledSpeechEventRef.current = companion.speechEventId;
       hasGreetedInFloatSessionRef.current = true;
-      if (companion.isUrgentSpeech || cooldownElapsed) {
-        lastAutoBubbleAtRef.current = nowTs;
-        openBubbleBriefly(companion.isUrgentSpeech ? 3800 : 3000);
-      }
+      lastAutoBubbleAtRef.current = nowTs;
+      openBubbleBriefly(companion.isUrgentSpeech ? 4200 : 3800);
       return;
     }
 
     if (!hasGreetedInFloatSessionRef.current) {
       hasGreetedInFloatSessionRef.current = true;
+      const cooldownElapsed = nowTs - lastAutoBubbleAtRef.current >= AUTO_BUBBLE_COOLDOWN_MS;
       if (!companion.isUrgentSpeech && !cooldownElapsed) return;
       const delayTimer = window.setTimeout(() => {
         if (flightPhaseRef.current === 'floating' && !dragStateRef.current.didDrag) {
           lastAutoBubbleAtRef.current = Date.now();
-          openBubbleBriefly(companion.isUrgentSpeech ? 3600 : 2900);
+          openBubbleBriefly(companion.isUrgentSpeech ? 3800 : 3400);
         }
-      }, 320);
+      }, 280);
       return () => window.clearTimeout(delayTimer);
     }
   }, [
@@ -512,33 +511,38 @@ export function FloatingMascotDock({
     // - If bubble is OPEN   -> cycle to a new reaction & reset brief auto-hide timer
     haptics.orbSnap();
     if (!bubbleOpen) {
-      openBubbleBriefly(4600);
+      openBubbleBriefly(4400);
     } else {
-      lastHandledSpeechEventRef.current = companion.speechEventId + 1;
       companion.triggerNextReaction();
-      openBubbleBriefly(4600);
+      openBubbleBriefly(4400);
     }
   };
 
   if (flightPhase === 'hidden') return null;
 
   const bubbleSurfaceClass = isAero
-    ? 'rounded-[14px] border border-sky-200/35 bg-gradient-to-b from-[#234361]/85 via-[#132940]/88 to-[#091624]/92 backdrop-blur-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.52),inset_0_0_0_1px_rgba(255,255,255,0.12),0_18px_42px_-12px_rgba(0,0,0,0.82)]'
+    ? 'rounded-[14px] border border-sky-200/35 bg-gradient-to-b from-[#234361]/85 via-[#132940]/88 to-[#091624]/92 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.52),inset_0_0_0_1px_rgba(255,255,255,0.12),0_18px_42px_-12px_rgba(0,0,0,0.82)]'
     : isMaterialYou
       ? 'rounded-[24px] border border-md-outline-variant bg-md-surface-high shadow-[0_14px_34px_-12px_rgba(0,0,0,0.68)]'
-      : isFrosted
-        ? 'rounded-[22px] border border-white/22 bg-[#101829]/82 backdrop-blur-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_20px_48px_-14px_rgba(0,0,0,0.8)]'
-        : isCarbon
-          ? 'rounded-xl border border-white/16 bg-[#11141A]/96 shadow-[0_16px_36px_-14px_rgba(0,0,0,0.86)]'
-          : 'rounded-2xl border border-white/15 bg-[#121620]/90 backdrop-blur-xl shadow-[0_18px_42px_-14px_rgba(0,0,0,0.78)]';
+      : isYaru
+        ? 'rounded-xl border border-white/12 bg-[#2C2C2C] shadow-[0_4px_14px_rgba(0,0,0,0.38)]'
+        : isFrosted
+          ? 'rounded-[22px] border border-white/22 bg-[#101829]/82 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_20px_48px_-14px_rgba(0,0,0,0.8)]'
+          : isCarbon
+            ? 'rounded-xl border border-white/16 bg-[#11141A]/96 shadow-[0_16px_36px_-14px_rgba(0,0,0,0.86)]'
+            : 'rounded-2xl border border-white/15 bg-[#121620]/88 backdrop-blur-md shadow-[0_18px_42px_-14px_rgba(0,0,0,0.78)]';
 
   const orbBackdropClass = isAero
-    ? 'bg-[#132940]/80 backdrop-blur-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.48),0_12px_30px_-8px_rgba(0,0,0,0.8)]'
+    ? 'bg-[#132940]/80 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.48),0_12px_30px_-8px_rgba(0,0,0,0.8)]'
     : isMaterialYou
       ? 'bg-md-surface-high ring-1 ring-md-outline-variant shadow-[0_10px_28px_-8px_rgba(0,0,0,0.72)]'
-      : isFrosted
-        ? 'bg-[#101829]/78 backdrop-blur-xl shadow-[0_12px_32px_-8px_rgba(0,0,0,0.78)]'
-        : 'bg-[#10131B]/90 backdrop-blur-md shadow-[0_12px_30px_-8px_rgba(0,0,0,0.78)]';
+      : isYaru
+        ? 'bg-[#2C2C2C] ring-1 ring-white/14 shadow-[0_4px_12px_rgba(0,0,0,0.38)]'
+        : isFrosted
+          ? 'bg-[#101829]/78 backdrop-blur-md shadow-[0_12px_32px_-8px_rgba(0,0,0,0.78)]'
+          : isCarbon
+            ? 'bg-[#12151B] ring-1 ring-white/14 shadow-[0_12px_30px_-8px_rgba(0,0,0,0.85)]'
+            : 'bg-[#10131B]/88 backdrop-blur-md shadow-[0_12px_30px_-8px_rgba(0,0,0,0.78)]';
 
   return (
     <ModalPortal>

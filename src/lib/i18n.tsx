@@ -12,15 +12,18 @@ export type UiTheme =
   | 'midnight-frosted'
   | 'carbon-forge'
   | 'material-you'
-  | 'aeroglass';
+  | 'aeroglass'
+  | 'ubuntu-yaru';
 
 export const DEFAULT_ACCENT_COLOR = '#C8FF2E';
+export const YARU_ORANGE_ACCENT = '#E95420';
 export const DEFAULT_MATERIAL_TINT_BY_THEME: Record<UiTheme, string> = {
   obsidian: '#161A23',
   'midnight-frosted': '#162238',
   'carbon-forge': '#12151B',
   'material-you': '#1C1B22',
   aeroglass: '#1B334B',
+  'ubuntu-yaru': '#2C2C2C',
 };
 
 export interface ColorPresetOption {
@@ -39,11 +42,13 @@ export const ACCENT_COLOR_PRESETS: ColorPresetOption[] = [
   { id: 'emerald', hex: '#34D399', labelId: 'Hijau Sage', labelEn: 'Forest Sage' },
   { id: 'teal', hex: '#2DD4BF', labelId: 'Teal Samudra', labelEn: 'Ocean Teal' },
   { id: 'coral', hex: '#FB923C', labelId: 'Terakota', labelEn: 'Terracotta Clay' },
+  { id: 'yaru-orange', hex: '#E95420', labelId: 'Oranye Yaru', labelEn: 'Yaru Orange' },
 ];
 
 export const MATERIAL_TINT_PRESETS: ColorPresetOption[] = [
   { id: 'slate', hex: '#161A23', labelId: 'Obsidian Slate', labelEn: 'Obsidian Slate' },
   { id: 'gunmetal', hex: '#12151B', labelId: 'Carbon Gunmetal', labelEn: 'Carbon Gunmetal' },
+  { id: 'yaru-dark', hex: '#2C2C2C', labelId: 'Yaru Charcoal', labelEn: 'Yaru Charcoal' },
   { id: 'sapphire', hex: '#162238', labelId: 'Midnight Sapphire', labelEn: 'Midnight Sapphire' },
   { id: 'violet', hex: '#23163D', labelId: 'Deep Violet', labelEn: 'Deep Violet' },
   { id: 'emerald', hex: '#112922', labelId: 'Smoked Emerald', labelEn: 'Smoked Emerald' },
@@ -58,6 +63,25 @@ const TIME_THEME_STORAGE_KEY = 'ironpulse_today_theme_mode';
 const UI_THEME_STORAGE_KEY = 'ironpulse_ui_theme';
 const ACCENT_COLOR_STORAGE_KEY = 'ironpulse_accent_color';
 const MATERIAL_TINT_STORAGE_KEY = 'ironpulse_material_tint';
+const PRE_YARU_ACCENT_STORAGE_KEY = 'ironpulse_pre_yaru_accent';
+const PRE_YARU_TINT_STORAGE_KEY = 'ironpulse_pre_yaru_tint';
+const PERF_PREFS_STORAGE_KEY = 'ironpulse_perf_prefs';
+
+export interface PerformancePreferences {
+  noBlur: boolean;
+  noAnimations: boolean;
+  noAmbientGlow: boolean;
+  staticMascot: boolean;
+}
+
+export type PerformancePresetId = 'balanced' | 'battery' | 'ultra';
+
+export const DEFAULT_PERFORMANCE_PREFS: PerformancePreferences = {
+  noBlur: false,
+  noAnimations: false,
+  noAmbientGlow: false,
+  staticMascot: false,
+};
 
 function normalizeHex(hex: string, fallback: string): string {
   const cleaned = (hex || '').trim();
@@ -135,6 +159,7 @@ export function getStoredUiTheme(): UiTheme {
     if (val === 'carbon-forge') return 'carbon-forge';
     if (val === 'material-you') return 'material-you';
     if (val === 'aeroglass') return 'aeroglass';
+    if (val === 'ubuntu-yaru') return 'ubuntu-yaru';
     return 'material-you';
   } catch {
     return 'material-you';
@@ -156,6 +181,47 @@ export function getStoredMaterialTintColor(): string | null {
     return val && /^#[0-9A-Fa-f]{6}$/.test(val) ? val.toUpperCase() : null;
   } catch {
     return null;
+  }
+}
+
+export function getStoredPerformancePreferences(): PerformancePreferences {
+  try {
+    const raw = localStorage.getItem(PERF_PREFS_STORAGE_KEY);
+    if (!raw) return DEFAULT_PERFORMANCE_PREFS;
+    const parsed = JSON.parse(raw) as Partial<PerformancePreferences>;
+    return {
+      noBlur: Boolean(parsed.noBlur),
+      noAnimations: Boolean(parsed.noAnimations),
+      noAmbientGlow: Boolean(parsed.noAmbientGlow),
+      staticMascot: Boolean(parsed.staticMascot),
+    };
+  } catch {
+    return DEFAULT_PERFORMANCE_PREFS;
+  }
+}
+
+export function applyPerformanceTokensToDocument(prefs: PerformancePreferences): void {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  if (prefs.noBlur) {
+    root.dataset.perfNoBlur = 'true';
+  } else {
+    delete root.dataset.perfNoBlur;
+  }
+  if (prefs.noAnimations) {
+    root.dataset.perfNoAnim = 'true';
+  } else {
+    delete root.dataset.perfNoAnim;
+  }
+  if (prefs.noAmbientGlow) {
+    root.dataset.perfNoGlow = 'true';
+  } else {
+    delete root.dataset.perfNoGlow;
+  }
+  if (prefs.staticMascot) {
+    root.dataset.perfStaticMascot = 'true';
+  } else {
+    delete root.dataset.perfStaticMascot;
   }
 }
 
@@ -222,13 +288,15 @@ export function applyThemeTokensToDocument(
   const canvasBg =
     uiTheme === 'material-you'
       ? palette.surface
-      : uiTheme === 'midnight-frosted'
-        ? '#05070C'
-        : uiTheme === 'carbon-forge'
-          ? '#07080A'
-          : uiTheme === 'aeroglass'
-            ? '#06101B'
-            : '#0A0B0E';
+      : uiTheme === 'ubuntu-yaru'
+        ? '#1E1E1E'
+        : uiTheme === 'midnight-frosted'
+          ? '#05070C'
+          : uiTheme === 'carbon-forge'
+            ? '#07080A'
+            : uiTheme === 'aeroglass'
+              ? '#06101B'
+              : '#0A0B0E';
   root.style.setProperty('--ip-canvas-bg', canvasBg);
 
   const themeColorMeta = document.querySelector('meta[name="theme-color"]');
@@ -239,13 +307,14 @@ export function applyThemeTokensToDocument(
   return palette;
 }
 
-// Synchronously apply stored visual tokens before initial React render to prevent theme flash
+// Synchronously apply stored visual & performance tokens before initial React render to prevent flash
 if (typeof document !== 'undefined') {
   applyThemeTokensToDocument(
     getStoredUiTheme(),
     getStoredAccentColor(),
     getStoredMaterialTintColor()
   );
+  applyPerformanceTokensToDocument(getStoredPerformancePreferences());
 }
 
 export function resolveDayTimePhase(mode: DayTimeMode, now: Date = new Date()): DayTimePhase {
@@ -366,6 +435,9 @@ interface I18nContextValue {
   materialPalette: MaterialYouPalette;
   setMaterialTintColor: (hex: string | null) => void;
   resetThemeCustomization: () => void;
+  performance: PerformancePreferences;
+  setPerformance: (patch: Partial<PerformancePreferences>) => void;
+  applyPerformancePreset: (preset: PerformancePresetId) => void;
   hapticsEnabled: boolean;
   setHapticsEnabled: (enabled: boolean) => void;
   t: <T>(idText: T, enText: T) => T;
@@ -389,6 +461,9 @@ const I18nContext = createContext<I18nContextValue>({
   materialPalette: DEFAULT_MATERIAL_PALETTE,
   setMaterialTintColor: () => {},
   resetThemeCustomization: () => {},
+  performance: DEFAULT_PERFORMANCE_PREFS,
+  setPerformance: () => {},
+  applyPerformancePreset: () => {},
   hapticsEnabled: true,
   setHapticsEnabled: () => {},
   t: (idText) => idText,
@@ -402,6 +477,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [accentColor, setAccentColorState] = useState<string>(getStoredAccentColor);
   const [materialTintColor, setMaterialTintColorState] = useState<string | null>(
     getStoredMaterialTintColor
+  );
+  const [performance, setPerformanceState] = useState<PerformancePreferences>(
+    getStoredPerformancePreferences
   );
   const [hapticsEnabled, setHapticsEnabledState] = useState<boolean>(getStoredHapticsEnabled);
 
@@ -419,6 +497,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyThemeTokensToDocument(uiTheme, accentColor, materialTintColor);
   }, [uiTheme, accentColor, materialTintColor]);
+
+  useEffect(() => {
+    applyPerformanceTokensToDocument(performance);
+  }, [performance]);
 
   const setLang = useCallback((next: AppLanguage) => {
     setLangState(next);
@@ -441,15 +523,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const setTodayThemeMode = useCallback((next: DayTimeMode) => {
     setTodayThemeModeState(next);
     saveStoredDayTimeMode(next);
-  }, []);
-
-  const setUiTheme = useCallback((next: UiTheme) => {
-    setUiThemeState(next);
-    try {
-      localStorage.setItem(UI_THEME_STORAGE_KEY, next);
-    } catch {
-      // ignore storage errors
-    }
   }, []);
 
   const setAccentColor = useCallback((next: string) => {
@@ -481,10 +554,95 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setUiTheme = useCallback(
+    (next: UiTheme) => {
+      if (next === uiTheme) return;
+
+      if (next === 'ubuntu-yaru' && uiTheme !== 'ubuntu-yaru') {
+        try {
+          localStorage.setItem(PRE_YARU_ACCENT_STORAGE_KEY, accentColor);
+          localStorage.setItem(
+            PRE_YARU_TINT_STORAGE_KEY,
+            materialTintColor === null ? '__AUTO__' : materialTintColor
+          );
+        } catch {
+          // ignore storage errors
+        }
+        setAccentColor(YARU_ORANGE_ACCENT);
+        setMaterialTintColor(null);
+      } else if (uiTheme === 'ubuntu-yaru' && next !== 'ubuntu-yaru') {
+        let savedAccent: string | null = null;
+        let savedTint: string | null = null;
+        try {
+          savedAccent = localStorage.getItem(PRE_YARU_ACCENT_STORAGE_KEY);
+          savedTint = localStorage.getItem(PRE_YARU_TINT_STORAGE_KEY);
+          localStorage.removeItem(PRE_YARU_ACCENT_STORAGE_KEY);
+          localStorage.removeItem(PRE_YARU_TINT_STORAGE_KEY);
+        } catch {
+          // ignore storage errors
+        }
+
+        if (accentColor.toUpperCase() === YARU_ORANGE_ACCENT.toUpperCase()) {
+          setAccentColor(
+            savedAccent ? normalizeHex(savedAccent, DEFAULT_ACCENT_COLOR) : DEFAULT_ACCENT_COLOR
+          );
+        }
+        if (materialTintColor === null && savedTint) {
+          setMaterialTintColor(
+            savedTint === '__AUTO__'
+              ? null
+              : normalizeHex(savedTint, DEFAULT_MATERIAL_TINT_BY_THEME[next])
+          );
+        }
+      }
+
+      setUiThemeState(next);
+      try {
+        localStorage.setItem(UI_THEME_STORAGE_KEY, next);
+      } catch {
+        // ignore storage errors
+      }
+    },
+    [uiTheme, accentColor, materialTintColor, setAccentColor, setMaterialTintColor]
+  );
+
   const resetThemeCustomization = useCallback(() => {
-    setAccentColor(DEFAULT_ACCENT_COLOR);
+    try {
+      localStorage.removeItem(PRE_YARU_ACCENT_STORAGE_KEY);
+      localStorage.removeItem(PRE_YARU_TINT_STORAGE_KEY);
+    } catch {
+      // ignore storage errors
+    }
+    setAccentColor(uiTheme === 'ubuntu-yaru' ? YARU_ORANGE_ACCENT : DEFAULT_ACCENT_COLOR);
     setMaterialTintColor(null);
-  }, [setAccentColor, setMaterialTintColor]);
+  }, [uiTheme, setAccentColor, setMaterialTintColor]);
+
+  const setPerformance = useCallback((patch: Partial<PerformancePreferences>) => {
+    setPerformanceState((prev) => {
+      const next: PerformancePreferences = { ...prev, ...patch };
+      try {
+        localStorage.setItem(PERF_PREFS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // ignore storage errors
+      }
+      return next;
+    });
+  }, []);
+
+  const applyPerformancePreset = useCallback((preset: PerformancePresetId) => {
+    const next: PerformancePreferences =
+      preset === 'ultra'
+        ? { noBlur: true, noAnimations: true, noAmbientGlow: true, staticMascot: true }
+        : preset === 'battery'
+          ? { noBlur: true, noAnimations: false, noAmbientGlow: true, staticMascot: false }
+          : DEFAULT_PERFORMANCE_PREFS;
+    setPerformanceState(next);
+    try {
+      localStorage.setItem(PERF_PREFS_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // ignore storage errors
+    }
+  }, []);
 
   const setHapticsEnabled = useCallback((enabled: boolean) => {
     setHapticsEnabledState(enabled);
@@ -514,6 +672,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         materialPalette,
         setMaterialTintColor,
         resetThemeCustomization,
+        performance,
+        setPerformance,
+        applyPerformancePreset,
         hapticsEnabled,
         setHapticsEnabled,
         t,

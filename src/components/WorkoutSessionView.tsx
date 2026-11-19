@@ -32,11 +32,7 @@ import {
   resolveDayTimePhase,
   useI18n,
 } from '../lib/i18n';
-import {
-  resolveCardRadiusPx,
-  SHARED_IDS,
-  SHARED_LAYOUT_SPRING,
-} from '../lib/motionTokens';
+import { resolveCardRadiusPx } from '../lib/motionTokens';
 import {
   DayKey,
   DaySchedule,
@@ -1248,16 +1244,11 @@ export function WorkoutSessionView({
             <p className="text-xs font-medium text-[#9CA3AF]">
               {dayLabel} · {t('Sesi Latihan Aktif', 'Active Workout Session')}
             </p>
-            <motion.h1
-              layout={prefersReducedMotion ? false : 'position'}
-              layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutTitle}
-              transition={SHARED_LAYOUT_SPRING}
-              className="mt-0.5 font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F4F5F7]"
-            >
+            <h1 className="mt-0.5 font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
               {activeSchedule.isGymDay
                 ? activeSchedule.focusTitle
                 : `${dayLabel} — ${t('Hari Istirahat', 'Rest Day')}`}
-            </motion.h1>
+            </h1>
           </div>
 
           {/* Quick Rest Launcher (Desktop & Mobile) when Floating Bar is Hidden */}
@@ -1282,10 +1273,7 @@ export function WorkoutSessionView({
         </div>
 
         {activeSchedule.isGymDay && totalSets > 0 && (
-          <motion.div
-            layout={!prefersReducedMotion}
-            layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutProgress}
-            transition={SHARED_LAYOUT_SPRING}
+          <div
             style={{ borderRadius: 9999 }}
             className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10"
           >
@@ -1295,7 +1283,7 @@ export function WorkoutSessionView({
               }`}
               style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressPct / 100))})` }}
             />
-          </motion.div>
+          </div>
         )}
       </section>
 

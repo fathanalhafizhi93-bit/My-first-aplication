@@ -1,33 +1,13 @@
 import { UiTheme } from './i18n';
 
-export const SHARED_LAYOUT_SPRING = {
-  type: 'spring' as const,
-  stiffness: 310,
-  damping: 27,
-  mass: 0.85,
-};
-
 export const TAB_INDICATOR_SPRING = {
   type: 'spring' as const,
-  stiffness: 410,
-  damping: 28,
-  mass: 0.78,
-};
-
-export const TAB_GLIDE_SPRING = {
-  type: 'spring' as const,
-  stiffness: 350,
+  stiffness: 420,
   damping: 30,
-  mass: 0.82,
+  mass: 0.72,
 };
 
 export const SHARED_IDS = {
-  workoutHeroCard: 'shared-workout-hero-card',
-  workoutTitle: 'shared-workout-title',
-  workoutProgress: 'shared-workout-progress',
-  restTimerCard: 'shared-rest-timer-card',
-  restTimerDigits: 'shared-rest-timer-digits',
-  pageAccentBar: 'shared-page-accent-bar',
   exerciseDayPill: 'exercise-day-pill',
   settingsSubTabPill: 'settings-subtab-pill',
 } as const;
@@ -40,6 +20,8 @@ export function resolveCardRadiusPx(uiTheme: UiTheme): number {
       return 24;
     case 'aeroglass':
       return 14;
+    case 'ubuntu-yaru':
+      return 12;
     case 'carbon-forge':
       return 10;
     default:

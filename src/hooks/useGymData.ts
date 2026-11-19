@@ -533,6 +533,33 @@ export function useGymData() {
     [schedules, updateSchedule]
   );
 
+  const addExercisesToDay = useCallback(
+    async (dayKey: DayKey, exercises: Array<Omit<ExerciseItem, 'id'>>) => {
+      if (!schedules || exercises.length === 0) return;
+      const current = schedules[dayKey];
+      if (!current) return;
+      if (current.exercises.length + exercises.length > 30) {
+        const remaining = Math.max(0, 30 - current.exercises.length);
+        throw new Error(
+          remaining === 0
+            ? 'Jadwal hari ini sudah penuh (maksimal 30 gerakan).'
+            : `Maksimal 30 gerakan per hari. Tersisa ${remaining} slot gerakan.`
+        );
+      }
+      const baseTs = Date.now();
+      const newItems = exercises.map((ex, idx) =>
+        sanitizeExerciseItem({
+          ...ex,
+          id: `ex_${baseTs}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
+        })
+      );
+      await updateSchedule(dayKey, {
+        exercises: [...current.exercises, ...newItems],
+      });
+    },
+    [schedules, updateSchedule]
+  );
+
   const updateExerciseInDay = useCallback(
     async (dayKey: DayKey, exerciseId: string, patch: Partial<ExerciseItem>) => {
       if (!schedules) return;
@@ -894,6 +921,7 @@ export function useGymData() {
     updateProfile,
     updateSchedule,
     addExerciseToDay,
+    addExercisesToDay,
     updateExerciseInDay,
     removeExerciseFromDay,
     moveExerciseInDay,

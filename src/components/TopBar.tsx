@@ -30,13 +30,13 @@ export function TopBar({
   const isCarbon = uiTheme === 'carbon-forge';
   const isMaterialYou = uiTheme === 'material-you';
   const isAero = uiTheme === 'aeroglass';
+  const isYaru = uiTheme === 'ubuntu-yaru';
 
   const navItems: { id: AppTab; label: string }[] = [
     { id: 'today', label: t('Hari Ini', 'Today') },
     { id: 'schedule', label: t('Jadwal', 'Schedule') },
     { id: 'history', label: t('Riwayat', 'History') },
     { id: 'exercises', label: t('Gerakan', 'Exercises') },
-    { id: 'ringtones', label: t('Ringtone', 'Ringtones') },
   ];
 
   const settingsActive = activeTab === 'settings' && activePopup === null;
@@ -44,16 +44,18 @@ export function TopBar({
 
   return (
     <header
-      className={`glass-bar sticky top-0 z-30 border-b pt-[env(safe-area-inset-top)] transition-colors duration-500 ${
+      className={`glass-bar sticky top-0 z-30 border-b pt-[env(safe-area-inset-top)] transition-colors duration-300 ${
         isAero
           ? 'border-sky-200/30'
           : isMaterialYou
             ? 'border-md-outline-variant'
-            : isFrosted
-              ? 'border-white/15'
-              : isCarbon
-                ? 'border-white/12'
-                : phaseToken.headerTint
+            : isYaru
+              ? 'border-white/10'
+              : isFrosted
+                ? 'border-white/15'
+                : isCarbon
+                  ? 'border-white/12'
+                  : phaseToken.headerTint
       }`}
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:gap-8 lg:px-8">
@@ -103,21 +105,29 @@ export function TopBar({
                 type="button"
                 onClick={() => onSelectTab(item.id)}
                 className={`relative isolate whitespace-nowrap shrink-0 text-sm transition-colors duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-pulse ${
-                  isCarbon || isMaterialYou || isAero ? 'font-semibold tracking-wide' : 'font-medium'
+                  isCarbon || isMaterialYou || isAero || isYaru
+                    ? 'font-semibold tracking-wide'
+                    : 'font-medium'
                 } ${
                   isAero
                     ? 'rounded-lg px-3.5 py-1.5'
                     : isFrosted || isMaterialYou
                       ? 'rounded-full px-3.5 py-1.5'
-                      : 'py-2'
+                      : isYaru
+                        ? 'rounded-lg px-3 py-1.5'
+                        : 'py-2'
                 } ${
                   isActive
                     ? isMaterialYou
                       ? 'text-md-on-secondary-container'
-                      : 'text-pulse'
+                      : isYaru
+                        ? 'bg-[#353535] text-white'
+                        : 'text-pulse'
                     : isMaterialYou
                       ? 'text-md-on-surface-variant hover:text-md-on-surface'
-                      : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+                      : isYaru
+                        ? 'text-[#C0BFBC] hover:bg-[#303030] hover:text-white'
+                        : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
                 }`}
               >
                 {isActive && isAero && (
@@ -146,10 +156,12 @@ export function TopBar({
                   <motion.span
                     layoutId={prefersReducedMotion ? undefined : 'desktop-nav-underline'}
                     transition={TAB_INDICATOR_SPRING}
-                    className={`absolute inset-x-0 -bottom-[17px] bg-pulse ${
-                      isCarbon
-                        ? 'h-[2.5px] rounded-none shadow-[0_0_10px_rgba(var(--ip-accent-rgb),0.6)]'
-                        : 'h-0.5 rounded-full'
+                    className={`absolute inset-x-0 bg-pulse ${
+                      isYaru
+                        ? '-bottom-[13px] h-[2px] rounded-full'
+                        : isCarbon
+                          ? '-bottom-[17px] h-[2.5px] rounded-none shadow-[0_0_10px_rgba(var(--ip-accent-rgb),0.6)]'
+                          : '-bottom-[17px] h-0.5 rounded-full'
                     }`}
                   />
                 )}
@@ -176,11 +188,13 @@ export function TopBar({
                   ? 'border-sky-200/32 bg-gradient-to-b from-white/18 via-white/8 to-sky-400/10 text-[#E5E7EB] shadow-[inset_0_1px_0_rgba(255,255,255,0.48)] hover:border-sky-200/55 hover:text-white'
                   : isMaterialYou
                     ? 'border-md-outline-variant bg-md-surface-high text-md-on-surface-variant hover:border-md-outline hover:text-md-on-surface'
-                    : isFrosted
-                      ? 'border-white/18 bg-white/[0.08] text-[#D1D5DB] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:border-white/30 hover:text-[#F4F5F7]'
-                      : isCarbon
-                        ? 'border-white/14 bg-[#12151B]/95 text-[#9CA3AF] hover:border-white/30 hover:text-[#F4F5F7]'
-                        : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                    : isYaru
+                      ? 'border-white/12 bg-[#353535] text-[#D5D4D0] shadow-[0_1px_2px_rgba(0,0,0,0.22)] hover:border-white/25 hover:text-white'
+                      : isFrosted
+                        ? 'border-white/18 bg-white/[0.08] text-[#D1D5DB] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:border-white/30 hover:text-[#F4F5F7]'
+                        : isCarbon
+                          ? 'border-white/14 bg-[#12151B]/95 text-[#9CA3AF] hover:border-white/30 hover:text-[#F4F5F7]'
+                          : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
             }`}
           >
             <Settings className="h-4 w-4" />
@@ -201,11 +215,13 @@ export function TopBar({
                   ? 'border-sky-200/32 bg-gradient-to-b from-white/18 via-white/8 to-sky-400/10 text-[#E5E7EB] shadow-[inset_0_1px_0_rgba(255,255,255,0.48)] hover:border-sky-200/55 hover:text-white'
                   : isMaterialYou
                     ? 'border-md-outline-variant bg-md-surface-high text-md-on-surface-variant hover:border-md-outline hover:text-md-on-surface'
-                    : isFrosted
-                      ? 'border-white/18 bg-white/[0.08] text-[#D1D5DB] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:border-white/30 hover:text-[#F4F5F7]'
-                      : isCarbon
-                        ? 'border-white/14 bg-[#12151B]/95 text-[#9CA3AF] hover:border-white/30 hover:text-[#F4F5F7]'
-                        : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                    : isYaru
+                      ? 'border-white/12 bg-[#353535] text-[#D5D4D0] shadow-[0_1px_2px_rgba(0,0,0,0.22)] hover:border-white/25 hover:text-white'
+                      : isFrosted
+                        ? 'border-white/18 bg-white/[0.08] text-[#D1D5DB] shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] hover:border-white/30 hover:text-[#F4F5F7]'
+                        : isCarbon
+                          ? 'border-white/14 bg-[#12151B]/95 text-[#9CA3AF] hover:border-white/30 hover:text-[#F4F5F7]'
+                          : 'border-white/10 bg-[#13161C]/80 text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
             }`}
           >
             <Info className="h-4 w-4" />

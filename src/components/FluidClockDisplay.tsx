@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { formatClockTime } from '../lib/dateUtils';
+import { ClockFormat } from '../lib/i18n';
 
 interface FluidClockDisplayProps {
   timeText: string;
@@ -61,14 +64,14 @@ export function FluidClockDisplay({ timeText, meridiem }: FluidClockDisplayProps
               <AnimatePresence initial={false} mode="sync">
                 <motion.span
                   key={`${idx}-${char}`}
-                  initial={{ y: '46%', opacity: 0, filter: 'blur(2.5px)' }}
-                  animate={{ y: '0%', opacity: 1, filter: 'blur(0px)' }}
-                  exit={{ y: '-46%', opacity: 0, filter: 'blur(2.5px)' }}
+                  initial={{ y: '42%', opacity: 0 }}
+                  animate={{ y: '0%', opacity: 1 }}
+                  exit={{ y: '-42%', opacity: 0 }}
                   transition={{
-                    duration: 0.24,
+                    duration: 0.2,
                     ease: [0.16, 1, 0.3, 1],
                   }}
-                  className={`absolute inset-0 flex items-center justify-center will-change-transform ${
+                  className={`absolute inset-0 flex items-center justify-center ${
                     isSecondsDigit ? 'text-[#DCE3EE]' : 'text-[#F4F5F7]'
                   }`}
                 >
@@ -87,7 +90,7 @@ export function FluidClockDisplay({ timeText, meridiem }: FluidClockDisplayProps
             initial={prefersReducedMotion ? false : { opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={prefersReducedMotion ? undefined : { opacity: 0, y: -4 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className="font-mono text-xs sm:text-base lg:text-lg font-extrabold tracking-wide text-pulse"
           >
             {meridiem}
@@ -96,4 +99,18 @@ export function FluidClockDisplay({ timeText, meridiem }: FluidClockDisplayProps
       )}
     </div>
   );
+}
+
+export function LiveFluidClock({ clockFormat }: { clockFormat: ClockFormat }) {
+  const [tickNow, setTickNow] = useState<Date>(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTickNow(new Date());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const formatted = formatClockTime(tickNow, clockFormat, true);
+  return <FluidClockDisplay timeText={formatted.timeText} meridiem={formatted.meridiem} />;
 }

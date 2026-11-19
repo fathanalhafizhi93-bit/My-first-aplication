@@ -1,9 +1,7 @@
-import { motion, useReducedMotion } from 'motion/react';
 import { Bell, BellOff, ChevronRight } from 'lucide-react';
 import { BUILTIN_RINGTONES } from '../lib/audioEngine';
 import { formatAlarmTime } from '../lib/dateUtils';
 import { DAY_LABELS, useI18n } from '../lib/i18n';
-import { SHARED_IDS, TAB_INDICATOR_SPRING } from '../lib/motionTokens';
 import {
   CustomRingtone,
   DAY_LIST,
@@ -35,7 +33,6 @@ export function WeeklyScheduleView({
   onOpenExerciseManager,
 }: WeeklyScheduleViewProps) {
   const { lang, clockFormat, t } = useI18n();
-  const prefersReducedMotion = useReducedMotion();
   const activeGymDaysCount = DAY_LIST.filter((d) => schedules[d.key]?.isGymDay).length;
   const activeAlarmsCount = DAY_LIST.filter(
     (d) => schedules[d.key]?.isGymDay && schedules[d.key]?.alarmEnabled
@@ -45,9 +42,7 @@ export function WeeklyScheduleView({
     <div className="space-y-6">
       <div className="flex flex-col gap-2 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <motion.span
-            layoutId={prefersReducedMotion ? undefined : SHARED_IDS.pageAccentBar}
-            transition={TAB_INDICATOR_SPRING}
+          <span
             aria-hidden="true"
             className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
           />

@@ -51,6 +51,7 @@ export function WorkoutFloatingRestBar({
 
   const isMaterialYou = uiTheme === 'material-you';
   const isFrosted = uiTheme === 'midnight-frosted';
+  const isYaru = uiTheme === 'ubuntu-yaru';
   const secUnit = t('d', 's');
 
   useEffect(() => {
@@ -88,10 +89,12 @@ export function WorkoutFloatingRestBar({
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 6, scale: 0.98 }}
                   transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
-                  className={`mb-2 space-y-2 rounded-2xl border p-2.5 shadow-[0_16px_36px_rgba(0,0,0,0.5)] backdrop-blur-xl ${
-                    isMaterialYou
-                      ? 'border-md-outline-variant bg-md-surface-highest/98'
-                      : 'glass-surface border-white/15 bg-[#121620]/96'
+                  className={`mb-2 space-y-2 border p-2.5 ${
+                    isYaru
+                      ? 'rounded-xl border-white/12 bg-[#2C2C2C] shadow-[0_4px_14px_rgba(0,0,0,0.4)]'
+                      : isMaterialYou
+                        ? 'rounded-2xl border-md-outline-variant bg-md-surface-highest/98 shadow-[0_16px_36px_rgba(0,0,0,0.5)]'
+                        : 'glass-surface rounded-2xl border-white/15 bg-[#121620]/96 shadow-[0_16px_36px_rgba(0,0,0,0.5)] backdrop-blur-xl'
                   }`}
                 >
                   {/* Row 1: Fine Adjust (-15 / +15), Reset & Dismiss */}
@@ -187,16 +190,24 @@ export function WorkoutFloatingRestBar({
 
             {/* Compact Main Floating Rest Capsule — Guaranteed Non-Overlapping Layout */}
             <div
-              className={`flex items-center justify-between gap-2.5 rounded-[22px] border px-3 py-2 shadow-[0_18px_42px_rgba(0,0,0,0.54)] backdrop-blur-xl transition-colors ${
-                isFinished
-                  ? 'border-[#16A34A]/65 bg-[#0F1F16]/96'
-                  : isMaterialYou
-                    ? restRunning
-                      ? 'border-pulse/55 bg-md-surface-high/98'
-                      : 'border-md-outline-variant bg-md-surface-high/98'
+              className={`flex items-center justify-between gap-2.5 border px-3 py-2 transition-colors ${
+                isYaru
+                  ? isFinished
+                    ? 'rounded-xl border-[#16A34A]/65 bg-[#173021] shadow-[0_4px_14px_rgba(0,0,0,0.4)]'
                     : restRunning
-                      ? 'glass-surface border-pulse/55 bg-[#121620]/96'
-                      : 'glass-surface border-white/15 bg-[#121620]/96'
+                      ? 'rounded-xl border-pulse/60 bg-[#2C2C2C] shadow-[0_4px_14px_rgba(0,0,0,0.4)]'
+                      : 'rounded-xl border-white/12 bg-[#2C2C2C] shadow-[0_4px_14px_rgba(0,0,0,0.4)]'
+                  : `rounded-[22px] shadow-[0_18px_42px_rgba(0,0,0,0.54)] ${
+                      isFinished
+                        ? 'border-[#16A34A]/65 bg-[#0F1F16]/96'
+                        : isMaterialYou
+                          ? restRunning
+                            ? 'border-pulse/55 bg-md-surface-high/98'
+                            : 'border-md-outline-variant bg-md-surface-high/98'
+                          : restRunning
+                            ? 'glass-surface border-pulse/55 bg-[#121620]/96 backdrop-blur-xl'
+                            : 'glass-surface border-white/15 bg-[#121620]/96 backdrop-blur-xl'
+                    }`
               }`}
             >
               {/* Left: Clickable Progress Ring + Crisp Non-Overlapping Digits */}

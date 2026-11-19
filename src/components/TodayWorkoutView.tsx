@@ -1,5 +1,4 @@
 import { RefObject, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
 import {
   ArrowRight,
   Bell,
@@ -14,7 +13,6 @@ import {
 import gymArenaBackdrop from '../assets/images/gym_arena_backdrop_1794848258829.jpg';
 import {
   formatAlarmTime,
-  formatClockTime,
   formatCompactDuration,
   formatIndonesianDate,
   formatRestDuration,
@@ -37,12 +35,8 @@ import {
   WorkoutLogEntry,
 } from '../types/gym';
 import { MascotCompanionState } from '../hooks/useMascotCompanion';
-import {
-  resolveCardRadiusPx,
-  SHARED_IDS,
-  SHARED_LAYOUT_SPRING,
-} from '../lib/motionTokens';
-import { FluidClockDisplay } from './FluidClockDisplay';
+import { resolveCardRadiusPx } from '../lib/motionTokens';
+import { LiveFluidClock } from './FluidClockDisplay';
 import { PhaseLogoEmblem } from './PhaseLogoEmblem';
 import { PWAInstallCard } from './PWAInstallBanner';
 import { TodayMascot } from './TodayMascot';
@@ -105,7 +99,6 @@ export function TodayWorkoutView({
   onOpenScheduleManager,
 }: TodayWorkoutViewProps) {
   const { lang, t, clockFormat, todayThemeMode, uiTheme } = useI18n();
-  const prefersReducedMotion = useReducedMotion();
   const cardRadiusPx = resolveCardRadiusPx(uiTheme);
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -113,7 +106,6 @@ export function TodayWorkoutView({
   const dayLabel = DAY_LABELS[lang][todayDayKey].label;
   const timePhase = resolveDayTimePhase(todayThemeMode, now);
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
-  const formattedClock = formatClockTime(now, clockFormat, true);
   const formattedAlarm = formatAlarmTime(activeSchedule.alarmTime, clockFormat);
 
   const totalSets = todayEntries.reduce((acc, e) => acc + e.sets.length, 0);
@@ -178,10 +170,7 @@ export function TodayWorkoutView({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
       {/* Left Primary Column Row 1: Merged Hero Banner with Clock, Next Alarm, Mascot & Progress */}
-      <motion.section
-        layout={!prefersReducedMotion}
-        layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutHeroCard}
-        transition={SHARED_LAYOUT_SPRING}
+      <section
         style={{ borderRadius: cardRadiusPx }}
         className={`glass-surface relative overflow-hidden rounded-2xl border transition-colors duration-300 lg:col-span-8 lg:col-start-1 lg:row-start-1 ${phaseToken.heroBorder}`}
       >
@@ -216,10 +205,7 @@ export function TodayWorkoutView({
               <PhaseLogoEmblem timePhase={timePhase} uiTheme={uiTheme} />
 
               <div className="min-w-0">
-                <FluidClockDisplay
-                  timeText={formattedClock.timeText}
-                  meridiem={formattedClock.meridiem}
-                />
+                <LiveFluidClock clockFormat={clockFormat} />
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <span className={`text-xs sm:text-sm font-bold tracking-tight ${phaseToken.labelClass}`}>
@@ -258,17 +244,14 @@ export function TodayWorkoutView({
                 {formatIndonesianDate(now, lang)}
               </p>
 
-              <motion.h1
-                layout={prefersReducedMotion ? false : 'position'}
-                layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutTitle}
-                transition={SHARED_LAYOUT_SPRING}
+              <h1
                 className="font-display text-[2.375rem] sm:text-5xl lg:text-[3.75rem] font-extrabold leading-[1.0] tracking-[-0.015em] text-[#F8FAFC]"
                 style={{ textWrap: 'balance' }}
               >
                 {activeSchedule.isGymDay
                   ? activeSchedule.focusTitle
                   : `${dayLabel} — ${t('Hari Istirahat', 'Rest Day')}`}
-              </motion.h1>
+              </h1>
             </div>
 
             <div className="flex items-center gap-2 pt-0.5 text-xs sm:text-[13px] text-[#CBD5E1] min-w-0">
@@ -343,10 +326,7 @@ export function TodayWorkoutView({
                   {progressPct}%
                 </span>
               </div>
-              <motion.div
-                layout={!prefersReducedMotion}
-                layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutProgress}
-                transition={SHARED_LAYOUT_SPRING}
+              <div
                 style={{ borderRadius: 9999 }}
                 className="h-2 w-full overflow-hidden rounded-full bg-white/10"
               >
@@ -354,18 +334,15 @@ export function TodayWorkoutView({
                   className="h-full w-full origin-left rounded-full bg-pulse transition-transform duration-300 ease-out"
                   style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressPct / 100))})` }}
                 />
-              </motion.div>
+              </div>
             </div>
           )}
         </div>
-      </motion.section>
+      </section>
 
       {/* Right Sticky Column on Desktop (Below Hero on Mobile): Rest Timer + Start Workout CTA */}
       <aside className="space-y-4 lg:col-span-4 lg:col-start-9 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24">
-        <motion.section
-          layout={!prefersReducedMotion}
-          layoutId={prefersReducedMotion ? undefined : SHARED_IDS.restTimerCard}
-          transition={SHARED_LAYOUT_SPRING}
+        <section
           style={{ borderRadius: cardRadiusPx }}
           className={`glass-surface rounded-2xl border p-4 sm:p-5 transition-colors ${
             restRunning
@@ -400,14 +377,9 @@ export function TodayWorkoutView({
                     className="transition-all duration-300"
                   />
                 </svg>
-                <motion.span
-                  layout={prefersReducedMotion ? false : 'position'}
-                  layoutId={prefersReducedMotion ? undefined : SHARED_IDS.restTimerDigits}
-                  transition={SHARED_LAYOUT_SPRING}
-                  className="absolute font-mono text-xl font-bold tabular-nums text-[#F4F5F7]"
-                >
+                <span className="absolute font-mono text-xl font-bold tabular-nums text-[#F4F5F7]">
                   {formatRestDuration(restRemaining)}
-                </motion.span>
+                </span>
               </div>
 
               <div className="min-w-0">
@@ -496,7 +468,7 @@ export function TodayWorkoutView({
               </div>
             </div>
           </div>
-        </motion.section>
+        </section>
 
         {/* Primary Start Workout CTA Directly Below Rest Timer Card */}
         {activeSchedule.isGymDay && todayEntries.length > 0 && (

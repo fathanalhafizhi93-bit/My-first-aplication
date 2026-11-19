@@ -1,19 +1,22 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   Bell,
   BellRing,
   Check,
   Clock,
   Droplets,
+  EyeOff,
+  Gauge,
   Globe,
   HelpCircle,
   Hexagon,
   Layers,
   LogOut,
+  Monitor,
   Moon,
-  Music,
   Palette,
+  PauseCircle,
   RotateCcw,
   Settings,
   ShieldAlert,
@@ -26,6 +29,7 @@ import {
   User,
   Vibrate,
   Volume2,
+  Zap,
 } from 'lucide-react';
 import { formatClockTime } from '../lib/dateUtils';
 import { haptics } from '../lib/haptics';
@@ -36,8 +40,11 @@ import {
   DEFAULT_ACCENT_COLOR,
   DEFAULT_MATERIAL_TINT_BY_THEME,
   MATERIAL_TINT_PRESETS,
+  PerformancePreferences,
+  PerformancePresetId,
   UiTheme,
   useI18n,
+  YARU_ORANGE_ACCENT,
 } from '../lib/i18n';
 import { SHARED_IDS, TAB_INDICATOR_SPRING } from '../lib/motionTokens';
 import {
@@ -48,17 +55,21 @@ import {
   requestAndroidNotificationPermission,
   scheduleAndroidTestNotification,
 } from '../lib/nativeAlarmBridge';
-import { UserProfile } from '../types/gym';
+import { CustomRingtone, UserProfile } from '../types/gym';
+import { RingtoneManagerView } from './RingtoneManagerView';
 
 interface SettingsViewProps {
   now: Date;
   profile: UserProfile;
+  customRingtones: CustomRingtone[];
   embeddedInModal?: boolean;
   onUpdateProfile: (
     patch: Partial<
       Pick<
         UserProfile,
         | 'displayName'
+        | 'defaultRingtoneId'
+        | 'restRingtoneId'
         | 'volume'
         | 'notificationsEnabled'
         | 'snoozeMinutes'
@@ -66,7 +77,8 @@ interface SettingsViewProps {
       >
     >
   ) => Promise<void>;
-  onOpenRingtones: () => void;
+  onUploadRingtone: (file: File, customName?: string) => Promise<CustomRingtone>;
+  onDeleteRingtone: (id: string) => Promise<void>;
   onOpenTutorial: () => void;
   onSignOut: () => Promise<void>;
 }
@@ -74,9 +86,11 @@ interface SettingsViewProps {
 export function SettingsView({
   now,
   profile,
+  customRingtones,
   embeddedInModal = false,
   onUpdateProfile,
-  onOpenRingtones,
+  onUploadRingtone,
+  onDeleteRingtone,
   onOpenTutorial,
   onSignOut,
 }: SettingsViewProps) {
@@ -96,6 +110,9 @@ export function SettingsView({
     materialPalette,
     setMaterialTintColor,
     resetThemeCustomization,
+    performance,
+    setPerformance,
+    applyPerformancePreset,
     hapticsEnabled,
     setHapticsEnabled,
     t,
@@ -269,20 +286,20 @@ export function SettingsView({
     ? androidDiag?.notificationPermission === 'granted'
     : notifPermission === 'granted';
 
+  const expectedDefaultAccent =
+    uiTheme === 'ubuntu-yaru' ? YARU_ORANGE_ACCENT : DEFAULT_ACCENT_COLOR;
   const isCustomColorActive =
-    accentColor !== DEFAULT_ACCENT_COLOR || materialTintColor !== null;
+    accentColor.toUpperCase() !== expectedDefaultAccent.toUpperCase() ||
+    materialTintColor !== null;
 
   const SETTINGS_SUB_TABS = ['profile', 'appearance', 'alarm', 'system'] as const;
   type SettingsSubTab = (typeof SETTINGS_SUB_TABS)[number];
 
   const [activeSection, setActiveSection] = useState<SettingsSubTab>('profile');
-  const [sectionDirection, setSectionDirection] = useState<1 | -1>(1);
+  const [displaySubTab, setDisplaySubTab] = useState<'theme' | 'performance'>('theme');
 
   const handleSelectSection = (next: SettingsSubTab) => {
     if (next === activeSection) return;
-    const prevIdx = SETTINGS_SUB_TABS.indexOf(activeSection);
-    const nextIdx = SETTINGS_SUB_TABS.indexOf(next);
-    setSectionDirection(nextIdx >= prevIdx ? 1 : -1);
     haptics.tabSwitch();
     setActiveSection(next);
   };
@@ -353,6 +370,14 @@ export function SettingsView({
       perfNoteId: 'Impact in performance — efek kaca glossy berlapis lebih berat di beberapa perangkat.',
       perfNoteEn: 'Impact in performance — layered glossy glass blur may affect smoothness on some devices.',
     },
+    {
+      id: 'ubuntu-yaru',
+      name: 'Ubuntu Yaru',
+      badgeId: 'GTK4 Gelap Super Ringan',
+      badgeEn: 'Lightweight GTK4 Dark',
+      descId: 'Permukaan solid #2C2C2C tanpa blur dengan bayangan halus GTK4 & otomatis aksen Yaru Orange.',
+      descEn: 'Zero-blur #2C2C2C matte GTK4 surfaces with soft elevation shadows & automatic Yaru Orange accent.',
+    },
   ];
 
   const previewContrastFg = computeContrastForeground(accentColor);
@@ -360,15 +385,14 @@ export function SettingsView({
   const isMaterialYouTheme = uiTheme === 'material-you';
   const isFrostedTheme = uiTheme === 'midnight-frosted';
   const isCarbonTheme = uiTheme === 'carbon-forge';
+  const isYaruTheme = uiTheme === 'ubuntu-yaru';
 
   return (
     <div className="space-y-5">
       {/* Header */}
       {!embeddedInModal && (
         <div className="border-b border-white/10 pb-4">
-          <motion.span
-            layoutId={prefersReducedMotion ? undefined : SHARED_IDS.pageAccentBar}
-            transition={TAB_INDICATOR_SPRING}
+          <span
             aria-hidden="true"
             className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
           />
@@ -377,8 +401,8 @@ export function SettingsView({
           </h1>
           <p className="mt-1 text-sm text-[#9CA3AF]">
             {t(
-              'Kelola profil maskot, tema material, alarm latihan, dan sistem aplikasi dalam 4 kategori rapi.',
-              'Manage your profile, material theme, workout alarms, and app system across 4 clean categories.'
+              'Kelola profil maskot, tema material, alarm & ringtone latihan, dan sistem aplikasi dalam 4 kategori rapi.',
+              'Manage your profile, material theme, alarms & ringtones, and app system across 4 clean categories.'
             )}
           </p>
         </div>
@@ -460,29 +484,18 @@ export function SettingsView({
         })}
       </div>
 
-      {/* Sub-Tab Panel Content */}
-      <AnimatePresence mode="wait" initial={false} custom={sectionDirection}>
-        <motion.div
-          key={activeSection}
-          role="tabpanel"
-          custom={sectionDirection}
-          initial={
-            prefersReducedMotion
-              ? { opacity: 0 }
-              : { opacity: 0, x: sectionDirection * 14 }
-          }
-          animate={{ opacity: 1, x: 0 }}
-          exit={
-            prefersReducedMotion
-              ? { opacity: 0 }
-              : { opacity: 0, x: sectionDirection * -14 }
-          }
-          transition={{
-            duration: prefersReducedMotion ? 0.12 : 0.2,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-          className="space-y-5"
-        >
+      {/* Sub-Tab Panel Content (Lightweight opacity crossfade, zero transform to protect mobile blur) */}
+      <motion.div
+        key={activeSection}
+        role="tabpanel"
+        initial={prefersReducedMotion ? false : { opacity: 0.4 }}
+        animate={{ opacity: 1 }}
+        transition={{
+          duration: prefersReducedMotion ? 0.08 : 0.13,
+          ease: [0.16, 1, 0.3, 1],
+        }}
+        className="space-y-5"
+      >
           {/* SUB-TAB 1: PROFIL */}
           {activeSection === 'profile' && (
             <>
@@ -574,6 +587,79 @@ export function SettingsView({
           {/* SUB-TAB 2: TAMPILAN */}
           {activeSection === 'appearance' && (
             <>
+              {/* Display Section Nested Switcher: Theme & Color vs Performance */}
+              <div
+                role="tablist"
+                aria-label={t('Sub-kategori Tampilan', 'Display Sub-categories')}
+                className={`glass-surface-subtle grid grid-cols-2 gap-1.5 border p-1.5 ${
+                  isMaterialYouTheme
+                    ? 'rounded-full border-pulse/20'
+                    : isCarbonTheme
+                      ? 'rounded-xl border-white/12'
+                      : 'rounded-2xl border-white/12'
+                }`}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={displaySubTab === 'theme'}
+                  onClick={() => {
+                    if (displaySubTab !== 'theme') haptics.tabSwitch();
+                    setDisplaySubTab('theme');
+                  }}
+                  className={`flex min-h-[42px] items-center justify-center gap-2 px-3 py-2 text-xs font-bold transition-colors whitespace-nowrap ${
+                    isMaterialYouTheme
+                      ? 'rounded-full'
+                      : isCarbonTheme
+                        ? 'rounded-lg'
+                        : 'rounded-xl'
+                  } ${
+                    displaySubTab === 'theme'
+                      ? isMaterialYouTheme
+                        ? 'bg-md-secondary-container text-md-on-secondary-container'
+                        : 'bg-pulse text-pulse-fg'
+                      : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+                  }`}
+                >
+                  <Palette className="h-4 w-4 shrink-0" />
+                  <span>{t('Tema & Warna', 'Theme & Color')}</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={displaySubTab === 'performance'}
+                  onClick={() => {
+                    if (displaySubTab !== 'performance') haptics.tabSwitch();
+                    setDisplaySubTab('performance');
+                  }}
+                  className={`flex min-h-[42px] items-center justify-center gap-2 px-3 py-2 text-xs font-bold transition-colors whitespace-nowrap ${
+                    isMaterialYouTheme
+                      ? 'rounded-full'
+                      : isCarbonTheme
+                        ? 'rounded-lg'
+                        : 'rounded-xl'
+                  } ${
+                    displaySubTab === 'performance'
+                      ? isMaterialYouTheme
+                        ? 'bg-md-secondary-container text-md-on-secondary-container'
+                        : 'bg-pulse text-pulse-fg'
+                      : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+                  }`}
+                >
+                  <Gauge className="h-4 w-4 shrink-0" />
+                  <span>
+                    {t('Performa', 'Performance')}
+                    {(performance.noBlur ||
+                      performance.noAnimations ||
+                      performance.noAmbientGlow ||
+                      performance.staticMascot) &&
+                      ' · Aktif'}
+                  </span>
+                </button>
+              </div>
+
+              {displaySubTab === 'theme' && (
+                <>
               {/* Material Theme & Color Studio */}
               <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -608,6 +694,7 @@ export function SettingsView({
                     const isCarbon = item.id === 'carbon-forge';
                     const isMaterialYou = item.id === 'material-you';
                     const isAero = item.id === 'aeroglass';
+                    const isYaru = item.id === 'ubuntu-yaru';
                     const isFullSpanLast =
                       idx === uiThemeOptions.length - 1 && uiThemeOptions.length % 2 === 1;
                     return (
@@ -633,25 +720,29 @@ export function SettingsView({
                               ? 'rounded-[20px]'
                               : isAero
                                 ? 'rounded-xl border-sky-200/30'
-                                : isCarbon
-                                  ? 'rounded-lg border-white/10'
-                                  : 'rounded-xl border-white/10'
+                                : isYaru
+                                  ? 'rounded-xl border-white/10'
+                                  : isCarbon
+                                    ? 'rounded-lg border-white/10'
+                                    : 'rounded-xl border-white/10'
                           }`}
                           style={{
                             borderColor: isMaterialYou ? materialPalette.outlineVariant : undefined,
                             backgroundColor: isMaterialYou
                               ? materialPalette.surface
-                              : isAero
-                                ? '#06101B'
-                                : isFrosted
-                                  ? '#05070C'
-                                  : isCarbon
-                                    ? '#07080A'
-                                    : '#0A0B0E',
+                              : isYaru
+                                ? '#1E1E1E'
+                                : isAero
+                                  ? '#06101B'
+                                  : isFrosted
+                                    ? '#05070C'
+                                    : isCarbon
+                                      ? '#07080A'
+                                      : '#0A0B0E',
                           }}
                         >
-                          {/* Ambient glow behind glass (suppressed on matte carbon & tonal Material You) */}
-                          {!isCarbon && !isMaterialYou && (
+                          {/* Ambient glow behind glass (suppressed on matte carbon, Material You & Ubuntu Yaru) */}
+                          {!isCarbon && !isMaterialYou && !isYaru && (
                             <div
                               aria-hidden="true"
                               className="pointer-events-none absolute -right-4 -top-4 h-16 w-24 rounded-full blur-xl"
@@ -686,21 +777,25 @@ export function SettingsView({
                                   ? '14px'
                                   : isAero
                                     ? '11px'
-                                    : isCarbon
-                                      ? '6px'
-                                      : '10px',
-                              backgroundColor: isCarbon
-                                ? `${effectiveMaterialTint}EE`
-                                : isMaterialYou
-                                  ? materialPalette.surfaceContainer
-                                  : isAero
-                                    ? `${effectiveMaterialTint}8A`
-                                    : isFrosted
-                                      ? 'transparent'
-                                      : `${effectiveMaterialTint}D0`,
+                                    : isYaru
+                                      ? '10px'
+                                      : isCarbon
+                                        ? '6px'
+                                        : '10px',
+                              backgroundColor: isYaru
+                                ? '#2C2C2C'
+                                : isCarbon
+                                  ? `${effectiveMaterialTint}EE`
+                                  : isMaterialYou
+                                    ? materialPalette.surfaceContainer
+                                    : isAero
+                                      ? `${effectiveMaterialTint}8A`
+                                      : isFrosted
+                                        ? 'transparent'
+                                        : `${effectiveMaterialTint}D0`,
                               backgroundImage: isCarbon
                                 ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 4px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 4px)'
-                                : isMaterialYou
+                                : isMaterialYou || isYaru
                                   ? 'none'
                                   : isAero
                                     ? 'linear-gradient(180deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.02) 47%, rgba(56,189,248,0.12) 100%)'
@@ -711,27 +806,31 @@ export function SettingsView({
                                 ? 'blur(16px) saturate(165%)'
                                 : isFrosted
                                   ? 'blur(18px) saturate(185%)'
-                                  : isCarbon || isMaterialYou
+                                  : isCarbon || isMaterialYou || isYaru
                                     ? 'none'
                                     : 'blur(10px)',
                               boxShadow: isMaterialYou
                                 ? 'none'
-                                : isAero
-                                  ? 'inset 0 1px 0 rgba(255,255,255,0.62), inset 0 0 0 1px rgba(255,255,255,0.18), 0 6px 14px rgba(0,8,20,0.45)'
-                                  : isFrosted
-                                    ? 'inset 0 1px 0 rgba(255,255,255,0.34), inset 1px 0 0 rgba(255,255,255,0.16)'
-                                    : isCarbon
-                                      ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.5)'
-                                      : 'inset 0 1px 0 rgba(255,255,255,0.1)',
+                                : isYaru
+                                  ? 'inset 0 1px 0 rgba(255,255,255,0.06), 0 2px 6px rgba(0,0,0,0.38)'
+                                  : isAero
+                                    ? 'inset 0 1px 0 rgba(255,255,255,0.62), inset 0 0 0 1px rgba(255,255,255,0.18), 0 6px 14px rgba(0,8,20,0.45)'
+                                    : isFrosted
+                                      ? 'inset 0 1px 0 rgba(255,255,255,0.34), inset 1px 0 0 rgba(255,255,255,0.16)'
+                                      : isCarbon
+                                        ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.5)'
+                                        : 'inset 0 1px 0 rgba(255,255,255,0.1)',
                               border: isMaterialYou
                                 ? `1px solid ${materialPalette.outlineVariant}`
                                 : isAero
                                   ? '1px solid rgba(186,230,253,0.45)'
                                   : isFrosted
                                     ? '1px solid rgba(255,255,255,0.2)'
-                                    : isCarbon
-                                      ? '1px solid rgba(255,255,255,0.14)'
-                                      : '1px solid rgba(255,255,255,0.1)',
+                                    : isYaru
+                                      ? '1px solid rgba(255,255,255,0.11)'
+                                      : isCarbon
+                                        ? '1px solid rgba(255,255,255,0.14)'
+                                        : '1px solid rgba(255,255,255,0.1)',
                             }}
                           >
                             <div className="flex items-center justify-between">
@@ -756,11 +855,19 @@ export function SettingsView({
                                         : 'rounded-md'
                                 }`}
                                 style={{
-                                  backgroundColor: isMaterialYou ? materialPalette.primary : accentColor,
+                                  backgroundColor: isYaru
+                                    ? '#E95420'
+                                    : isMaterialYou
+                                      ? materialPalette.primary
+                                      : accentColor,
                                   backgroundImage: isAero
                                     ? 'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.12) 48%, rgba(0,0,0,0.1) 50%, rgba(255,255,255,0.06) 100%)'
                                     : 'none',
-                                  color: isMaterialYou ? materialPalette.onPrimary : previewContrastFg,
+                                  color: isYaru
+                                    ? '#FFFFFF'
+                                    : isMaterialYou
+                                      ? materialPalette.onPrimary
+                                      : previewContrastFg,
                                 }}
                               >
                                 {t('Aksi', 'Action')}
@@ -776,9 +883,11 @@ export function SettingsView({
                                     ? 'rounded-lg border border-sky-200/35 bg-sky-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.42)]'
                                     : isFrosted
                                       ? 'mx-1 rounded-full border border-white/20 bg-white/10'
-                                      : isCarbon
-                                        ? 'rounded-[4px] border border-white/12 bg-black/55'
-                                        : 'rounded-lg border border-white/10 bg-black/35'
+                                      : isYaru
+                                        ? 'rounded-md border border-white/10 bg-[#242424]'
+                                        : isCarbon
+                                          ? 'rounded-[4px] border border-white/12 bg-black/55'
+                                          : 'rounded-lg border border-white/10 bg-black/35'
                               }`}
                               style={
                                 isMaterialYou
@@ -813,7 +922,7 @@ export function SettingsView({
                               ) : (
                                 <span
                                   className={`h-1 w-5 ${isCarbon ? 'rounded-none' : 'rounded-full'}`}
-                                  style={{ backgroundColor: accentColor }}
+                                  style={{ backgroundColor: isYaru ? '#E95420' : accentColor }}
                                 />
                               )}
                               <span className="h-1 w-4 rounded-full bg-white/25" />
@@ -827,6 +936,8 @@ export function SettingsView({
                             <span className="flex items-center gap-1.5 text-sm font-bold text-[#F4F5F7]">
                               {isAero ? (
                                 <Droplets className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#7DD3FC]'}`} />
+                              ) : isYaru ? (
+                                <Monitor className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#E95420]'}`} />
                               ) : isMaterialYou ? (
                                 <Palette className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`} />
                               ) : isFrosted ? (
@@ -948,7 +1059,9 @@ export function SettingsView({
                         <span>
                           {isMaterialYouTheme
                             ? t('Rona Permukaan Tonal (Opsional)', 'Tonal Surface Hue (Optional)')
-                            : t('Warna Material Kaca', 'Glass Material Tint')}
+                            : isYaruTheme
+                              ? t('Warna Kartu Yaru', 'Yaru Surface Tint')
+                              : t('Warna Material Kaca', 'Glass Material Tint')}
                         </span>
                       </div>
                       <span className="font-mono text-[11px] font-bold uppercase text-[#D1D5DB]">
@@ -1144,24 +1257,244 @@ export function SettingsView({
                   })}
                 </div>
               </section>
+                </>
+              )}
+
+              {displaySubTab === 'performance' && (
+                <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+                        {t('Optimasi Performa & Efek Visual', 'Performance & Visual Effects Tuning')}
+                      </h2>
+                      <p className="mt-0.5 text-xs text-[#9CA3AF]">
+                        {t(
+                          'Matikan efek grafis berat secara mandiri agar aplikasi terasa instan dan hemat baterai di HP.',
+                          'Disable heavy graphical effects independently for instant responsiveness and battery savings.'
+                        )}
+                      </p>
+                    </div>
+
+                    {(performance.noBlur ||
+                      performance.noAnimations ||
+                      performance.noAmbientGlow ||
+                      performance.staticMascot) && (
+                      <button
+                        type="button"
+                        onClick={() => applyPerformancePreset('balanced')}
+                        className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-white/12 bg-[#0A0B0E]/80 px-3 py-1.5 text-xs font-semibold text-[#D1D5DB] transition-colors hover:border-pulse/50 hover:text-pulse whitespace-nowrap"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        {t('Reset ke Seimbang', 'Reset to Balanced')}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quick One-Tap Performance Presets */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-[#D1D5DB]">
+                      {t('Profil Cepat', 'Quick Profiles')}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                      {(
+                        [
+                          {
+                            id: 'balanced' as PerformancePresetId,
+                            titleId: 'Seimbang (Normal)',
+                            titleEn: 'Balanced (Default)',
+                            descId: 'Semua efek mengikuti tema aktif.',
+                            descEn: 'All effects follow active theme.',
+                            matches:
+                              !performance.noBlur &&
+                              !performance.noAnimations &&
+                              !performance.noAmbientGlow &&
+                              !performance.staticMascot,
+                          },
+                          {
+                            id: 'battery' as PerformancePresetId,
+                            titleId: 'Hemat Daya',
+                            titleEn: 'Battery Saver',
+                            descId: 'No Blur + Matikan Glow latar.',
+                            descEn: 'No Blur + No Ambient Glow.',
+                            matches:
+                              performance.noBlur &&
+                              !performance.noAnimations &&
+                              performance.noAmbientGlow &&
+                              !performance.staticMascot,
+                          },
+                          {
+                            id: 'ultra' as PerformancePresetId,
+                            titleId: 'Ultra Ringan',
+                            titleEn: 'Ultra Fast',
+                            descId: 'Matikan blur, animasi, glow & maskot.',
+                            descEn: 'All heavy effects & motion disabled.',
+                            matches:
+                              performance.noBlur &&
+                              performance.noAnimations &&
+                              performance.noAmbientGlow &&
+                              performance.staticMascot,
+                          },
+                        ] as const
+                      ).map((preset) => (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            haptics.toggle();
+                            applyPerformancePreset(preset.id);
+                          }}
+                          className={`flex min-h-[60px] flex-col justify-between rounded-xl border p-3 text-left transition-colors ${
+                            preset.matches
+                              ? 'border-pulse bg-pulse/12'
+                              : 'border-white/10 bg-[#0A0B0E] hover:border-white/25'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-[#F4F5F7]">
+                              {t(preset.titleId, preset.titleEn)}
+                            </span>
+                            <Zap
+                              className={`h-3.5 w-3.5 ${
+                                preset.matches ? 'text-pulse' : 'text-[#9CA3AF]'
+                              }`}
+                            />
+                          </div>
+                          <span className="mt-1 text-[11px] text-[#9CA3AF]">
+                            {t(preset.descId, preset.descEn)}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Individual System Performance Toggles */}
+                  <div className="space-y-2.5 border-t border-white/10 pt-4">
+                    {(
+                      [
+                        {
+                          key: 'noBlur' as keyof PerformancePreferences,
+                          Icon: EyeOff,
+                          titleId: 'No Blur (Matikan Blur Kaca)',
+                          titleEn: 'No Blur (Disable Glass Blur)',
+                          descId:
+                            'Mengganti efek buram kaca di kartu, navbar, dan modal dengan warna solid tegas agar GPU HP tetap dingin.',
+                          descEn:
+                            'Replaces backdrop blur across cards, navbars, and modals with crisp solid fills to reduce GPU load.',
+                        },
+                        {
+                          key: 'noAnimations' as keyof PerformancePreferences,
+                          Icon: Zap,
+                          titleId: 'No Animation (Matikan Semua Animasi)',
+                          titleEn: 'No Animation (Disable All Animations)',
+                          descId:
+                            'Menghilangkan animasi perpindahan tab, pegas indikator, efek tombol, dan splash pembuka secara instan.',
+                          descEn:
+                            'Disables tab transitions, spring indicators, micro-motion, and splash intro for zero-delay switching.',
+                        },
+                        {
+                          key: 'noAmbientGlow' as keyof PerformancePreferences,
+                          Icon: Sparkles,
+                          titleId: 'No Ambient Glow & Shadows (Matikan Cahaya Latar)',
+                          titleEn: 'No Ambient Glow & Shadows',
+                          descId:
+                            'Menghapus orb cahaya radial di latar belakang serta menyederhanakan bayangan berlapis kartu.',
+                          descEn:
+                            'Removes background radial glow orbs and simplifies multi-layered card shadows.',
+                        },
+                        {
+                          key: 'staticMascot' as keyof PerformancePreferences,
+                          Icon: PauseCircle,
+                          titleId: 'Mode Hemat Maskot (Static Mascot)',
+                          titleEn: 'Static Mascot (Low-Power Companion)',
+                          descId:
+                            'Menghentikan timer kedip mata, lirikan, dan pergantian ekspresi berkala di latar belakang.',
+                          descEn:
+                            'Pauses periodic blinking, eye glances, and idle expression loops while keeping tap reactions active.',
+                        },
+                      ] as const
+                    ).map((item) => {
+                      const active = performance[item.key];
+                      const Icon = item.Icon;
+                      return (
+                        <div
+                          key={item.key}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5"
+                        >
+                          <div className="flex items-start gap-3 min-w-0">
+                            <Icon
+                              className={`mt-0.5 h-4 w-4 shrink-0 ${
+                                active ? 'text-pulse' : 'text-[#9CA3AF]'
+                              }`}
+                            />
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-[#F4F5F7]">
+                                {t(item.titleId, item.titleEn)}
+                              </p>
+                              <p className="mt-0.5 text-xs leading-relaxed text-[#9CA3AF]">
+                                {t(item.descId, item.descEn)}
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={active}
+                            onClick={() => {
+                              haptics.toggle();
+                              setPerformance({ [item.key]: !active });
+                            }}
+                            className={`min-h-[40px] shrink-0 rounded-xl px-3.5 text-xs font-bold transition-colors whitespace-nowrap ${
+                              active
+                                ? 'bg-pulse text-pulse-fg'
+                                : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF] hover:text-[#F4F5F7]'
+                            }`}
+                          >
+                            {active ? t('Aktif', 'Enabled') : t('Nonaktif', 'Off')}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {(isYaruTheme || isMaterialYouTheme || isCarbonTheme) && (
+                    <p className="rounded-xl border border-white/10 bg-[#0A0B0E]/65 px-3.5 py-2.5 text-xs text-[#9CA3AF]">
+                      {t(
+                        `Catatan: Tema aktif (${
+                          isYaruTheme
+                            ? 'Ubuntu Yaru'
+                            : isMaterialYouTheme
+                              ? 'Material You'
+                              : 'Carbon Forge'
+                        }) secara bawaan sudah berjalan tanpa efek blur kaca. Mengaktifkan No Animation atau No Ambient Glow akan semakin meringankannya.`,
+                        `Note: Your active theme (${
+                          isYaruTheme
+                            ? 'Ubuntu Yaru'
+                            : isMaterialYouTheme
+                              ? 'Material You'
+                              : 'Carbon Forge'
+                        }) already renders zero backdrop blur natively. Enabling No Animation or No Ambient Glow makes it even lighter.`
+                      )}
+                    </p>
+                  )}
+                </section>
+              )}
             </>
           )}
 
-          {/* SUB-TAB 3: ALARM */}
+          {/* SUB-TAB 3: ALARM & RINGTUNE */}
           {activeSection === 'alarm' && (
+            <>
             <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
                 <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
                   {t('Preferensi Alarm, Timer & Notifikasi', 'Alarm, Timer & Notification Preferences')}
                 </h2>
-                <button
-                  type="button"
-                  onClick={onOpenRingtones}
-                  className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-white/10 bg-[#0A0B0E] px-3 py-1.5 text-xs font-semibold text-[#D1D5DB] hover:border-pulse/50 hover:text-pulse whitespace-nowrap"
-                >
-                  <Music className="h-3.5 w-3.5 text-pulse" />
-                  {t('Kelola Ringtone', 'Manage Ringtones')}
-                </button>
+                <p className="mt-0.5 text-xs text-[#9CA3AF]">
+                  {t(
+                    'Atur volume master, jeda snooze, haptik, izin sistem, serta nada dering alarm di satu panel terpadu.',
+                    'Configure master volume, snooze, haptics, system permissions, and ringtones in one unified panel.'
+                  )}
+                </p>
               </div>
 
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -1382,6 +1715,17 @@ export function SettingsView({
                 </div>
               )}
             </section>
+
+            {/* Embedded Ringtone Picker & Custom Upload Manager */}
+            <RingtoneManagerView
+              embeddedInSettings
+              profile={profile}
+              customRingtones={customRingtones}
+              onUpdateProfile={onUpdateProfile}
+              onUploadRingtone={onUploadRingtone}
+              onDeleteRingtone={onDeleteRingtone}
+            />
+            </>
           )}
 
           {/* SUB-TAB 4: SISTEM */}
@@ -1501,7 +1845,6 @@ export function SettingsView({
             </>
           )}
         </motion.div>
-      </AnimatePresence>
     </div>
   );
 }

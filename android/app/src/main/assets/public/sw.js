@@ -87,7 +87,7 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "revision": "990f8de592e733ce00402407c8ba78b1"
   }, {
     "url": "index.html",
-    "revision": "21afbf1c972686927e6714184054b367"
+    "revision": "8c5dd7b06fb42dade5a0633f7b624201"
   }, {
     "url": "icon.svg",
     "revision": "f0a9258bfc0b2edf858585c6f809f6b8"
@@ -104,22 +104,61 @@ define(['./workbox-afac4cd2'], (function (workbox) { 'use strict';
     "url": "assets/workbox-window.prod.es5-Bd17z0YL.js",
     "revision": null
   }, {
-    "url": "assets/web-CzT2qunx.js",
+    "url": "assets/web-DKU3n5DP.js",
     "revision": null
   }, {
-    "url": "assets/web-BnO0LTSo.js",
+    "url": "assets/web-C9_rfUdu.js",
     "revision": null
   }, {
-    "url": "assets/web-BbuaYL-W.js",
+    "url": "assets/web-B-8_Zlx4.js",
     "revision": null
   }, {
-    "url": "assets/index-DujFKG1w.css",
+    "url": "assets/timer-CWlKd8B-.js",
     "revision": null
   }, {
-    "url": "assets/index-CQFeEvSj.js",
+    "url": "assets/square-rOOPLR_0.js",
+    "revision": null
+  }, {
+    "url": "assets/shield-alert-DJfu63lC.js",
+    "revision": null
+  }, {
+    "url": "assets/index-BwGfYzSa.css",
+    "revision": null
+  }, {
+    "url": "assets/index-BCttjA_R.js",
     "revision": null
   }, {
     "url": "assets/gym_arena_backdrop_1794848258829-sLjOZs5A.jpg",
+    "revision": null
+  }, {
+    "url": "assets/dist-BD91r3g6.js",
+    "revision": null
+  }, {
+    "url": "assets/definitions-BdWVgBTV.js",
+    "revision": null
+  }, {
+    "url": "assets/dateUtils-Bc7E02UT.js",
+    "revision": null
+  }, {
+    "url": "assets/chevron-right-D7Cpo7zh.js",
+    "revision": null
+  }, {
+    "url": "assets/chevron-left-Bi_PhLZj.js",
+    "revision": null
+  }, {
+    "url": "assets/WorkoutSessionView-DvQ5p088.js",
+    "revision": null
+  }, {
+    "url": "assets/WeeklyScheduleView-BO_2XIsB.js",
+    "revision": null
+  }, {
+    "url": "assets/SettingsView-DPCuMvAr.js",
+    "revision": null
+  }, {
+    "url": "assets/HistoryProgressView-tKCnrxvc.js",
+    "revision": null
+  }, {
+    "url": "assets/ExerciseManagerView-DIO49O8Y.js",
     "revision": null
   }, {
     "url": "apple-touch-icon.png",

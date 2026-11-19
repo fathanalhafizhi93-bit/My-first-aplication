@@ -20,6 +20,7 @@ export function PhaseLogoEmblem({ timePhase, uiTheme }: PhaseLogoEmblemProps) {
   const isCarbon = uiTheme === 'carbon-forge';
   const isMaterialYou = uiTheme === 'material-you';
   const isAero = uiTheme === 'aeroglass';
+  const isYaru = uiTheme === 'ubuntu-yaru';
   const PhaseIcon = PHASE_ICON_MAP[timePhase];
 
   const frameShapeClass = isMaterialYou
@@ -28,9 +29,11 @@ export function PhaseLogoEmblem({ timePhase, uiTheme }: PhaseLogoEmblemProps) {
       ? 'rounded-[18px]'
       : isAero
         ? 'rounded-[14px] shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]'
-        : isCarbon
-          ? 'rounded-[10px]'
-          : 'rounded-2xl';
+        : isYaru
+          ? 'rounded-xl'
+          : isCarbon
+            ? 'rounded-[10px]'
+            : 'rounded-2xl';
 
   return (
     <div

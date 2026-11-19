@@ -3,26 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, LayoutGroup, motion, MotionConfig, useReducedMotion } from 'motion/react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { AboutView } from './components/AboutView';
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
-import { ExerciseManagerView } from './components/ExerciseManagerView';
 import { FeatureTutorialModal } from './components/FeatureTutorialModal';
 import { FloatingMascotDock } from './components/FloatingMascotDock';
 import { GlassModal } from './components/GlassModal';
-import { HistoryProgressView } from './components/HistoryProgressView';
 import { LaunchIntro } from './components/LaunchIntro';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { NamePromptModal } from './components/NamePromptModal';
 import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner';
-import { RingtoneManagerView } from './components/RingtoneManagerView';
-import { SettingsView } from './components/SettingsView';
 import { ExerciseTimerState, TodayWorkoutView } from './components/TodayWorkoutView';
 import { TopBar } from './components/TopBar';
-import { WeeklyScheduleView } from './components/WeeklyScheduleView';
-import { WorkoutSessionView } from './components/WorkoutSessionView';
 import { useGymData } from './hooks/useGymData';
 import { MascotMood, useMascotCompanion } from './hooks/useMascotCompanion';
 import { audioEngine, BUILTIN_RINGTONES } from './lib/audioEngine';
@@ -41,7 +35,6 @@ import {
   useI18n,
 } from './lib/i18n';
 import { attachGlobalButtonHaptics, haptics } from './lib/haptics';
-import { TAB_GLIDE_SPRING } from './lib/motionTokens';
 import { syncNativeWeeklyAlarms } from './lib/nativeAlarmBridge';
 import {
   AppTab,
@@ -51,6 +44,28 @@ import {
   TimerDirection,
   WorkoutLogEntry,
 } from './types/gym';
+
+const loadWorkoutSessionView = () => import('./components/WorkoutSessionView');
+const loadWeeklyScheduleView = () => import('./components/WeeklyScheduleView');
+const loadHistoryProgressView = () => import('./components/HistoryProgressView');
+const loadExerciseManagerView = () => import('./components/ExerciseManagerView');
+const loadSettingsView = () => import('./components/SettingsView');
+
+const WorkoutSessionView = lazy(() =>
+  loadWorkoutSessionView().then((m) => ({ default: m.WorkoutSessionView }))
+);
+const WeeklyScheduleView = lazy(() =>
+  loadWeeklyScheduleView().then((m) => ({ default: m.WeeklyScheduleView }))
+);
+const HistoryProgressView = lazy(() =>
+  loadHistoryProgressView().then((m) => ({ default: m.HistoryProgressView }))
+);
+const ExerciseManagerView = lazy(() =>
+  loadExerciseManagerView().then((m) => ({ default: m.ExerciseManagerView }))
+);
+const SettingsView = lazy(() =>
+  loadSettingsView().then((m) => ({ default: m.SettingsView }))
+);
 
 interface TriggeredAlarmState {
   schedule: DaySchedule;
@@ -64,51 +79,15 @@ interface CooldownAlertTarget {
   exerciseName: string;
 }
 
-const TAB_ORDER: Record<AppTab, number> = {
-  today: 0,
-  workout: 0.5,
-  schedule: 1,
-  history: 2,
-  exercises: 3,
-  ringtones: 4,
-  settings: 5,
-  about: 6,
-};
-
-const TAB_SLIDE_VARIANTS = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? 28 : direction < 0 ? -28 : 0,
-    opacity: 0,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-  },
-  exit: (direction: number) => ({
-    x: direction > 0 ? -28 : direction < 0 ? 28 : 0,
-    opacity: 0,
-  }),
-};
-
-const SHARED_PAIR_VARIANTS = {
-  enter: { opacity: 0.94 },
-  center: { opacity: 1 },
-  exit: { opacity: 0 },
-};
-
-const REDUCED_TAB_VARIANTS = {
-  enter: { opacity: 0 },
-  center: { opacity: 1 },
-  exit: { opacity: 0 },
-};
-
 function AppContent() {
-  const { lang, t, todayThemeMode, uiTheme } = useI18n();
+  const { lang, t, todayThemeMode, uiTheme, performance } = useI18n();
   const prefersReducedMotion = useReducedMotion();
+  const disableAnim = Boolean(prefersReducedMotion || performance.noAnimations);
   const isFrosted = uiTheme === 'midnight-frosted';
   const isCarbon = uiTheme === 'carbon-forge';
   const isMaterialYou = uiTheme === 'material-you';
   const isAero = uiTheme === 'aeroglass';
+  const isYaru = uiTheme === 'ubuntu-yaru';
   const {
     user,
     authReady,
@@ -127,6 +106,7 @@ function AppContent() {
     updateProfile,
     updateSchedule,
     addExerciseToDay,
+    addExercisesToDay,
     updateExerciseInDay,
     removeExerciseFromDay,
     moveExerciseInDay,
@@ -140,44 +120,27 @@ function AppContent() {
     deleteCustomRingtone,
   } = useGymData();
 
-  const [tabState, setTabState] = useState<{
-    activeTab: AppTab;
-    prevTab: AppTab;
-    direction: number;
-  }>({
-    activeTab: 'today',
-    prevTab: 'today',
-    direction: 0,
-  });
-  const { activeTab, prevTab, direction: tabDirection } = tabState;
-  const isSharedPairTransition =
-    (prevTab === 'today' && activeTab === 'workout') ||
-    (prevTab === 'workout' && activeTab === 'today');
+  const [activeTab, setActiveTab] = useState<AppTab>('today');
   const [activePopup, setActivePopup] = useState<'about' | null>(null);
   const [heroMascotVisible, setHeroMascotVisible] = useState<boolean>(true);
   const [floatingOrbPresent, setFloatingOrbPresent] = useState<boolean>(false);
   const heroOrbAnchorRef = useRef<HTMLButtonElement | null>(null);
 
   const navigateToTab = useCallback((nextTab: AppTab) => {
-    setTabState((curr) => {
-      if (curr.activeTab === nextTab) return curr;
+    setActiveTab((curr) => {
+      if (curr === nextTab) return curr;
       haptics.tabSwitch();
-      const dir = TAB_ORDER[nextTab] >= TAB_ORDER[curr.activeTab] ? 1 : -1;
-      return {
-        activeTab: nextTab,
-        prevTab: curr.activeTab,
-        direction: dir,
-      };
+      return nextTab;
     });
   }, []);
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(() => !performance.noAnimations);
   const [nameConfirmed, setNameConfirmed] = useState<boolean>(true);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialStartWithLang, setTutorialStartWithLang] = useState(true);
-  const [isOpeningGreeting, setIsOpeningGreeting] = useState(true);
   const [exerciseDayKey, setExerciseDayKey] = useState<DayKey>(todayDayKey);
   const [focusedWorkoutExerciseId, setFocusedWorkoutExerciseId] = useState<string | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
+  const lastMinuteBucketRef = useRef<number>(Math.floor(Date.now() / 60_000));
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const timePhase = resolveDayTimePhase(todayThemeMode, now);
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
@@ -355,11 +318,37 @@ function AppContent() {
     [resolveRingtoneMeta, profile, customRingtones, t]
   );
 
-  // 1-second clock + midnight rollover + alarm watcher
+  // Background-prefetch secondary tab chunks after launch splash ends
+  useEffect(() => {
+    if (showIntro) return;
+    const prefetchAll = () => {
+      void loadWorkoutSessionView();
+      void loadWeeklyScheduleView();
+      void loadHistoryProgressView();
+      void loadExerciseManagerView();
+      void loadSettingsView();
+    };
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(prefetchAll);
+      return () => {
+        if (typeof window.cancelIdleCallback === 'function') {
+          window.cancelIdleCallback(id);
+        }
+      };
+    }
+    const timer = globalThis.setTimeout(prefetchAll, 300);
+    return () => globalThis.clearTimeout(timer);
+  }, [showIntro]);
+
+  // Minute-isolated root clock + midnight rollover + alarm watcher (avoids per-second root re-renders)
   useEffect(() => {
     const interval = window.setInterval(() => {
       const current = new Date();
-      setNow(current);
+      const minuteBucket = Math.floor(current.getTime() / 60_000);
+      if (minuteBucket !== lastMinuteBucketRef.current) {
+        lastMinuteBucketRef.current = minuteBucket;
+        setNow(current);
+      }
 
       const currentDateKey = formatLocalDateKey(current);
       if (currentDateKey !== lastDateKeyRef.current) {
@@ -405,18 +394,25 @@ function AppContent() {
     return () => window.clearInterval(interval);
   }, [schedules, profile, snoozeTargetMs, triggerAlarm]);
 
-  // Derived 30s cooldown remaining seconds
-  const cooldownRemaining = useMemo(() => {
-    if (cooldownUntilMs === null) return 0;
-    return Math.max(0, Math.ceil((cooldownUntilMs - now.getTime()) / 1000));
-  }, [cooldownUntilMs, now]);
-
+  // Isolated 30s cooldown ticker (runs ONLY while cooldown is active)
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
   useEffect(() => {
-    if (cooldownUntilMs !== null && now.getTime() >= cooldownUntilMs) {
-      setCooldownUntilMs(null);
-      setCooldownAlertTarget(null);
+    if (cooldownUntilMs === null) {
+      setCooldownRemaining(0);
+      return;
     }
-  }, [cooldownUntilMs, now]);
+    const tickCooldown = () => {
+      const rem = Math.max(0, Math.ceil((cooldownUntilMs - Date.now()) / 1000));
+      setCooldownRemaining(rem);
+      if (rem <= 0) {
+        setCooldownUntilMs(null);
+        setCooldownAlertTarget(null);
+      }
+    };
+    tickCooldown();
+    const id = window.setInterval(tickCooldown, 1000);
+    return () => window.clearInterval(id);
+  }, [cooldownUntilMs]);
 
   // Sync scheduled alarms to native Android background scheduler when running in Capacitor APK
   useEffect(() => {
@@ -562,7 +558,6 @@ function AppContent() {
 
       if (becameCompleted) {
         setDayJustChanged(false);
-        setIsOpeningGreeting(false);
         triggerClapBurst(finishedAll);
 
         if (profile?.autoStartRestTimer && schedules && nextIncomplete && !finishedAll) {
@@ -884,7 +879,6 @@ function AppContent() {
         setCooldownUntilMs(Date.now() + 30_000);
         setCooldownAlertTarget(null);
         setDayJustChanged(false);
-        setIsOpeningGreeting(false);
         triggerClapBurst(willAllFinish);
 
         if (profile?.autoStartRestTimer && schedules && !willAllFinish) {
@@ -930,7 +924,6 @@ function AppContent() {
     if (becameCompleted) {
       setCooldownUntilMs(Date.now() + 30_000);
       setDayJustChanged(false);
-      setIsOpeningGreeting(false);
       triggerClapBurst(willAllFinish);
 
       if (profile?.autoStartRestTimer && schedules && !willAllFinish) {
@@ -998,7 +991,6 @@ function AppContent() {
   // Check whether signed-in user has confirmed their display name after login,
   // and reset active session timers/alarms cleanly on sign-out.
   useEffect(() => {
-    setIsOpeningGreeting(true);
     if (!user) {
       setNameConfirmed(true);
       audioEngine.stop();
@@ -1041,7 +1033,6 @@ function AppContent() {
         }
       }
       setNameConfirmed(true);
-      setIsOpeningGreeting(true);
     },
     [updateProfile, user]
   );
@@ -1152,6 +1143,16 @@ function AppContent() {
     mascotMood = 'ready';
   }
 
+  const dialogueActive =
+    !showIntro &&
+    authReady &&
+    !dataLoading &&
+    Boolean(profile) &&
+    nameConfirmed &&
+    !tutorialOpen &&
+    !activeAlarm &&
+    activePopup === null;
+
   const companion = useMascotCompanion({
     mood: mascotMood,
     timePhase,
@@ -1164,6 +1165,8 @@ function AppContent() {
     dayLabel: todayDayLabel,
     userName: profile?.displayName,
     dayJustChanged,
+    dialogueActive,
+    voiceVolume: profile?.volume ?? 0.85,
   });
 
   const getHeroOrbRect = useCallback(() => {
@@ -1223,82 +1226,91 @@ function AppContent() {
       );
     }
 
+    const tabFallback = (
+      <div className="space-y-4">
+        <div className="h-32 animate-pulse rounded-2xl bg-[#13161C]/75" />
+        <div className="h-56 animate-pulse rounded-2xl bg-[#13161C]/75" />
+      </div>
+    );
+
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: showIntro ? 0.78 : 1 }}
-        transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
-        className="relative min-h-screen bg-[var(--ip-canvas-bg)] text-[#F4F5F7]"
-      >
-        {/* Lightweight Fixed Atmospheric Time-of-Day Ambient Glow & Glass Refraction Orbs */}
-        <div
-          aria-hidden="true"
-          className={`pointer-events-none fixed inset-x-0 top-0 z-0 h-[440px] transition-opacity duration-500 ${
-            isCarbon || isMaterialYou ? 'opacity-40' : 'opacity-100'
-          }`}
-          style={{
-            backgroundImage: isAero
-              ? 'radial-gradient(ellipse 88% 58% at 50% -10%, rgba(56, 189, 248, 0.34), rgba(14, 165, 233, 0.1) 50%, transparent 78%)'
-              : phaseToken.ambientGlow,
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className={`pointer-events-none fixed -left-24 top-28 z-0 rounded-full transition-all duration-500 ${
-            isAero
-              ? 'h-[26rem] w-[26rem] opacity-55'
-              : isFrosted
-                ? 'h-96 w-96 opacity-45'
-                : isCarbon || isMaterialYou
-                  ? 'h-72 w-72 opacity-10'
-                  : 'h-80 w-80 opacity-25'
-          }`}
-          style={{
-            backgroundImage: isAero
-              ? 'radial-gradient(circle, rgba(125, 211, 252, 0.42) 0%, rgba(14, 165, 233, 0.22) 45%, transparent 74%)'
-              : isMaterialYou
-                ? 'radial-gradient(circle, rgba(var(--md-sys-color-primary-rgb), 0.28) 0%, transparent 72%)'
-                : isFrosted
-                  ? `radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.72) 0%, ${phaseToken.accent}52 42%, transparent 74%)`
-                  : `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className={`pointer-events-none fixed -right-24 top-44 z-0 rounded-full transition-all duration-500 ${
-            isAero
-              ? 'h-[28rem] w-[28rem] opacity-42'
-              : isFrosted
-                ? 'h-[28rem] w-[28rem] opacity-35'
-                : isMaterialYou
-                  ? 'h-96 w-96 opacity-16'
-                  : isCarbon
-                    ? 'h-80 w-80 opacity-8'
-                    : 'h-96 w-96 opacity-20'
-          }`}
-          style={{
-            backgroundImage: isAero
-              ? 'radial-gradient(circle, rgba(56, 189, 248, 0.32) 0%, rgba(var(--ip-accent-rgb), 0.16) 44%, transparent 74%)'
-              : isMaterialYou
-                ? 'radial-gradient(circle, rgba(var(--md-sys-color-secondary-container-rgb), 0.55) 0%, rgba(var(--md-sys-color-primary-rgb), 0.14) 48%, transparent 74%)'
-                : isFrosted
-                  ? `radial-gradient(circle, rgba(var(--ip-accent-rgb), 0.24) 0%, ${phaseToken.accentBright}35 44%, transparent 74%)`
-                  : `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
-          }}
-        />
-        {(isFrosted || isAero) && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none fixed bottom-10 left-1/3 z-0 h-80 w-80 rounded-full opacity-32 transition-all duration-500"
-            style={{
-              backgroundImage: isAero
-                ? 'radial-gradient(circle, rgba(186, 230, 253, 0.26) 0%, rgba(14, 165, 233, 0.12) 48%, transparent 75%)'
-                : 'radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.65) 0%, rgba(var(--ip-accent-rgb), 0.14) 48%, transparent 75%)',
-            }}
-          />
+      <div className="relative min-h-screen bg-[var(--ip-canvas-bg)] text-[#F4F5F7]">
+        {/* Fixed Atmospheric Time-of-Day Ambient Glow & Glass Refraction Orbs (disabled on ubuntu-yaru or when No Ambient Glow is active) */}
+        {!isYaru && !performance.noAmbientGlow && (
+          <>
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none fixed inset-x-0 top-0 z-0 h-[440px] transition-opacity duration-500 ${
+                isCarbon || isMaterialYou ? 'opacity-40' : 'opacity-100'
+              }`}
+              style={{
+                backgroundImage: isAero
+                  ? 'radial-gradient(ellipse 88% 58% at 50% -10%, rgba(56, 189, 248, 0.34), rgba(14, 165, 233, 0.1) 50%, transparent 78%)'
+                  : phaseToken.ambientGlow,
+              }}
+            />
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none fixed -left-10 top-20 z-0 rounded-full transition-all duration-500 sm:-left-20 ${
+                isAero
+                  ? 'h-80 w-80 opacity-60 sm:h-[26rem] sm:w-[26rem]'
+                  : isFrosted
+                    ? 'h-80 w-80 opacity-50 sm:h-96 sm:w-96'
+                    : isCarbon || isMaterialYou
+                      ? 'h-64 w-64 opacity-10 sm:h-72 sm:w-72'
+                      : 'h-72 w-72 opacity-34 sm:h-80 sm:w-80'
+              }`}
+              style={{
+                backgroundImage: isAero
+                  ? 'radial-gradient(circle, rgba(125, 211, 252, 0.44) 0%, rgba(14, 165, 233, 0.22) 45%, transparent 74%)'
+                  : isMaterialYou
+                    ? 'radial-gradient(circle, rgba(var(--md-sys-color-primary-rgb), 0.28) 0%, transparent 72%)'
+                    : isFrosted
+                      ? `radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.72) 0%, ${phaseToken.accent}52 42%, transparent 74%)`
+                      : `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
+              }}
+            />
+            <div
+              aria-hidden="true"
+              className={`pointer-events-none fixed -right-10 top-48 z-0 rounded-full transition-all duration-500 sm:-right-20 ${
+                isAero
+                  ? 'h-80 w-80 opacity-45 sm:h-[28rem] sm:w-[28rem]'
+                  : isFrosted
+                    ? 'h-80 w-80 opacity-40 sm:h-[28rem] sm:w-[28rem]'
+                    : isMaterialYou
+                      ? 'h-72 w-72 opacity-16 sm:h-96 sm:w-96'
+                      : isCarbon
+                        ? 'h-64 w-64 opacity-8 sm:h-80 sm:w-80'
+                        : 'h-80 w-80 opacity-26 sm:h-96 sm:w-96'
+              }`}
+              style={{
+                backgroundImage: isAero
+                  ? 'radial-gradient(circle, rgba(56, 189, 248, 0.34) 0%, rgba(var(--ip-accent-rgb), 0.18) 44%, transparent 74%)'
+                  : isMaterialYou
+                    ? 'radial-gradient(circle, rgba(var(--md-sys-color-secondary-container-rgb), 0.55) 0%, rgba(var(--md-sys-color-primary-rgb), 0.14) 48%, transparent 74%)'
+                    : isFrosted
+                      ? `radial-gradient(circle, rgba(var(--ip-accent-rgb), 0.26) 0%, ${phaseToken.accentBright}35 44%, transparent 74%)`
+                      : `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
+              }}
+            />
+            {!isCarbon && !isMaterialYou && (
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none fixed inset-x-0 top-64 z-0 mx-auto h-72 w-72 rounded-full transition-all duration-500 sm:h-80 sm:w-80 ${
+                  isAero ? 'opacity-36' : isFrosted ? 'opacity-38' : 'opacity-26'
+                }`}
+                style={{
+                  backgroundImage: isAero
+                    ? 'radial-gradient(circle, rgba(186, 230, 253, 0.32) 0%, rgba(14, 165, 233, 0.14) 48%, transparent 75%)'
+                    : isFrosted
+                      ? `radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.65) 0%, ${phaseToken.accent}24 48%, transparent 75%)`
+                      : `radial-gradient(circle, ${phaseToken.accentBright}40 0%, rgba(var(--ip-accent-rgb), 0.14) 48%, transparent 75%)`,
+                }}
+              />
+            )}
+          </>
         )}
 
-        <LayoutGroup id="ironpulse-shell">
         <TopBar
           activeTab={activeTab}
           activePopup={activePopup}
@@ -1324,168 +1336,144 @@ function AppContent() {
           <div className="mb-5 lg:hidden">
             <PWAInstallCard />
           </div>
-          <div className="relative overflow-x-clip">
-            <AnimatePresence mode="popLayout" initial={false} custom={tabDirection}>
-              <motion.div
-                key={activeTab}
-                custom={tabDirection}
-                variants={
-                  prefersReducedMotion
-                    ? REDUCED_TAB_VARIANTS
-                    : isSharedPairTransition
-                      ? SHARED_PAIR_VARIANTS
-                      : TAB_SLIDE_VARIANTS
-                }
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={
-                  prefersReducedMotion
-                    ? { duration: 0.12 }
-                    : isSharedPairTransition
-                      ? { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
-                      : {
-                          x: TAB_GLIDE_SPRING,
-                          opacity: { duration: 0.18, ease: 'easeOut' },
-                        }
-                }
-                className="w-full"
-              >
-                {activeTab === 'today' && (
-                  <TodayWorkoutView
-                    now={now}
-                    todayDayKey={todayDayKey}
-                    schedules={schedules}
-                    todayEntries={effectiveTodayEntries}
-                    nextAlarm={nextAlarm}
-                    audioUnlocked={audioUnlocked}
-                    onUnlockAudio={handleUnlockAudio}
-                    restTotalSeconds={restTotalSeconds}
-                    restRemaining={restRemaining}
-                    restRunning={restRunning}
-                    restExerciseLabel={restExerciseLabel}
-                    companion={companion}
-                    heroOrbAnchorRef={heroOrbAnchorRef}
-                    hideHeroOrbVisual={floatingOrbPresent}
-                    onHeroMascotVisibilityChange={setHeroMascotVisible}
-                    onToggleRestPause={handleToggleRestPause}
-                    onResetRest={handleResetRest}
-                    onAdjustRest={handleAdjustRest}
-                    onStartRestTimer={startRestTimer}
-                    onStartWorkout={(exerciseId) => {
-                      setFocusedWorkoutExerciseId(exerciseId || null);
-                      navigateToTab('workout');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    onOpenExerciseManager={(dayKey) => {
-                      setExerciseDayKey(dayKey);
-                      navigateToTab('exercises');
-                    }}
-                    onOpenScheduleManager={() => navigateToTab('schedule')}
-                  />
-                )}
+          <Suspense fallback={tabFallback}>
+            <motion.div
+              key={activeTab}
+              initial={disableAnim ? false : { opacity: 0.38 }}
+              animate={{ opacity: 1 }}
+              transition={{
+                duration: disableAnim ? 0 : 0.13,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="w-full"
+            >
+              {activeTab === 'today' && (
+                <TodayWorkoutView
+                  now={now}
+                  todayDayKey={todayDayKey}
+                  schedules={schedules}
+                  todayEntries={effectiveTodayEntries}
+                  nextAlarm={nextAlarm}
+                  audioUnlocked={audioUnlocked}
+                  onUnlockAudio={handleUnlockAudio}
+                  restTotalSeconds={restTotalSeconds}
+                  restRemaining={restRemaining}
+                  restRunning={restRunning}
+                  restExerciseLabel={restExerciseLabel}
+                  companion={companion}
+                  heroOrbAnchorRef={heroOrbAnchorRef}
+                  hideHeroOrbVisual={floatingOrbPresent}
+                  onHeroMascotVisibilityChange={setHeroMascotVisible}
+                  onToggleRestPause={handleToggleRestPause}
+                  onResetRest={handleResetRest}
+                  onAdjustRest={handleAdjustRest}
+                  onStartRestTimer={startRestTimer}
+                  onStartWorkout={(exerciseId) => {
+                    setFocusedWorkoutExerciseId(exerciseId || null);
+                    navigateToTab('workout');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onOpenExerciseManager={(dayKey) => {
+                    setExerciseDayKey(dayKey);
+                    navigateToTab('exercises');
+                  }}
+                  onOpenScheduleManager={() => navigateToTab('schedule')}
+                />
+              )}
 
-                {activeTab === 'workout' && (
-                  <WorkoutSessionView
-                    now={now}
-                    todayDayKey={todayDayKey}
-                    schedules={schedules}
-                    todayEntries={effectiveTodayEntries}
-                    initialExerciseId={focusedWorkoutExerciseId}
-                    restTotalSeconds={restTotalSeconds}
-                    restRemaining={restRemaining}
-                    restRunning={restRunning}
-                    restExerciseLabel={restExerciseLabel}
-                    cooldownRemaining={cooldownRemaining}
-                    cooldownAlertTarget={cooldownAlertTarget}
-                    exerciseTimers={exerciseTimers}
-                    onBackToToday={() => {
-                      navigateToTab('today');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    onToggleRestPause={handleToggleRestPause}
-                    onResetRest={handleResetRest}
-                    onAdjustRest={handleAdjustRest}
-                    onStartRestTimer={startRestTimer}
-                    onToggleSetComplete={handleToggleSetWithAutoRest}
-                    onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
-                    onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
-                    onUpdateSetMetrics={updateSetMetrics}
-                    onUpdateSetDuration={updateSetDuration}
-                    onToggleExerciseTimer={handleToggleExerciseTimer}
-                    onResetExerciseTimer={handleResetExerciseTimer}
-                    onChangeExerciseTimerDirection={handleChangeExerciseTimerDirection}
-                    onSelectExerciseTimerSet={handleSelectExerciseTimerSet}
-                    onSaveExerciseTimerSet={handleSaveExerciseTimerSet}
-                    onAddSet={addSetToExercise}
-                    onRemoveSet={removeSetFromExercise}
-                    onOpenExerciseManager={(dayKey) => {
-                      setExerciseDayKey(dayKey);
-                      navigateToTab('exercises');
-                    }}
-                    onOpenScheduleManager={() => navigateToTab('schedule')}
-                  />
-                )}
+              {activeTab === 'workout' && (
+                <WorkoutSessionView
+                  now={now}
+                  todayDayKey={todayDayKey}
+                  schedules={schedules}
+                  todayEntries={effectiveTodayEntries}
+                  initialExerciseId={focusedWorkoutExerciseId}
+                  restTotalSeconds={restTotalSeconds}
+                  restRemaining={restRemaining}
+                  restRunning={restRunning}
+                  restExerciseLabel={restExerciseLabel}
+                  cooldownRemaining={cooldownRemaining}
+                  cooldownAlertTarget={cooldownAlertTarget}
+                  exerciseTimers={exerciseTimers}
+                  onBackToToday={() => {
+                    navigateToTab('today');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onToggleRestPause={handleToggleRestPause}
+                  onResetRest={handleResetRest}
+                  onAdjustRest={handleAdjustRest}
+                  onStartRestTimer={startRestTimer}
+                  onToggleSetComplete={handleToggleSetWithAutoRest}
+                  onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
+                  onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
+                  onUpdateSetMetrics={updateSetMetrics}
+                  onUpdateSetDuration={updateSetDuration}
+                  onToggleExerciseTimer={handleToggleExerciseTimer}
+                  onResetExerciseTimer={handleResetExerciseTimer}
+                  onChangeExerciseTimerDirection={handleChangeExerciseTimerDirection}
+                  onSelectExerciseTimerSet={handleSelectExerciseTimerSet}
+                  onSaveExerciseTimerSet={handleSaveExerciseTimerSet}
+                  onAddSet={addSetToExercise}
+                  onRemoveSet={removeSetFromExercise}
+                  onOpenExerciseManager={(dayKey) => {
+                    setExerciseDayKey(dayKey);
+                    navigateToTab('exercises');
+                  }}
+                  onOpenScheduleManager={() => navigateToTab('schedule')}
+                />
+              )}
 
-                {activeTab === 'schedule' && (
-                  <WeeklyScheduleView
-                    todayDayKey={todayDayKey}
-                    schedules={schedules}
-                    customRingtones={customRingtones}
-                    onUpdateSchedule={updateSchedule}
-                    onOpenExerciseManager={(dayKey) => {
-                      setExerciseDayKey(dayKey);
-                      navigateToTab('exercises');
-                    }}
-                  />
-                )}
+              {activeTab === 'schedule' && (
+                <WeeklyScheduleView
+                  todayDayKey={todayDayKey}
+                  schedules={schedules}
+                  customRingtones={customRingtones}
+                  onUpdateSchedule={updateSchedule}
+                  onOpenExerciseManager={(dayKey) => {
+                    setExerciseDayKey(dayKey);
+                    navigateToTab('exercises');
+                  }}
+                />
+              )}
 
-                {activeTab === 'history' && (
-                  <HistoryProgressView
-                    workoutHistory={workoutHistory}
-                    loading={historyLoading}
-                    todayDateKey={todayDateKey}
-                    onGoToToday={() => navigateToTab('today')}
-                  />
-                )}
+              {activeTab === 'history' && (
+                <HistoryProgressView
+                  workoutHistory={workoutHistory}
+                  loading={historyLoading}
+                  todayDateKey={todayDateKey}
+                  onGoToToday={() => navigateToTab('today')}
+                />
+              )}
 
-                {activeTab === 'exercises' && (
-                  <ExerciseManagerView
-                    selectedDayKey={exerciseDayKey}
-                    onSelectDayKey={setExerciseDayKey}
-                    schedules={schedules}
-                    onAddExercise={addExerciseToDay}
-                    onUpdateExercise={updateExerciseInDay}
-                    onRemoveExercise={removeExerciseFromDay}
-                    onMoveExercise={moveExerciseInDay}
-                  />
-                )}
+              {activeTab === 'exercises' && (
+                <ExerciseManagerView
+                  selectedDayKey={exerciseDayKey}
+                  onSelectDayKey={setExerciseDayKey}
+                  schedules={schedules}
+                  onAddExercise={addExerciseToDay}
+                  onAddExercises={addExercisesToDay}
+                  onUpdateExercise={updateExerciseInDay}
+                  onRemoveExercise={removeExerciseFromDay}
+                  onMoveExercise={moveExerciseInDay}
+                />
+              )}
 
-                {activeTab === 'ringtones' && (
-                  <RingtoneManagerView
-                    profile={profile}
-                    customRingtones={customRingtones}
-                    onUpdateProfile={updateProfile}
-                    onUploadRingtone={addCustomRingtone}
-                    onDeleteRingtone={deleteCustomRingtone}
-                  />
-                )}
-
-                {activeTab === 'settings' && (
-                  <SettingsView
-                    now={now}
-                    profile={profile}
-                    onUpdateProfile={updateProfile}
-                    onOpenRingtones={() => navigateToTab('ringtones')}
-                    onOpenTutorial={handleOpenTutorialFromUi}
-                    onSignOut={async () => {
-                      await signOutUser();
-                    }}
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+              {activeTab === 'settings' && (
+                <SettingsView
+                  now={now}
+                  profile={profile}
+                  customRingtones={customRingtones}
+                  onUpdateProfile={updateProfile}
+                  onUploadRingtone={addCustomRingtone}
+                  onDeleteRingtone={deleteCustomRingtone}
+                  onOpenTutorial={handleOpenTutorialFromUi}
+                  onSignOut={async () => {
+                    await signOutUser();
+                  }}
+                />
+              )}
+            </motion.div>
+          </Suspense>
         </main>
 
         <MobileBottomNav
@@ -1495,7 +1483,6 @@ function AppContent() {
           restRemaining={restRemaining}
           restRunning={restRunning}
         />
-        </LayoutGroup>
 
         <FloatingMascotDock
           companion={companion}
@@ -1547,7 +1534,7 @@ function AppContent() {
         />
 
         <OfflineIndicator />
-      </motion.div>
+      </div>
     );
   };
 
@@ -1556,9 +1543,9 @@ function AppContent() {
   }, []);
 
   return (
-    <>
+    <MotionConfig reducedMotion={performance.noAnimations ? 'always' : 'user'}>
       <AnimatePresence>
-        {showIntro && (
+        {showIntro && !performance.noAnimations && (
           <LaunchIntro
             timePhase={timePhase}
             onComplete={handleIntroComplete}
@@ -1566,16 +1553,14 @@ function AppContent() {
         )}
       </AnimatePresence>
       {renderBody()}
-    </>
+    </MotionConfig>
   );
 }
 
 export default function App() {
   return (
-    <MotionConfig reducedMotion="user">
-      <LanguageProvider>
-        <AppContent />
-      </LanguageProvider>
-    </MotionConfig>
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
   );
 }

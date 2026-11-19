@@ -365,6 +365,100 @@ class GymAudioEngine {
       }, 1300);
     }
   }
+
+  public playMascotChirp(
+    variant: 'ready' | 'clap' | 'milestone' | 'celebrate' | 'rest' | 'timerActive' | 'restday' | 'night' = 'ready',
+    volume = 0.85
+  ): void {
+    try {
+      const ctx = this.ensureContext();
+      const master = Math.max(0.03, Math.min(0.2, volume * 0.14));
+
+      const emitNotes = () => {
+        if ((ctx.state as AudioContextState) !== 'running') return;
+        const now = ctx.currentTime;
+
+        const chirp = (
+          startFreq: number,
+          endFreq: number,
+          offset: number,
+          duration: number,
+          wave: OscillatorType = 'triangle',
+          gainScale = 1
+        ) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = wave;
+          osc.frequency.setValueAtTime(startFreq, now + offset);
+          osc.frequency.exponentialRampToValueAtTime(
+            Math.max(80, endFreq),
+            now + offset + duration
+          );
+
+          const peak = Math.max(0.004, master * gainScale);
+          gain.gain.setValueAtTime(0.0001, now + offset);
+          gain.gain.exponentialRampToValueAtTime(peak, now + offset + 0.012);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + duration);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + offset);
+          osc.stop(now + offset + duration + 0.02);
+          osc.onended = () => {
+            try {
+              osc.disconnect();
+              gain.disconnect();
+            } catch {
+              // ignore disconnect errors
+            }
+          };
+        };
+
+        switch (variant) {
+          case 'celebrate':
+          case 'milestone': {
+            chirp(587.33, 659.25, 0, 0.055, 'triangle', 1.0);
+            chirp(783.99, 880, 0.065, 0.06, 'triangle', 1.05);
+            chirp(1046.5, 1174.66, 0.135, 0.085, 'sine', 1.1);
+            break;
+          }
+          case 'clap': {
+            chirp(659.25, 783.99, 0, 0.05, 'triangle', 0.95);
+            chirp(880, 987.77, 0.06, 0.07, 'sine', 1.0);
+            break;
+          }
+          case 'rest':
+          case 'timerActive': {
+            chirp(523.25, 587.33, 0, 0.055, 'sine', 0.85);
+            chirp(659.25, 698.46, 0.07, 0.065, 'sine', 0.85);
+            break;
+          }
+          case 'restday':
+          case 'night': {
+            chirp(440, 493.88, 0, 0.065, 'sine', 0.72);
+            chirp(523.25, 554.37, 0.08, 0.075, 'sine', 0.68);
+            break;
+          }
+          case 'ready':
+          default: {
+            // Cute game-character 3-syllable chatter chirp
+            chirp(540, 680, 0, 0.048, 'triangle', 0.9);
+            chirp(720, 820, 0.058, 0.045, 'triangle', 0.95);
+            chirp(640, 760, 0.115, 0.065, 'sine', 0.85);
+            break;
+          }
+        }
+      };
+
+      if (ctx.state === 'running') {
+        emitNotes();
+      } else {
+        void ctx.resume().then(emitNotes).catch(() => {});
+      }
+    } catch {
+      // Ignore Web Audio errors when autoplay is still blocked
+    }
+  }
 }
 
 export const audioEngine = new GymAudioEngine();

@@ -187,70 +187,70 @@
 }
 
 /* ============================================================================
-   Theme 1: Obsidian Glass (Default Matte Athletic Frosted Glass)
+   Theme 1: Obsidian Glass (Uniform Lightweight Matte Frosted Glass)
    ============================================================================ */
 .glass-surface {
   background: linear-gradient(
     165deg,
-    rgba(var(--ip-glass-rgb), 0.78) 0%,
-    rgba(var(--ip-glass-rgb), 0.62) 56%,
-    rgba(10, 12, 17, 0.84) 100%
+    rgba(var(--ip-glass-rgb), 0.72) 0%,
+    rgba(var(--ip-glass-rgb), 0.56) 56%,
+    rgba(10, 12, 17, 0.78) 100%
   );
-  backdrop-filter: blur(14px) saturate(135%);
-  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    0 12px 32px -14px rgba(0, 0, 0, 0.58);
+    0 12px 30px -14px rgba(0, 0, 0, 0.56);
   transition:
-    background 260ms ease,
-    box-shadow 260ms ease,
-    border-color 220ms ease,
-    border-radius 220ms ease;
+    background 220ms ease,
+    box-shadow 220ms ease,
+    border-color 200ms ease,
+    border-radius 200ms ease;
 }
 
 .glass-surface-subtle {
   background: linear-gradient(
     165deg,
-    rgba(var(--ip-glass-rgb), 0.6) 0%,
-    rgba(12, 15, 21, 0.7) 100%
+    rgba(var(--ip-glass-rgb), 0.54) 0%,
+    rgba(12, 15, 21, 0.64) 100%
   );
-  backdrop-filter: blur(10px) saturate(125%);
-  -webkit-backdrop-filter: blur(10px) saturate(125%);
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition:
-    background 240ms ease,
-    box-shadow 240ms ease,
-    border-color 220ms ease;
+    background 220ms ease,
+    box-shadow 220ms ease,
+    border-color 200ms ease;
 }
 
 .glass-bar {
-  background: rgba(var(--ip-glass-rgb), 0.74);
-  backdrop-filter: blur(18px) saturate(145%);
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  background: rgba(var(--ip-glass-rgb), 0.68);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   transition:
-    background 260ms ease,
-    box-shadow 260ms ease,
-    border-color 220ms ease;
+    background 220ms ease,
+    box-shadow 220ms ease,
+    border-color 200ms ease;
 }
 
 /* ============================================================================
-   Theme 2: Midnight Frosted (Liquid Multi-Layered Frosted Glass + Specular Rim)
+   Theme 2: Midnight Frosted (Uniform Lightweight Frosted Glass + Specular Rim)
    ============================================================================ */
 html[data-ui-theme="midnight-frosted"] .glass-surface {
   background: linear-gradient(
     145deg,
     rgba(255, 255, 255, 0.115) 0%,
-    rgba(var(--ip-glass-rgb), 0.44) 36%,
+    rgba(var(--ip-glass-rgb), 0.42) 38%,
     rgba(var(--ip-glass-rgb), 0.52) 100%
   );
-  backdrop-filter: blur(28px) saturate(190%) brightness(1.06);
-  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.06);
+  backdrop-filter: blur(12px) saturate(165%) brightness(1.05);
+  -webkit-backdrop-filter: blur(12px) saturate(165%) brightness(1.05);
   box-shadow:
     inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
     inset 1px 0 0 rgba(255, 255, 255, 0.14),
     inset 0 -1px 0 rgba(255, 255, 255, 0.06),
-    0 24px 56px -18px rgba(0, 0, 0, 0.74);
+    0 20px 46px -18px rgba(0, 0, 0, 0.72);
 }
 
 html[data-ui-theme="midnight-frosted"] .glass-surface.rounded-2xl {
@@ -261,10 +261,10 @@ html[data-ui-theme="midnight-frosted"] .glass-surface-subtle {
   background: linear-gradient(
     150deg,
     rgba(255, 255, 255, 0.09) 0%,
-    rgba(var(--ip-glass-rgb), 0.36) 100%
+    rgba(var(--ip-glass-rgb), 0.38) 100%
   );
-  backdrop-filter: blur(20px) saturate(175%);
-  -webkit-backdrop-filter: blur(20px) saturate(175%);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -1px 0 rgba(255, 255, 255, 0.05);
@@ -276,11 +276,11 @@ html[data-ui-theme="midnight-frosted"] .glass-bar {
     rgba(255, 255, 255, 0.1) 0%,
     rgba(var(--ip-glass-rgb), 0.48) 100%
   );
-  backdrop-filter: blur(32px) saturate(195%);
-  -webkit-backdrop-filter: blur(32px) saturate(195%);
+  backdrop-filter: blur(12px) saturate(165%);
+  -webkit-backdrop-filter: blur(12px) saturate(165%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    0 12px 36px -14px rgba(0, 0, 0, 0.62);
+    0 12px 32px -14px rgba(0, 0, 0, 0.62);
 }
 
 /* Specular liquid-glass sheen on primary accent action buttons in Midnight Frosted */
@@ -290,13 +290,14 @@ html[data-ui-theme="midnight-frosted"] button.bg-pulse {
     0 10px 26px -10px rgba(var(--ip-accent-rgb), 0.42);
 }
 
-/* Soften recessed controls inside Midnight Frosted so nothing feels opaque-matte */
+/* Soften recessed controls inside Midnight Frosted without nested backdrop-filter */
 html[data-ui-theme="midnight-frosted"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]),
 html[data-ui-theme="midnight-frosted"] .glass-surface select,
 html[data-ui-theme="midnight-frosted"] .glass-surface textarea {
-  background-color: rgba(var(--ip-glass-rgb), 0.45);
+  background-color: rgba(var(--ip-glass-rgb), 0.52);
   border-color: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* ============================================================================
@@ -591,15 +592,15 @@ html[data-ui-theme="aeroglass"] .glass-surface {
       rgba(var(--ip-glass-rgb), 0.36) 55%,
       rgba(6, 18, 32, 0.62) 100%
     );
-  backdrop-filter: blur(20px) saturate(185%) brightness(1.08);
-  -webkit-backdrop-filter: blur(20px) saturate(185%) brightness(1.08);
+  backdrop-filter: blur(12px) saturate(165%) brightness(1.06);
+  -webkit-backdrop-filter: blur(12px) saturate(165%) brightness(1.06);
   border-color: rgba(186, 230, 253, 0.34);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.56),
     inset 0 0 0 1px rgba(255, 255, 255, 0.15),
     inset 0 -1px 0 rgba(56, 189, 248, 0.18),
-    0 18px 42px -16px rgba(0, 0, 0, 0.78),
-    0 0 28px -12px rgba(56, 189, 248, 0.22);
+    0 18px 40px -16px rgba(0, 0, 0, 0.78),
+    0 0 24px -12px rgba(56, 189, 248, 0.22);
 }
 
 html[data-ui-theme="aeroglass"] .glass-surface.rounded-2xl {
@@ -615,9 +616,9 @@ html[data-ui-theme="aeroglass"] .glass-surface-subtle {
       rgba(255, 255, 255, 0.01) 48%,
       rgba(56, 189, 248, 0.05) 100%
     ),
-    rgba(var(--ip-glass-rgb), 0.42);
-  backdrop-filter: blur(16px) saturate(170%) brightness(1.06);
-  -webkit-backdrop-filter: blur(16px) saturate(170%) brightness(1.06);
+    rgba(var(--ip-glass-rgb), 0.44);
+  backdrop-filter: blur(10px) saturate(155%) brightness(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(155%) brightness(1.05);
   border-color: rgba(186, 230, 253, 0.28);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.44),
@@ -642,13 +643,13 @@ html[data-ui-theme="aeroglass"] .glass-bar {
       rgba(56, 189, 248, 0.08) 100%
     ),
     rgba(var(--ip-glass-rgb), 0.56);
-  backdrop-filter: blur(24px) saturate(190%) brightness(1.08);
-  -webkit-backdrop-filter: blur(24px) saturate(190%) brightness(1.08);
+  backdrop-filter: blur(12px) saturate(165%) brightness(1.06);
+  -webkit-backdrop-filter: blur(12px) saturate(165%) brightness(1.06);
   border-color: rgba(186, 230, 253, 0.32);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.52),
     inset 0 -1px 0 rgba(125, 211, 252, 0.2),
-    0 12px 32px -12px rgba(0, 0, 0, 0.65);
+    0 12px 30px -12px rgba(0, 0, 0, 0.65);
 }
 
 /* Signature Aero glossy split-sheen on primary action buttons */
@@ -674,11 +675,12 @@ html[data-ui-theme="aeroglass"] button.bg-pulse:not(.rounded-full) {
 html[data-ui-theme="aeroglass"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]),
 html[data-ui-theme="aeroglass"] .glass-surface select,
 html[data-ui-theme="aeroglass"] .glass-surface textarea {
-  background-color: rgba(7, 20, 35, 0.56);
+  background-color: rgba(7, 20, 35, 0.62);
   border-color: rgba(186, 230, 253, 0.28);
   border-radius: 0.625rem;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(12px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 html[data-ui-theme="aeroglass"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]):focus,
@@ -688,6 +690,149 @@ html[data-ui-theme="aeroglass"] .glass-surface textarea:focus {
   box-shadow:
     0 0 0 2px rgba(56, 189, 248, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================================================
+   Theme 6: Ubuntu Yaru (Lightweight GTK4 Dark · #2C2C2C Solid + Soft Shadow · Zero Blur)
+   ============================================================================ */
+html[data-ui-theme="ubuntu-yaru"] body {
+  background-color: #1E1E1E;
+  background-image: none;
+  color: #F7F7F7;
+}
+
+html[data-ui-theme="ubuntu-yaru"] .glass-surface {
+  background-color: rgb(var(--ip-glass-rgb));
+  background-image: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.11);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 2px 6px rgba(0, 0, 0, 0.28),
+    0 1px 2px rgba(0, 0, 0, 0.22);
+}
+
+html[data-ui-theme="ubuntu-yaru"] .glass-surface.rounded-2xl {
+  border-radius: 0.75rem;
+}
+
+html[data-ui-theme="ubuntu-yaru"] .glass-surface-subtle {
+  background-color: #353535;
+  background-image: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+html[data-ui-theme="ubuntu-yaru"] .glass-surface-subtle.rounded-2xl {
+  border-radius: 0.75rem;
+}
+
+html[data-ui-theme="ubuntu-yaru"] .glass-surface-subtle.rounded-xl {
+  border-radius: 0.5rem;
+}
+
+html[data-ui-theme="ubuntu-yaru"] .glass-bar {
+  background-color: #242424;
+  background-image: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.26);
+}
+
+/* Harmonize recessed dark surfaces & muted secondary text to warm Ubuntu neutrals */
+html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#0A0B0E"] {
+  background-color: #242424;
+}
+
+html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#13161C"] {
+  background-color: #2C2C2C;
+}
+
+html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#1A1E26"] {
+  background-color: #353535;
+}
+
+html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="text-[#9CA3AF]"] {
+  color: #B5B4B0;
+}
+
+/* Crisp GTK4 tactile button & control corners */
+html[data-ui-theme="ubuntu-yaru"] button.bg-pulse:not(.rounded-full),
+html[data-ui-theme="ubuntu-yaru"] a.bg-pulse:not(.rounded-full),
+html[data-ui-theme="ubuntu-yaru"] label.bg-pulse:not(.rounded-full) {
+  border-radius: 0.5rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+html[data-ui-theme="ubuntu-yaru"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]),
+html[data-ui-theme="ubuntu-yaru"] .glass-surface select,
+html[data-ui-theme="ubuntu-yaru"] .glass-surface textarea {
+  background-color: #353535;
+  border-color: rgba(255, 255, 255, 0.14);
+  border-radius: 0.5rem;
+  color: #F7F7F7;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-ui-theme="ubuntu-yaru"] .glass-surface input:not([type="range"]):not([type="color"]):not([data-stepper-input="true"]):focus,
+html[data-ui-theme="ubuntu-yaru"] .glass-surface select:focus,
+html[data-ui-theme="ubuntu-yaru"] .glass-surface textarea:focus {
+  border-color: var(--ip-accent);
+  box-shadow: 0 0 0 2px rgba(var(--ip-accent-rgb), 0.26);
+}
+
+/* ============================================================================
+   Global Performance Overrides (Settings -> Display -> Performance)
+   ============================================================================ */
+html[data-perf-no-blur="true"] .glass-surface,
+html[data-perf-no-blur="true"] .glass-surface-subtle,
+html[data-perf-no-blur="true"] .glass-bar,
+html[data-perf-no-blur="true"] [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-perf-no-blur="true"]:not([data-ui-theme="material-you"]):not([data-ui-theme="ubuntu-yaru"]):not([data-ui-theme="carbon-forge"]) .glass-surface {
+  background: rgba(var(--ip-glass-rgb), 0.94) !important;
+}
+
+html[data-perf-no-blur="true"]:not([data-ui-theme="material-you"]):not([data-ui-theme="ubuntu-yaru"]):not([data-ui-theme="carbon-forge"]) .glass-surface-subtle {
+  background: rgba(var(--ip-glass-rgb), 0.88) !important;
+}
+
+html[data-perf-no-blur="true"]:not([data-ui-theme="material-you"]):not([data-ui-theme="ubuntu-yaru"]):not([data-ui-theme="carbon-forge"]) .glass-bar {
+  background: rgba(var(--ip-glass-rgb), 0.96) !important;
+}
+
+html[data-perf-no-glow="true"] .glass-surface,
+html[data-perf-no-glow="true"] .glass-surface-subtle,
+html[data-perf-no-glow="true"] .glass-bar,
+html[data-perf-no-glow="true"] button.bg-pulse {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.24) !important;
+}
+
+html[data-perf-no-glow="true"] body {
+  background-image: none !important;
+}
+
+html[data-perf-no-glow="true"] * {
+  text-shadow: none !important;
+}
+
+html[data-perf-no-anim="true"] *,
+html[data-perf-no-anim="true"] *::before,
+html[data-perf-no-anim="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
 }
 
 select option,

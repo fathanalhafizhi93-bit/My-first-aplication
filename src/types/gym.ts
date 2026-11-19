@@ -181,6 +181,5 @@ export type AppTab =
   | 'schedule'
   | 'history'
   | 'exercises'
-  | 'ringtones'
   | 'settings'
   | 'about';

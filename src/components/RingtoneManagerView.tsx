@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
 import {
   Bell,
   BellRing,
@@ -16,7 +15,6 @@ import {
 } from 'lucide-react';
 import { audioEngine, BUILTIN_RINGTONES } from '../lib/audioEngine';
 import { useI18n } from '../lib/i18n';
-import { SHARED_IDS, TAB_INDICATOR_SPRING } from '../lib/motionTokens';
 import {
   AndroidAlarmDiagnostics,
   getAndroidAlarmDiagnostics,
@@ -31,6 +29,7 @@ import { ConfirmDeleteModal } from './GlassModal';
 interface RingtoneManagerViewProps {
   profile: UserProfile;
   customRingtones: CustomRingtone[];
+  embeddedInSettings?: boolean;
   onUpdateProfile: (
     patch: Partial<
       Pick<
@@ -51,12 +50,12 @@ interface RingtoneManagerViewProps {
 export function RingtoneManagerView({
   profile,
   customRingtones,
+  embeddedInSettings = false,
   onUpdateProfile,
   onUploadRingtone,
   onDeleteRingtone,
 }: RingtoneManagerViewProps) {
   const { t } = useI18n();
-  const prefersReducedMotion = useReducedMotion();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [customTitle, setCustomTitle] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -208,26 +207,26 @@ export function RingtoneManagerView({
 
   return (
     <div className="space-y-6">
-      <div className="border-b border-white/10 pb-5">
-        <motion.span
-          layoutId={prefersReducedMotion ? undefined : SHARED_IDS.pageAccentBar}
-          transition={TAB_INDICATOR_SPRING}
-          aria-hidden="true"
-          className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
-        />
-        <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
-          {t('Pengaturan Ringtone & Audio Alarm', 'Ringtones & Alarm Audio Settings')}
-        </h1>
-        <p className="mt-1 text-sm text-[#9CA3AF]">
-          {t(
-            'Pilih nada alarm bawaan atau unggah file musik/audio Anda sendiri untuk pengingat jadwal gym dan penanda selesai istirahat.',
-            'Choose built-in alarm tones or upload your own audio files for workout reminders and rest completion.'
-          )}
-        </p>
-      </div>
+      {!embeddedInSettings && (
+        <div className="border-b border-white/10 pb-5">
+          <span
+            aria-hidden="true"
+            className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
+          />
+          <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
+            {t('Pengaturan Ringtone & Audio Alarm', 'Ringtones & Alarm Audio Settings')}
+          </h1>
+          <p className="mt-1 text-sm text-[#9CA3AF]">
+            {t(
+              'Pilih nada alarm bawaan atau unggah file musik/audio Anda sendiri untuk pengingat jadwal gym dan penanda selesai istirahat.',
+              'Choose built-in alarm tones or upload your own audio files for workout reminders and rest completion.'
+            )}
+          </p>
+        </div>
+      )}
 
       {/* Android APK Native Background Alarm Diagnostics */}
-      {runningNativeAndroid && (
+      {!embeddedInSettings && runningNativeAndroid && (
         <section className="glass-surface rounded-2xl border border-pulse/30 p-5 space-y-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-start gap-3">
@@ -338,6 +337,7 @@ export function RingtoneManagerView({
       )}
 
       {/* Master Audio & Behavior Controls */}
+      {!embeddedInSettings && (
       <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
         <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
           {t('Preferensi Suara & Notifikasi', 'Sound & Notification Preferences')}
@@ -457,6 +457,7 @@ export function RingtoneManagerView({
           </div>
         </div>
       </section>
+      )}
 
       {/* Upload Custom Ringtone */}
       <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">

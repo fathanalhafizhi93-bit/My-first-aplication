@@ -4,12 +4,15 @@ import {
   ArrowDown,
   ArrowUp,
   BookOpen,
+  Check,
+  CheckSquare,
   Clock,
   Dumbbell,
   Edit3,
   Plus,
   Repeat,
   Search,
+  Square,
   Timer,
   Trash2,
   X,
@@ -39,6 +42,7 @@ interface ExerciseManagerViewProps {
   onSelectDayKey: (dayKey: DayKey) => void;
   schedules: Record<DayKey, DaySchedule>;
   onAddExercise: (dayKey: DayKey, exercise: Omit<ExerciseItem, 'id'>) => Promise<void>;
+  onAddExercises: (dayKey: DayKey, exercises: Array<Omit<ExerciseItem, 'id'>>) => Promise<void>;
   onUpdateExercise: (
     dayKey: DayKey,
     exerciseId: string,
@@ -50,6 +54,65 @@ interface ExerciseManagerViewProps {
     exerciseId: string,
     direction: 'up' | 'down'
   ) => Promise<void>;
+}
+
+type EquipmentBucket =
+  | 'all'
+  | 'barbel'
+  | 'dumbbell'
+  | 'kabel'
+  | 'mesin'
+  | 'kettlebell'
+  | 'bodyweight'
+  | 'kardio';
+
+const EQUIPMENT_FILTERS: ReadonlyArray<{
+  id: EquipmentBucket;
+  labelId: string;
+  labelEn: string;
+}> = [
+  { id: 'all', labelId: 'Semua Alat', labelEn: 'All Equipment' },
+  { id: 'barbel', labelId: 'Barbel & EZ-Bar', labelEn: 'Barbell & EZ-Bar' },
+  { id: 'dumbbell', labelId: 'Dumbbell', labelEn: 'Dumbbell' },
+  { id: 'kabel', labelId: 'Kabel', labelEn: 'Cable' },
+  { id: 'mesin', labelId: 'Mesin', labelEn: 'Machine' },
+  { id: 'kettlebell', labelId: 'Kettlebell', labelEn: 'Kettlebell' },
+  { id: 'bodyweight', labelId: 'Tanpa Alat & Bar', labelEn: 'Bodyweight & Bars' },
+  { id: 'kardio', labelId: 'Alat Kardio', labelEn: 'Cardio Gear' },
+];
+
+function resolveEquipmentBucket(
+  equipment: string,
+  muscleGroup: MuscleGroup
+): Exclude<EquipmentBucket, 'all'> {
+  const eq = equipment.toLowerCase();
+  if (
+    eq.includes('treadmill') ||
+    eq.includes('air bike') ||
+    eq.includes('sepeda') ||
+    eq.includes('elliptical') ||
+    eq.includes('stairmaster') ||
+    eq.includes('dayung') ||
+    eq.includes('skipping')
+  ) {
+    return 'kardio';
+  }
+  if (eq.includes('kettlebell')) return 'kettlebell';
+  if (eq.includes('kabel')) return 'kabel';
+  if (eq.includes('dumbbell')) return 'dumbbell';
+  if (eq.includes('barbel') || eq.includes('ez-bar') || eq.includes('smith')) {
+    return eq.includes('mesin / smith') ? 'mesin' : 'barbel';
+  }
+  if (eq.includes('mesin')) return 'mesin';
+  if (
+    eq.includes('tanpa alat') ||
+    eq.includes('pull-up bar') ||
+    eq.includes('dip bar') ||
+    eq.includes('pelat beban')
+  ) {
+    return 'bodyweight';
+  }
+  return muscleGroup === 'Kardio' ? 'kardio' : 'bodyweight';
 }
 
 interface ExerciseFormState {
@@ -89,6 +152,7 @@ export function ExerciseManagerView({
   onSelectDayKey,
   schedules,
   onAddExercise,
+  onAddExercises,
   onUpdateExercise,
   onRemoveExercise,
   onMoveExercise,
@@ -97,6 +161,10 @@ export function ExerciseManagerView({
   const prefersReducedMotion = useReducedMotion();
   const [searchQuery, setSearchQuery] = useState('');
   const [muscleFilter, setMuscleFilter] = useState<'Semua' | MuscleGroup>('Semua');
+  const [equipmentFilter, setEquipmentFilter] = useState<EquipmentBucket>('all');
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedPresetNames, setSelectedPresetNames] = useState<string[]>([]);
+  const [batchAdding, setBatchAdding] = useState(false);
   const [showLibraryModal, setShowLibraryModal] = useState(false);
   const [addingPresetName, setAddingPresetName] = useState<string | null>(null);
   const [libraryErrorMsg, setLibraryErrorMsg] = useState<string | null>(null);
@@ -120,11 +188,19 @@ export function ExerciseManagerView({
   const schedule = schedules[selectedDayKey];
   const dayLabel = DAY_LABELS[lang][selectedDayKey].label;
   const secUnit = t('d', 's');
+  const remainingDaySlots = Math.max(0, 30 - schedule.exercises.length);
+
+  const scheduledNameSet = useMemo(
+    () => new Set(schedule.exercises.map((ex) => ex.name.trim().toLowerCase())),
+    [schedule.exercises]
+  );
 
   const filteredLibrary = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return EXERCISE_LIBRARY.filter((ex) => {
       const matchMuscle = muscleFilter === 'Semua' || ex.muscleGroup === muscleFilter;
+      const bucket = resolveEquipmentBucket(ex.equipment, ex.muscleGroup);
+      const matchEquipment = equipmentFilter === 'all' || bucket === equipmentFilter;
       const localizedMuscle = MUSCLE_LABELS[lang][ex.muscleGroup].toLowerCase();
       const matchQuery =
         !q ||
@@ -132,9 +208,9 @@ export function ExerciseManagerView({
         ex.equipment.toLowerCase().includes(q) ||
         ex.muscleGroup.toLowerCase().includes(q) ||
         localizedMuscle.includes(q);
-      return matchMuscle && matchQuery;
+      return matchMuscle && matchEquipment && matchQuery;
     });
-  }, [searchQuery, muscleFilter, lang]);
+  }, [searchQuery, muscleFilter, equipmentFilter, lang]);
 
   const showToast = (msg: string, isError = false) => {
     if (toastTimeoutRef.current !== null) {
@@ -315,17 +391,80 @@ export function ExerciseManagerView({
 
   const handleOpenLibrary = () => {
     setLibraryErrorMsg(null);
+    setSelectedPresetNames([]);
     setShowLibraryModal(true);
   };
 
   const handleCloseLibrary = () => {
-    if (addingPresetName !== null) return;
+    if (addingPresetName !== null || batchAdding) return;
     setShowLibraryModal(false);
     setLibraryErrorMsg(null);
+    setSelectedPresetNames([]);
+  };
+
+  const handleToggleSelectPreset = (presetName: string) => {
+    if (batchAdding || addingPresetName !== null) return;
+    setLibraryErrorMsg(null);
+    setSelectedPresetNames((prev) => {
+      if (prev.includes(presetName)) {
+        haptics.buttonTap();
+        return prev.filter((name) => name !== presetName);
+      }
+      if (prev.length >= remainingDaySlots) {
+        haptics.cooldownBlocked();
+        setLibraryErrorMsg(
+          remainingDaySlots === 0
+            ? t(
+                'Jadwal hari ini sudah penuh (maksimal 30 gerakan).',
+                'This day’s schedule is full (maximum 30 exercises).'
+              )
+            : t(
+                `Maksimal pilih ${remainingDaySlots} gerakan tambahan sesuai sisa kapasitas hari ${dayLabel}.`,
+                `You can select up to ${remainingDaySlots} more exercises for ${dayLabel}.`
+              )
+        );
+        return prev;
+      }
+      haptics.buttonTap();
+      return [...prev, presetName];
+    });
+  };
+
+  const handleBatchAddPresets = async () => {
+    if (batchAdding || addingPresetName !== null || selectedPresetNames.length === 0) return;
+    const chosen = selectedPresetNames
+      .map((name) => EXERCISE_LIBRARY.find((ex) => ex.name === name))
+      .filter((ex): ex is Omit<ExerciseItem, 'id'> => Boolean(ex));
+    if (chosen.length === 0) return;
+
+    setBatchAdding(true);
+    setLibraryErrorMsg(null);
+    try {
+      await onAddExercises(selectedDayKey, chosen);
+      haptics.setComplete();
+      const addedCount = chosen.length;
+      setSelectedPresetNames([]);
+      setMultiSelectMode(false);
+      setShowLibraryModal(false);
+      showToast(
+        t(
+          `${addedCount} gerakan berhasil ditambahkan ke hari ${dayLabel}.`,
+          `${addedCount} exercises added to ${dayLabel}.`
+        )
+      );
+    } catch (err) {
+      setLibraryErrorMsg(
+        err instanceof Error
+          ? err.message
+          : t('Gagal menambahkan gerakan terpilih.', 'Failed to add selected exercises.')
+      );
+    } finally {
+      setBatchAdding(false);
+    }
   };
 
   const handleQuickAddPreset = async (preset: Omit<ExerciseItem, 'id'>) => {
-    if (addingPresetName !== null) return;
+    if (addingPresetName !== null || batchAdding) return;
     setAddingPresetName(preset.name);
     setLibraryErrorMsg(null);
     try {
@@ -352,9 +491,7 @@ export function ExerciseManagerView({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <motion.span
-            layoutId={prefersReducedMotion ? undefined : SHARED_IDS.pageAccentBar}
-            transition={TAB_INDICATOR_SPRING}
+          <span
             aria-hidden="true"
             className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
           />
@@ -934,8 +1071,8 @@ export function ExerciseManagerView({
         onClose={handleCloseLibrary}
         title={`${t('Pustaka Gerakan Siap Pakai', 'Ready-to-Use Exercise Library')} — ${dayLabel}`}
         subtitle={t(
-          'Cari atau filter berdasarkan kelompok otot, lalu tekan Tambah untuk langsung memasukkan ke jadwal hari ini.',
-          'Search or filter by muscle group, then tap Add to immediately add it to this day’s schedule.'
+          'Cari, filter otot & alat, lalu tambah langsung satu per satu atau aktifkan Pilih Banyak.',
+          'Search, filter by muscle & equipment, and quick-add individually or switch on Multi-Select.'
         )}
         maxWidthClass="max-w-3xl"
         accentBorderClass="border-pulse/30"
@@ -947,49 +1084,117 @@ export function ExerciseManagerView({
             </p>
           )}
 
-          {/* Search Input */}
-          <div className="relative w-full">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t('Cari nama gerakan atau alat...', 'Search exercise or equipment...')}
-              className="h-11 w-full rounded-xl border border-white/12 bg-[#0A0B0E]/85 pl-10 pr-10 text-sm text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-pulse focus:outline-none"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                aria-label={t('Hapus pencarian', 'Clear search')}
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-white/10 hover:text-[#F4F5F7]"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
+          {/* Search & Multi-Select Mode Toolbar */}
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6B7280]" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('Cari nama gerakan atau alat...', 'Search exercise or equipment...')}
+                className="h-11 w-full rounded-xl border border-white/12 bg-[#0A0B0E]/85 pl-10 pr-10 text-sm text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-pulse focus:outline-none"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  aria-label={t('Hapus pencarian', 'Clear search')}
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-[#9CA3AF] hover:bg-white/10 hover:text-[#F4F5F7]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                haptics.toggle();
+                setMultiSelectMode((prev) => {
+                  const next = !prev;
+                  if (!next) {
+                    setSelectedPresetNames([]);
+                    setLibraryErrorMsg(null);
+                  }
+                  return next;
+                });
+              }}
+              className={`inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-bold transition-colors whitespace-nowrap ${
+                multiSelectMode
+                  ? 'border-pulse bg-pulse text-pulse-fg'
+                  : 'border-white/15 bg-[#0A0B0E]/85 text-[#D1D5DB] hover:border-pulse/50 hover:text-pulse'
+              }`}
+            >
+              {multiSelectMode ? (
+                <CheckSquare className="h-4 w-4" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+              <span>{t('Pilih Banyak', 'Multi-Select')}</span>
+            </button>
           </div>
 
-          {/* Muscle Filter Controls */}
-          <div className="flex flex-wrap gap-1.5">
-            {(['Semua', ...MUSCLE_GROUPS] as const).map((group) => {
-              const active = muscleFilter === group;
-              const groupLabel =
-                group === 'Semua' ? t('Semua', 'All') : MUSCLE_LABELS[lang][group];
-              return (
-                <button
-                  key={group}
-                  type="button"
-                  onClick={() => setMuscleFilter(group)}
-                  className={`min-h-[38px] rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
-                    active
-                      ? 'bg-pulse text-pulse-fg font-bold'
-                      : 'border border-white/10 bg-[#0A0B0E]/75 text-[#9CA3AF] hover:text-[#F4F5F7]'
-                  }`}
-                >
-                  {groupLabel}
-                </button>
-              );
-            })}
+          {/* Muscle Group Filter Row */}
+          <div className="space-y-2">
+            <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap">
+              {(['Semua', ...MUSCLE_GROUPS] as const).map((group) => {
+                const active = muscleFilter === group;
+                const groupLabel =
+                  group === 'Semua' ? t('Semua Otot', 'All Muscles') : MUSCLE_LABELS[lang][group];
+                return (
+                  <button
+                    key={group}
+                    type="button"
+                    onClick={() => setMuscleFilter(group)}
+                    className={`min-h-[36px] shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors whitespace-nowrap ${
+                      active
+                        ? 'bg-pulse text-pulse-fg font-bold'
+                        : 'border border-white/10 bg-[#0A0B0E]/75 text-[#9CA3AF] hover:text-[#F4F5F7]'
+                    }`}
+                  >
+                    {groupLabel}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Equipment Filter Row */}
+            <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5 sm:flex-wrap">
+              {EQUIPMENT_FILTERS.map((eq) => {
+                const active = equipmentFilter === eq.id;
+                return (
+                  <button
+                    key={eq.id}
+                    type="button"
+                    onClick={() => setEquipmentFilter(eq.id)}
+                    className={`min-h-[34px] shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors whitespace-nowrap ${
+                      active
+                        ? 'border border-pulse/60 bg-pulse/18 text-pulse font-bold'
+                        : 'border border-white/10 bg-[#0A0B0E]/60 text-[#9CA3AF] hover:text-[#F4F5F7]'
+                    }`}
+                  >
+                    {t(eq.labelId, eq.labelEn)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Live Match Counter */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#9CA3AF]">
+            <span className="font-mono tabular-nums">
+              {t(
+                `${filteredLibrary.length} dari ${EXERCISE_LIBRARY.length} gerakan tersedia`,
+                `${filteredLibrary.length} of ${EXERCISE_LIBRARY.length} exercises shown`
+              )}
+            </span>
+            <span className="font-mono tabular-nums">
+              {t(
+                `Sisa slot ${dayLabel}: ${remainingDaySlots}/30`,
+                `${dayLabel} slots left: ${remainingDaySlots}/30`
+              )}
+            </span>
           </div>
 
           {/* Preset Exercise Grid */}
@@ -997,8 +1202,8 @@ export function ExerciseManagerView({
             <div className="rounded-xl border border-white/10 bg-[#0A0B0E]/65 p-6 text-center space-y-3">
               <p className="text-sm text-[#9CA3AF]">
                 {t(
-                  'Tidak ada gerakan yang cocok dengan pencarian atau filter otot ini.',
-                  'No movements match your search or muscle group filter.'
+                  'Tidak ada gerakan yang cocok dengan pencarian, filter otot, atau alat ini.',
+                  'No movements match your search, muscle group, or equipment filter.'
                 )}
               </p>
               <button
@@ -1006,10 +1211,11 @@ export function ExerciseManagerView({
                 onClick={() => {
                   setSearchQuery('');
                   setMuscleFilter('Semua');
+                  setEquipmentFilter('all');
                 }}
                 className="inline-flex min-h-[38px] items-center justify-center rounded-lg border border-white/15 px-3.5 py-1.5 text-xs font-semibold text-[#F4F5F7] hover:border-pulse hover:text-pulse"
               >
-                {t('Reset Pencarian & Filter', 'Reset Search & Filter')}
+                {t('Reset Pencarian & Filter', 'Reset Search & Filters')}
               </button>
             </div>
           ) : (
@@ -1017,6 +1223,58 @@ export function ExerciseManagerView({
               {filteredLibrary.map((preset) => {
                 const mode = resolveExerciseTrackingMode(preset);
                 const isAddingThis = addingPresetName === preset.name;
+                const isAlreadyScheduled = scheduledNameSet.has(preset.name.toLowerCase());
+                const isSelected = selectedPresetNames.includes(preset.name);
+
+                if (multiSelectMode) {
+                  return (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      disabled={batchAdding}
+                      onClick={() => handleToggleSelectPreset(preset.name)}
+                      className={`flex w-full items-center justify-between gap-3 rounded-xl border p-3.5 text-left transition-colors ${
+                        isSelected
+                          ? 'border-pulse bg-pulse/12'
+                          : 'border-white/10 bg-[#0A0B0E]/75 hover:border-white/25'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-[#F4F5F7]">
+                          {preset.name}
+                        </p>
+                        <p className="mt-1 text-xs text-[#9CA3AF]">
+                          {MUSCLE_LABELS[lang][preset.muscleGroup]} · {preset.equipment} ·{' '}
+                          <span
+                            className={`font-mono tabular-nums ${
+                              mode === 'timer' ? 'text-[#38BDF8]' : ''
+                            }`}
+                          >
+                            {mode === 'timer'
+                              ? `${t('Timer', 'Timer')} ${preset.targetSets}×${formatCompactDuration(
+                                  resolveTargetDurationSeconds(preset),
+                                  lang
+                                )}`
+                              : `${preset.targetSets}×${preset.targetReps}`}
+                          </span>
+                          {isAlreadyScheduled && (
+                            <span className="text-pulse"> · {t('Sudah di jadwal', 'Scheduled')}</span>
+                          )}
+                        </p>
+                      </div>
+                      <span
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${
+                          isSelected
+                            ? 'border-pulse bg-pulse text-pulse-fg'
+                            : 'border-white/20 bg-[#13161C] text-transparent'
+                        }`}
+                      >
+                        <Check className="h-4 w-4" strokeWidth={3} />
+                      </span>
+                    </button>
+                  );
+                }
+
                 return (
                   <div
                     key={preset.name}
@@ -1038,11 +1296,14 @@ export function ExerciseManagerView({
                               )}`
                             : `${preset.targetSets}×${preset.targetReps}`}
                         </span>
+                        {isAlreadyScheduled && (
+                          <span className="text-pulse"> · {t('Sudah di jadwal', 'Scheduled')}</span>
+                        )}
                       </p>
                     </div>
                     <button
                       type="button"
-                      disabled={addingPresetName !== null}
+                      disabled={addingPresetName !== null || remainingDaySlots === 0}
                       onClick={() => handleQuickAddPreset(preset)}
                       className="inline-flex min-h-[40px] items-center gap-1 rounded-xl border border-pulse/40 bg-pulse/10 px-3 py-2 text-xs font-bold text-pulse transition-colors hover:bg-pulse hover:text-pulse-fg active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 whitespace-nowrap shrink-0"
                     >
@@ -1052,6 +1313,55 @@ export function ExerciseManagerView({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Sticky Bottom Batch Action Bar when Multi-Select is active */}
+          {multiSelectMode && (
+            <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-pulse/35 bg-[#13161C]/95 p-3 shadow-lg">
+              <div className="text-xs">
+                <p className="font-bold text-[#F4F5F7] font-mono tabular-nums">
+                  {t(
+                    `${selectedPresetNames.length} gerakan dipilih`,
+                    `${selectedPresetNames.length} exercises selected`
+                  )}
+                </p>
+                <p className="text-[11px] text-[#9CA3AF] font-mono tabular-nums">
+                  {t(
+                    `Kapasitas tersisa: ${remainingDaySlots} slot`,
+                    `Remaining capacity: ${remainingDaySlots} slots`
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedPresetNames.length > 0 && (
+                  <button
+                    type="button"
+                    disabled={batchAdding}
+                    onClick={() => {
+                      setSelectedPresetNames([]);
+                      setLibraryErrorMsg(null);
+                    }}
+                    className="min-h-[40px] rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold text-[#D1D5DB] hover:bg-white/5 disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {t('Reset Pilihan', 'Clear')}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={batchAdding || selectedPresetNames.length === 0}
+                  onClick={handleBatchAddPresets}
+                  className="inline-flex min-h-[40px] items-center gap-1.5 rounded-xl bg-pulse px-4 py-2 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  {batchAdding
+                    ? t('Menambahkan...', 'Adding...')
+                    : t(
+                        `Tambahkan (${selectedPresetNames.length})`,
+                        `Add (${selectedPresetNames.length})`
+                      )}
+                </button>
+              </div>
             </div>
           )}
         </div>

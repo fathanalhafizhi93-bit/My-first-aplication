@@ -1,4 +1,4 @@
-import { CalendarDays, Dumbbell, History, Music, PlayCircle } from 'lucide-react';
+import { CalendarDays, Dumbbell, History, PlayCircle } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { formatRestDuration } from '../lib/dateUtils';
 import { DayTimePhase, PHASE_THEME_TOKENS, useI18n } from '../lib/i18n';
@@ -27,13 +27,13 @@ export function MobileBottomNav({
   const isCarbon = uiTheme === 'carbon-forge';
   const isMaterialYou = uiTheme === 'material-you';
   const isAero = uiTheme === 'aeroglass';
+  const isYaru = uiTheme === 'ubuntu-yaru';
 
   const tabs: { id: AppTab; label: string; Icon: typeof PlayCircle }[] = [
     { id: 'today', label: t('Hari Ini', 'Today'), Icon: PlayCircle },
     { id: 'schedule', label: t('Jadwal', 'Schedule'), Icon: CalendarDays },
     { id: 'history', label: t('Riwayat', 'History'), Icon: History },
     { id: 'exercises', label: t('Gerakan', 'Exercises'), Icon: Dumbbell },
-    { id: 'ringtones', label: t('Ringtone', 'Ringtones'), Icon: Music },
   ];
 
   return (
@@ -42,18 +42,20 @@ export function MobileBottomNav({
       className={
         isFrosted
           ? 'glass-bar fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-3 right-3 z-40 rounded-[28px] border border-white/22 px-1.5 py-1 shadow-[0_18px_48px_-12px_rgba(0,0,0,0.78)] transition-all duration-300 md:hidden'
-          : `glass-bar fixed bottom-0 left-0 right-0 z-40 border-t pb-[env(safe-area-inset-bottom)] transition-colors duration-500 md:hidden ${
+          : `glass-bar fixed bottom-0 left-0 right-0 z-40 border-t pb-[env(safe-area-inset-bottom)] transition-colors duration-300 md:hidden ${
               isAero
                 ? 'border-sky-200/35 px-1'
                 : isMaterialYou
                   ? 'border-md-outline-variant'
-                  : isCarbon
-                    ? 'border-white/12'
-                    : phaseToken.headerTint
+                  : isYaru
+                    ? 'border-white/10'
+                    : isCarbon
+                      ? 'border-white/12'
+                      : phaseToken.headerTint
             }`
       }
     >
-      <div className={`grid items-center ${isFrosted ? 'h-14 grid-cols-5 gap-1' : 'h-16 grid-cols-5'}`}>
+      <div className={`grid items-center ${isFrosted ? 'h-14 grid-cols-4 gap-1' : 'h-16 grid-cols-4'}`}>
         {tabs.map(({ id, label, Icon }) => {
           const active = activeTab === id || (id === 'today' && activeTab === 'workout');
           const showCompactRest = id === 'today' && restRunning && activeTab !== 'workout';
@@ -69,9 +71,11 @@ export function MobileBottomNav({
                     ? 'min-h-[50px] gap-0.5 rounded-xl mx-0.5'
                     : isMaterialYou
                       ? 'min-h-[52px] gap-1'
-                      : isCarbon
-                        ? 'min-h-[48px] gap-1 rounded-md'
-                        : 'min-h-[48px] gap-1'
+                      : isYaru
+                        ? 'min-h-[48px] gap-1 rounded-lg'
+                        : isCarbon
+                          ? 'min-h-[48px] gap-1 rounded-md'
+                          : 'min-h-[48px] gap-1'
               } ${
                 active
                   ? isMaterialYou
@@ -79,7 +83,9 @@ export function MobileBottomNav({
                     : 'text-pulse'
                   : isMaterialYou
                     ? 'text-md-on-surface-variant'
-                    : 'text-[#9CA3AF]'
+                    : isYaru
+                      ? 'text-[#B5B4B0]'
+                      : 'text-[#9CA3AF]'
               }`}
             >
               {active && isAero && (

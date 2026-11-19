@@ -1,6 +1,7 @@
 import { RefObject, useEffect, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { MascotCompanionState } from '../hooks/useMascotCompanion';
+import { audioEngine } from '../lib/audioEngine';
 import { haptics } from '../lib/haptics';
 import { PHASE_THEME_TOKENS, useI18n } from '../lib/i18n';
 import { MascotOrbFace } from './MascotOrbFace';
@@ -64,6 +65,7 @@ export function TodayMascot({
         ref={orbAnchorRef}
         type="button"
         onClick={() => {
+          void audioEngine.unlock();
           haptics.orbSnap();
           companion.triggerNextReaction();
         }}
@@ -109,7 +111,10 @@ export function TodayMascot({
 
         <button
           type="button"
-          onClick={companion.triggerNextReaction}
+          onClick={() => {
+            void audioEngine.unlock();
+            companion.triggerNextReaction();
+          }}
           className="mt-1.5 inline-flex items-center text-[11px] font-medium text-[#6B7280] transition-colors hover:text-[#D1D5DB]"
         >
           {t('Ketuk orb untuk reaksi lain', 'Tap orb for another reaction')}

@@ -26,8 +26,10 @@ export function GlassModal({
   closeAriaLabel,
   children,
 }: GlassModalProps) {
-  const { t, uiTheme } = useI18n();
+  const { t, uiTheme, performance } = useI18n();
   const isMaterialYou = uiTheme === 'material-you';
+  const disableBlur = performance.noBlur || uiTheme === 'ubuntu-yaru' || isMaterialYou;
+  const disableAnim = performance.noAnimations;
   const backdropMouseDownRef = useRef(false);
 
   useBodyScrollLock(open);
@@ -55,7 +57,7 @@ export function GlassModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.16 }}
+            transition={{ duration: disableAnim ? 0 : 0.16 }}
             onMouseDown={(e) => {
               backdropMouseDownRef.current = e.target === e.currentTarget;
             }}
@@ -65,13 +67,15 @@ export function GlassModal({
               }
               backdropMouseDownRef.current = false;
             }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md"
+            className={`fixed inset-0 z-[100] flex items-center justify-center p-4 ${
+              disableBlur ? 'bg-black/82' : 'bg-black/75 backdrop-blur-md'
+            }`}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              initial={disableAnim ? false : { opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 6 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              exit={disableAnim ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 6 }}
+              transition={{ duration: disableAnim ? 0 : 0.18, ease: [0.16, 1, 0.3, 1] }}
               onClick={(e) => e.stopPropagation()}
               className={`glass-surface flex max-h-[min(88dvh,calc(100dvh-2rem))] w-full flex-col overflow-hidden border shadow-2xl ${
                 isMaterialYou ? 'rounded-[28px]' : 'rounded-2xl'
