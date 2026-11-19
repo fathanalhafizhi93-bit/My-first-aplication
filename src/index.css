@@ -282,6 +282,226 @@ html[data-ui-theme="carbon-forge"] .glass-surface textarea {
   backdrop-filter: none;
 }
 
+/* ============================================================================
+   Theme 4: Material You (Dynamic Tonal Surfaces, Expressive Curves, Zero Blur)
+   ============================================================================ */
+html[data-ui-theme="material-you"] body {
+  background-image: radial-gradient(
+    ellipse 85% 55% at 50% -8%,
+    rgba(var(--ip-accent-rgb), 0.085),
+    transparent 70%
+  );
+}
+
+html[data-ui-theme="material-you"] .glass-surface {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(var(--ip-accent-rgb), 0.075) 0%,
+      rgba(var(--ip-accent-rgb), 0.04) 100%
+    ),
+    rgba(var(--ip-glass-rgb), 0.96);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(var(--ip-accent-rgb), 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 6px 20px -12px rgba(0, 0, 0, 0.55);
+}
+
+html[data-ui-theme="material-you"] .glass-surface.rounded-2xl {
+  border-radius: 1.75rem;
+}
+
+html[data-ui-theme="material-you"] .glass-surface-subtle {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(var(--ip-accent-rgb), 0.11) 0%,
+      rgba(var(--ip-accent-rgb), 0.07) 100%
+    ),
+    rgba(var(--ip-glass-rgb), 0.92);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(var(--ip-accent-rgb), 0.18);
+  box-shadow: none;
+}
+
+html[data-ui-theme="material-you"] .glass-surface-subtle.rounded-2xl {
+  border-radius: 1.5rem;
+}
+
+html[data-ui-theme="material-you"] .glass-surface-subtle.rounded-xl {
+  border-radius: 1.125rem;
+}
+
+html[data-ui-theme="material-you"] .glass-bar {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(var(--ip-accent-rgb), 0.08) 0%,
+      rgba(var(--ip-accent-rgb), 0.05) 100%
+    ),
+    rgba(var(--ip-glass-rgb), 0.97);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: rgba(var(--ip-accent-rgb), 0.14);
+  box-shadow: 0 4px 16px -10px rgba(0, 0, 0, 0.45);
+}
+
+/* Expressive Material 3 pill primary actions & tonal filled controls */
+html[data-ui-theme="material-you"] button.bg-pulse {
+  border-radius: 9999px;
+  box-shadow: 0 4px 14px -6px rgba(var(--ip-accent-rgb), 0.45);
+}
+
+html[data-ui-theme="material-you"] .glass-surface input:not([type="range"]):not([type="color"]),
+html[data-ui-theme="material-you"] .glass-surface select,
+html[data-ui-theme="material-you"] .glass-surface textarea {
+  background-color: rgba(var(--ip-accent-rgb), 0.06);
+  border-color: rgba(var(--ip-accent-rgb), 0.2);
+  border-radius: 1rem;
+  backdrop-filter: none;
+}
+
+html[data-ui-theme="material-you"] .glass-surface input:not([type="range"]):not([type="color"]):focus,
+html[data-ui-theme="material-you"] .glass-surface select:focus,
+html[data-ui-theme="material-you"] .glass-surface textarea:focus {
+  border-color: var(--ip-accent);
+  background-color: rgba(var(--ip-accent-rgb), 0.09);
+}
+
+/* ============================================================================
+   Theme 5: AeroGlass (Modern Windows Vista / 7 Glossy Translucent Glass)
+   ============================================================================ */
+html[data-ui-theme="aeroglass"] body {
+  background-image:
+    radial-gradient(
+      ellipse 95% 60% at 18% -10%,
+      rgba(56, 189, 248, 0.24),
+      rgba(14, 165, 233, 0.06) 52%,
+      transparent 78%
+    ),
+    radial-gradient(
+      ellipse 80% 55% at 88% 12%,
+      rgba(125, 211, 252, 0.16),
+      transparent 72%
+    ),
+    linear-gradient(180deg, #071525 0%, #06101B 48%, #040B14 100%);
+  background-attachment: fixed;
+}
+
+html[data-ui-theme="aeroglass"] .glass-surface {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.23) 0%,
+      rgba(255, 255, 255, 0.09) 46%,
+      rgba(255, 255, 255, 0.015) 47.5%,
+      rgba(125, 211, 252, 0.06) 100%
+    ),
+    linear-gradient(
+      155deg,
+      rgba(var(--ip-glass-rgb), 0.54) 0%,
+      rgba(var(--ip-glass-rgb), 0.36) 55%,
+      rgba(6, 18, 32, 0.62) 100%
+    );
+  backdrop-filter: blur(20px) saturate(185%) brightness(1.08);
+  -webkit-backdrop-filter: blur(20px) saturate(185%) brightness(1.08);
+  border-color: rgba(186, 230, 253, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.56),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(56, 189, 248, 0.18),
+    0 18px 42px -16px rgba(0, 0, 0, 0.78),
+    0 0 28px -12px rgba(56, 189, 248, 0.22);
+}
+
+html[data-ui-theme="aeroglass"] .glass-surface.rounded-2xl {
+  border-radius: 0.875rem;
+}
+
+html[data-ui-theme="aeroglass"] .glass-surface-subtle {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.17) 0%,
+      rgba(255, 255, 255, 0.06) 46%,
+      rgba(255, 255, 255, 0.01) 48%,
+      rgba(56, 189, 248, 0.05) 100%
+    ),
+    rgba(var(--ip-glass-rgb), 0.42);
+  backdrop-filter: blur(16px) saturate(170%) brightness(1.06);
+  -webkit-backdrop-filter: blur(16px) saturate(170%) brightness(1.06);
+  border-color: rgba(186, 230, 253, 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+html[data-ui-theme="aeroglass"] .glass-surface-subtle.rounded-2xl {
+  border-radius: 0.875rem;
+}
+
+html[data-ui-theme="aeroglass"] .glass-surface-subtle.rounded-xl {
+  border-radius: 0.75rem;
+}
+
+html[data-ui-theme="aeroglass"] .glass-bar {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.26) 0%,
+      rgba(255, 255, 255, 0.1) 47%,
+      rgba(255, 255, 255, 0.02) 49%,
+      rgba(56, 189, 248, 0.08) 100%
+    ),
+    rgba(var(--ip-glass-rgb), 0.56);
+  backdrop-filter: blur(24px) saturate(190%) brightness(1.08);
+  -webkit-backdrop-filter: blur(24px) saturate(190%) brightness(1.08);
+  border-color: rgba(186, 230, 253, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.52),
+    inset 0 -1px 0 rgba(125, 211, 252, 0.2),
+    0 12px 32px -12px rgba(0, 0, 0, 0.65);
+}
+
+/* Signature Aero glossy split-sheen on primary action buttons */
+html[data-ui-theme="aeroglass"] button.bg-pulse {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0.16) 47%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(255, 255, 255, 0.12) 100%
+  );
+  border-radius: 0.75rem;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 8px 22px -8px rgba(var(--ip-accent-rgb), 0.48),
+    0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+html[data-ui-theme="aeroglass"] .glass-surface input:not([type="range"]):not([type="color"]),
+html[data-ui-theme="aeroglass"] .glass-surface select,
+html[data-ui-theme="aeroglass"] .glass-surface textarea {
+  background-color: rgba(7, 20, 35, 0.56);
+  border-color: rgba(186, 230, 253, 0.28);
+  border-radius: 0.625rem;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+html[data-ui-theme="aeroglass"] .glass-surface input:not([type="range"]):not([type="color"]):focus,
+html[data-ui-theme="aeroglass"] .glass-surface select:focus,
+html[data-ui-theme="aeroglass"] .glass-surface textarea:focus {
+  border-color: rgba(125, 211, 252, 0.75);
+  box-shadow:
+    0 0 0 2px rgba(56, 189, 248, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
 select option,
 select optgroup {
   background-color: #13161C;

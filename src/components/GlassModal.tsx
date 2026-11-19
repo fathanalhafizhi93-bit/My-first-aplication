@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { haptics } from '../lib/haptics';
 import { useI18n } from '../lib/i18n';
 import { ModalPortal, useBodyScrollLock } from './ModalPortal';
 
@@ -131,6 +132,7 @@ export function ConfirmDeleteModal({
   }, [open]);
 
   const handleConfirm = async () => {
+    haptics.destructive();
     setDeleting(true);
     setDeleteError(null);
     try {

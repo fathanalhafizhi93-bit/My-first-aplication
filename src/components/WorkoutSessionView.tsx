@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft,
   Check,
@@ -27,6 +27,11 @@ import {
   resolveDayTimePhase,
   useI18n,
 } from '../lib/i18n';
+import {
+  resolveCardRadiusPx,
+  SHARED_IDS,
+  SHARED_LAYOUT_SPRING,
+} from '../lib/motionTokens';
 import {
   DayKey,
   DaySchedule,
@@ -196,7 +201,9 @@ export function WorkoutSessionView({
   onOpenExerciseManager,
   onOpenScheduleManager,
 }: WorkoutSessionViewProps) {
-  const { lang, t, todayThemeMode } = useI18n();
+  const { lang, t, todayThemeMode, uiTheme } = useI18n();
+  const prefersReducedMotion = useReducedMotion();
+  const cardRadiusPx = resolveCardRadiusPx(uiTheme);
   const [expandedNotes, setExpandedNotes] = useState<Record<string, boolean>>({});
 
   const activeSchedule = schedules[todayDayKey];
@@ -221,7 +228,11 @@ export function WorkoutSessionView({
   return (
     <div className="space-y-5">
       {/* Focused Session Top Header with Back Button */}
-      <section
+      <motion.section
+        layout={!prefersReducedMotion}
+        layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutHeroCard}
+        transition={SHARED_LAYOUT_SPRING}
+        style={{ borderRadius: cardRadiusPx }}
         className={`glass-surface rounded-2xl border p-4 sm:p-5 transition-colors ${phaseToken.subtleBorder}`}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -250,23 +261,34 @@ export function WorkoutSessionView({
             <p className="text-xs font-semibold text-[#9CA3AF]">
               {dayLabel} · {t('Fokus Set & Reps', 'Set & Reps Focus')}
             </p>
-            <h1 className="mt-0.5 font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
+            <motion.h1
+              layout={prefersReducedMotion ? false : 'position'}
+              layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutTitle}
+              transition={SHARED_LAYOUT_SPRING}
+              className="mt-0.5 font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F4F5F7]"
+            >
               {activeSchedule.isGymDay
                 ? activeSchedule.focusTitle
                 : `${dayLabel} — ${t('Hari Istirahat', 'Rest Day')}`}
-            </h1>
+            </motion.h1>
           </div>
         </div>
 
         {activeSchedule.isGymDay && totalSets > 0 && (
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+          <motion.div
+            layout={!prefersReducedMotion}
+            layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutProgress}
+            transition={SHARED_LAYOUT_SPRING}
+            style={{ borderRadius: 9999 }}
+            className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10"
+          >
             <div
               className="h-full w-full origin-left rounded-full bg-pulse transition-transform duration-300 ease-out"
               style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressPct / 100))})` }}
             />
-          </div>
+          </motion.div>
         )}
-      </section>
+      </motion.section>
 
       {/* Session Complete Banner with Quick Return to Hero Celebration */}
       {allSessionCompleted && (
@@ -297,7 +319,11 @@ export function WorkoutSessionView({
 
       {/* Compact Rest Timer Above Exercise Sets */}
       {activeSchedule.isGymDay && todayEntries.length > 0 && (
-        <section
+        <motion.section
+          layout={!prefersReducedMotion}
+          layoutId={prefersReducedMotion ? undefined : SHARED_IDS.restTimerCard}
+          transition={SHARED_LAYOUT_SPRING}
+          style={{ borderRadius: cardRadiusPx }}
           className={`glass-surface rounded-2xl border p-3.5 sm:p-4 transition-colors ${
             restRunning
               ? 'border-pulse/50'
@@ -322,9 +348,14 @@ export function WorkoutSessionView({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-baseline gap-2.5">
-                    <span className="font-mono text-2xl font-extrabold leading-none tracking-tight tabular-nums text-[#F4F5F7]">
+                    <motion.span
+                      layout={prefersReducedMotion ? false : 'position'}
+                      layoutId={prefersReducedMotion ? undefined : SHARED_IDS.restTimerDigits}
+                      transition={SHARED_LAYOUT_SPRING}
+                      className="font-mono text-2xl font-extrabold leading-none tracking-tight tabular-nums text-[#F4F5F7]"
+                    >
                       {formatRestDuration(restRemaining)}
-                    </span>
+                    </motion.span>
                     <span
                       className={`truncate text-xs font-semibold ${
                         restRemaining === 0
@@ -409,7 +440,7 @@ export function WorkoutSessionView({
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
       )}
 
       {/* Centered Anti-Misclick Cooldown Popup */}

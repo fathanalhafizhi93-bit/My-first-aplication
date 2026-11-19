@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { RefObject, useState } from 'react';
+import { motion, useReducedMotion } from 'motion/react';
 import {
   ArrowRight,
   Bell,
@@ -34,10 +35,16 @@ import {
   TimerDirection,
   WorkoutLogEntry,
 } from '../types/gym';
+import { MascotCompanionState } from '../hooks/useMascotCompanion';
+import {
+  resolveCardRadiusPx,
+  SHARED_IDS,
+  SHARED_LAYOUT_SPRING,
+} from '../lib/motionTokens';
 import { FluidClockDisplay } from './FluidClockDisplay';
 import { PhaseLogoEmblem } from './PhaseLogoEmblem';
 import { PWAInstallCard } from './PWAInstallBanner';
-import { MascotMood, TodayMascot } from './TodayMascot';
+import { TodayMascot } from './TodayMascot';
 
 export interface ExerciseTimerState {
   direction: TimerDirection;
@@ -59,11 +66,10 @@ interface TodayWorkoutViewProps {
   restRemaining: number;
   restRunning: boolean;
   restExerciseLabel: string | null;
-  justClapped: boolean;
-  dayJustChanged: boolean;
-  userName: string;
-  isOpeningGreeting: boolean;
-  exerciseTimers: Record<string, ExerciseTimerState>;
+  companion: MascotCompanionState;
+  heroOrbAnchorRef: RefObject<HTMLButtonElement | null>;
+  hideHeroOrbVisual: boolean;
+  onHeroMascotVisibilityChange: (visible: boolean) => void;
   onToggleRestPause: () => void;
   onResetRest: () => void;
   onAdjustRest: (deltaSeconds: number) => void;
@@ -85,11 +91,10 @@ export function TodayWorkoutView({
   restRemaining,
   restRunning,
   restExerciseLabel,
-  justClapped,
-  dayJustChanged,
-  userName,
-  isOpeningGreeting,
-  exerciseTimers,
+  companion,
+  heroOrbAnchorRef,
+  hideHeroOrbVisual,
+  onHeroMascotVisibilityChange,
   onToggleRestPause,
   onResetRest,
   onAdjustRest,
@@ -99,6 +104,8 @@ export function TodayWorkoutView({
   onOpenScheduleManager,
 }: TodayWorkoutViewProps) {
   const { lang, t, clockFormat, todayThemeMode, uiTheme } = useI18n();
+  const prefersReducedMotion = useReducedMotion();
+  const cardRadiusPx = resolveCardRadiusPx(uiTheme);
   const [imgFailed, setImgFailed] = useState(false);
 
   const activeSchedule = schedules[todayDayKey];
@@ -114,9 +121,6 @@ export function TodayWorkoutView({
     0
   );
   const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
-
-  const activeTimerEntry = todayEntries.find((e) => exerciseTimers[e.exerciseId]?.running);
-  const hasAnyTimerRunning = Boolean(activeTimerEntry);
 
   const totalVolumeKg = todayEntries.reduce((acc, e) => {
     if (resolveExerciseTrackingMode(e) === 'timer') return acc;
@@ -137,27 +141,6 @@ export function TodayWorkoutView({
         .reduce((sAcc, s) => sAcc + (s.durationSeconds || 0), 0)
     );
   }, 0);
-
-  // Celebration ('clap', 'milestone', 'celebrate') triggers ONLY during the set-completion burst,
-  // then returns smoothly to time-of-day living reactions ('ready' / 'restday').
-  let mascotMood: MascotMood = 'ready';
-  if (justClapped) {
-    if (totalSets > 0 && completedSets === totalSets) {
-      mascotMood = 'celebrate';
-    } else if (progressPct >= 50) {
-      mascotMood = 'milestone';
-    } else {
-      mascotMood = 'clap';
-    }
-  } else if (hasAnyTimerRunning) {
-    mascotMood = 'timerActive';
-  } else if (restRunning) {
-    mascotMood = 'rest';
-  } else if (!activeSchedule.isGymDay) {
-    mascotMood = 'restday';
-  } else {
-    mascotMood = 'ready';
-  }
 
   const restProgressRatio =
     restTotalSeconds > 0
@@ -184,7 +167,11 @@ export function TodayWorkoutView({
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
       {/* Left Primary Column Row 1: Merged Hero Banner with Clock, Next Alarm, Mascot & Progress */}
-      <section
+      <motion.section
+        layout={!prefersReducedMotion}
+        layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutHeroCard}
+        transition={SHARED_LAYOUT_SPRING}
+        style={{ borderRadius: cardRadiusPx }}
         className={`glass-surface relative overflow-hidden rounded-2xl border transition-colors duration-300 lg:col-span-8 lg:col-start-1 lg:row-start-1 ${phaseToken.heroBorder}`}
       >
         {!imgFailed ? (
@@ -260,14 +247,17 @@ export function TodayWorkoutView({
                 {formatIndonesianDate(now, lang)}
               </p>
 
-              <h1
+              <motion.h1
+                layout={prefersReducedMotion ? false : 'position'}
+                layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutTitle}
+                transition={SHARED_LAYOUT_SPRING}
                 className="font-display text-[2.375rem] sm:text-5xl lg:text-[3.75rem] font-extrabold leading-[1.0] tracking-[-0.015em] text-[#F8FAFC]"
                 style={{ textWrap: 'balance' }}
               >
                 {activeSchedule.isGymDay
                   ? activeSchedule.focusTitle
                   : `${dayLabel} — ${t('Hari Istirahat', 'Rest Day')}`}
-              </h1>
+              </motion.h1>
             </div>
 
             <div className="flex items-center gap-2 pt-0.5 text-xs sm:text-[13px] text-[#CBD5E1] min-w-0">
@@ -308,18 +298,10 @@ export function TodayWorkoutView({
 
           {/* Interactive Circular Living Companion Orb */}
           <TodayMascot
-            mood={mascotMood}
-            timePhase={timePhase}
-            hour={now.getHours()}
-            restRemainingFormatted={restRunning ? formatRestDuration(restRemaining) : undefined}
-            activeTimerExerciseName={activeTimerEntry?.name}
-            progressPct={progressPct}
-            completedSets={completedSets}
-            totalSets={totalSets}
-            dayLabel={dayLabel}
-            userName={userName}
-            dayJustChanged={dayJustChanged}
-            isOpeningGreeting={isOpeningGreeting}
+            companion={companion}
+            orbAnchorRef={heroOrbAnchorRef}
+            hideOrbVisual={hideHeroOrbVisual}
+            onVisibilityChange={onHeroMascotVisibilityChange}
           />
 
           {activeSchedule.isGymDay && activeSchedule.exercises.length > 0 && (
@@ -350,20 +332,30 @@ export function TodayWorkoutView({
                   {progressPct}%
                 </span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+              <motion.div
+                layout={!prefersReducedMotion}
+                layoutId={prefersReducedMotion ? undefined : SHARED_IDS.workoutProgress}
+                transition={SHARED_LAYOUT_SPRING}
+                style={{ borderRadius: 9999 }}
+                className="h-2 w-full overflow-hidden rounded-full bg-white/10"
+              >
                 <div
                   className="h-full w-full origin-left rounded-full bg-pulse transition-transform duration-300 ease-out"
                   style={{ transform: `scaleX(${Math.max(0, Math.min(1, progressPct / 100))})` }}
                 />
-              </div>
+              </motion.div>
             </div>
           )}
         </div>
-      </section>
+      </motion.section>
 
       {/* Right Sticky Column on Desktop (Below Hero on Mobile): Rest Timer + Start Workout CTA */}
       <aside className="space-y-4 lg:col-span-4 lg:col-start-9 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24">
-        <section
+        <motion.section
+          layout={!prefersReducedMotion}
+          layoutId={prefersReducedMotion ? undefined : SHARED_IDS.restTimerCard}
+          transition={SHARED_LAYOUT_SPRING}
+          style={{ borderRadius: cardRadiusPx }}
           className={`glass-surface rounded-2xl border p-4 sm:p-5 transition-colors ${
             restRunning
               ? 'border-pulse/50'
@@ -397,9 +389,14 @@ export function TodayWorkoutView({
                     className="transition-all duration-300"
                   />
                 </svg>
-                <span className="absolute font-mono text-xl font-bold tabular-nums text-[#F4F5F7]">
+                <motion.span
+                  layout={prefersReducedMotion ? false : 'position'}
+                  layoutId={prefersReducedMotion ? undefined : SHARED_IDS.restTimerDigits}
+                  transition={SHARED_LAYOUT_SPRING}
+                  className="absolute font-mono text-xl font-bold tabular-nums text-[#F4F5F7]"
+                >
                   {formatRestDuration(restRemaining)}
-                </span>
+                </motion.span>
               </div>
 
               <div className="min-w-0">
@@ -488,7 +485,7 @@ export function TodayWorkoutView({
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* Primary Start Workout CTA Directly Below Rest Timer Card */}
         {activeSchedule.isGymDay && todayEntries.length > 0 && (

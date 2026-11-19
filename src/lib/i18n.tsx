@@ -1,17 +1,25 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { DayKey, MuscleGroup } from '../types/gym';
+import { getStoredHapticsEnabled, setHapticsEnabledPref } from './haptics';
 
 export type AppLanguage = 'id' | 'en';
 export type ClockFormat = '12h' | '24h';
 export type DayTimeMode = 'auto' | 'morning' | 'afternoon' | 'night';
 export type DayTimePhase = 'morning' | 'afternoon' | 'night';
-export type UiTheme = 'obsidian' | 'midnight-frosted' | 'carbon-forge';
+export type UiTheme =
+  | 'obsidian'
+  | 'midnight-frosted'
+  | 'carbon-forge'
+  | 'material-you'
+  | 'aeroglass';
 
 export const DEFAULT_ACCENT_COLOR = '#C8FF2E';
 export const DEFAULT_MATERIAL_TINT_BY_THEME: Record<UiTheme, string> = {
   obsidian: '#161A23',
   'midnight-frosted': '#162238',
   'carbon-forge': '#12151B',
+  'material-you': '#1C1B22',
+  aeroglass: '#1B334B',
 };
 
 export interface ColorPresetOption {
@@ -38,6 +46,7 @@ export const MATERIAL_TINT_PRESETS: ColorPresetOption[] = [
   { id: 'emerald', hex: '#112922', labelId: 'Smoked Emerald', labelEn: 'Smoked Emerald' },
   { id: 'graphite', hex: '#25201D', labelId: 'Warm Graphite', labelEn: 'Warm Graphite' },
   { id: 'crystal', hex: '#2C364A', labelId: 'Crystal Frost', labelEn: 'Crystal Frost' },
+  { id: 'aero-sky', hex: '#1B334B', labelId: 'Aero Sapphire', labelEn: 'Aero Sapphire' },
 ];
 
 const LANG_STORAGE_KEY = 'ironpulse_lang';
@@ -120,6 +129,8 @@ export function getStoredUiTheme(): UiTheme {
     const val = localStorage.getItem(UI_THEME_STORAGE_KEY);
     if (val === 'midnight-frosted') return 'midnight-frosted';
     if (val === 'carbon-forge') return 'carbon-forge';
+    if (val === 'material-you') return 'material-you';
+    if (val === 'aeroglass') return 'aeroglass';
     return 'obsidian';
   } catch {
     return 'obsidian';
@@ -167,7 +178,11 @@ export function applyThemeTokensToDocument(
       ? '#05070C'
       : uiTheme === 'carbon-forge'
         ? '#07080A'
-        : '#0A0B0E';
+        : uiTheme === 'material-you'
+          ? '#111015'
+          : uiTheme === 'aeroglass'
+            ? '#06101B'
+            : '#0A0B0E';
   root.style.setProperty('--ip-canvas-bg', canvasBg);
 }
 
@@ -297,6 +312,8 @@ interface I18nContextValue {
   effectiveMaterialTint: string;
   setMaterialTintColor: (hex: string | null) => void;
   resetThemeCustomization: () => void;
+  hapticsEnabled: boolean;
+  setHapticsEnabled: (enabled: boolean) => void;
   t: <T>(idText: T, enText: T) => T;
 }
 
@@ -315,6 +332,8 @@ const I18nContext = createContext<I18nContextValue>({
   effectiveMaterialTint: DEFAULT_MATERIAL_TINT_BY_THEME.obsidian,
   setMaterialTintColor: () => {},
   resetThemeCustomization: () => {},
+  hapticsEnabled: true,
+  setHapticsEnabled: () => {},
   t: (idText) => idText,
 });
 
@@ -327,6 +346,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [materialTintColor, setMaterialTintColorState] = useState<string | null>(
     getStoredMaterialTintColor
   );
+  const [hapticsEnabled, setHapticsEnabledState] = useState<boolean>(getStoredHapticsEnabled);
 
   const effectiveMaterialTint =
     materialTintColor || DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme];
@@ -401,6 +421,11 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setMaterialTintColor(null);
   }, [setAccentColor, setMaterialTintColor]);
 
+  const setHapticsEnabled = useCallback((enabled: boolean) => {
+    setHapticsEnabledState(enabled);
+    setHapticsEnabledPref(enabled);
+  }, []);
+
   const t = useCallback(
     <T,>(idText: T, enText: T): T => (lang === 'en' ? enText : idText),
     [lang]
@@ -423,6 +448,8 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
         effectiveMaterialTint,
         setMaterialTintColor,
         resetThemeCustomization,
+        hapticsEnabled,
+        setHapticsEnabled,
         t,
       }}
     >

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   Bell,
   BellRing,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { audioEngine, BUILTIN_RINGTONES } from '../lib/audioEngine';
 import { useI18n } from '../lib/i18n';
+import { SHARED_IDS, TAB_INDICATOR_SPRING } from '../lib/motionTokens';
 import {
   AndroidAlarmDiagnostics,
   getAndroidAlarmDiagnostics,
@@ -54,6 +56,7 @@ export function RingtoneManagerView({
   onDeleteRingtone,
 }: RingtoneManagerViewProps) {
   const { t } = useI18n();
+  const prefersReducedMotion = useReducedMotion();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [customTitle, setCustomTitle] = useState('');
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -205,6 +208,12 @@ export function RingtoneManagerView({
   return (
     <div className="space-y-6">
       <div className="border-b border-white/10 pb-5">
+        <motion.span
+          layoutId={prefersReducedMotion ? undefined : SHARED_IDS.pageAccentBar}
+          transition={TAB_INDICATOR_SPRING}
+          aria-hidden="true"
+          className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
+        />
         <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
           {t('Pengaturan Ringtone & Audio Alarm', 'Ringtones & Alarm Audio Settings')}
         </h1>

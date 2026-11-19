@@ -1,9 +1,11 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   Bell,
   BellRing,
   Check,
   Clock,
+  Droplets,
   Globe,
   HelpCircle,
   Hexagon,
@@ -16,14 +18,17 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  SlidersHorizontal,
   Smartphone,
   Sparkles,
   Sun,
   Sunrise,
   User,
+  Vibrate,
   Volume2,
 } from 'lucide-react';
 import { formatClockTime } from '../lib/dateUtils';
+import { haptics } from '../lib/haptics';
 import {
   ACCENT_COLOR_PRESETS,
   computeContrastForeground,
@@ -34,6 +39,7 @@ import {
   UiTheme,
   useI18n,
 } from '../lib/i18n';
+import { SHARED_IDS, TAB_INDICATOR_SPRING } from '../lib/motionTokens';
 import {
   AndroidAlarmDiagnostics,
   getAndroidAlarmDiagnostics,
@@ -89,8 +95,11 @@ export function SettingsView({
     effectiveMaterialTint,
     setMaterialTintColor,
     resetThemeCustomization,
+    hapticsEnabled,
+    setHapticsEnabled,
     t,
   } = useI18n();
+  const prefersReducedMotion = useReducedMotion();
 
   const runningNativeAndroid = isNativeAndroid();
   const [androidDiag, setAndroidDiag] = useState<AndroidAlarmDiagnostics | null>(null);
@@ -262,6 +271,33 @@ export function SettingsView({
   const isCustomColorActive =
     accentColor !== DEFAULT_ACCENT_COLOR || materialTintColor !== null;
 
+  const SETTINGS_SUB_TABS = ['profile', 'appearance', 'alarm', 'system'] as const;
+  type SettingsSubTab = (typeof SETTINGS_SUB_TABS)[number];
+
+  const [activeSection, setActiveSection] = useState<SettingsSubTab>('profile');
+  const [sectionDirection, setSectionDirection] = useState<1 | -1>(1);
+
+  const handleSelectSection = (next: SettingsSubTab) => {
+    if (next === activeSection) return;
+    const prevIdx = SETTINGS_SUB_TABS.indexOf(activeSection);
+    const nextIdx = SETTINGS_SUB_TABS.indexOf(next);
+    setSectionDirection(nextIdx >= prevIdx ? 1 : -1);
+    haptics.tabSwitch();
+    setActiveSection(next);
+  };
+
+  const settingsSubTabItems: {
+    id: SettingsSubTab;
+    labelId: string;
+    labelEn: string;
+    Icon: typeof User;
+  }[] = [
+    { id: 'profile', labelId: 'Profil', labelEn: 'Profile', Icon: User },
+    { id: 'appearance', labelId: 'Tampilan', labelEn: 'Display', Icon: Palette },
+    { id: 'alarm', labelId: 'Alarm', labelEn: 'Alarm', Icon: Bell },
+    { id: 'system', labelId: 'Sistem', labelEn: 'System', Icon: SlidersHorizontal },
+  ];
+
   const uiThemeOptions: {
     id: UiTheme;
     name: string;
@@ -298,779 +334,1053 @@ export function SettingsView({
       descId: 'Tekstur micro-weave matte, sudut tajam presisi & aksen garis laser.',
       descEn: 'Matte micro-weave carbon weave, crisp corners & laser trim.',
     },
+    {
+      id: 'material-you',
+      name: 'Material You',
+      badgeId: 'Tonal Dinamis M3',
+      badgeEn: 'Dynamic Tonal M3',
+      descId: 'Permukaan tonal adaptif mengikuti warna aksen, sudut membulat ekspresif, tombol pil penuh & ringan tanpa blur.',
+      descEn: 'Adaptive tonal surfaces tinted by your accent color, expressive curves, pill buttons & smooth zero-blur performance.',
+    },
+    {
+      id: 'aeroglass',
+      name: 'AeroGlass',
+      badgeId: 'Kaca Glossy Vista/7',
+      badgeEn: 'Glossy Vista/7 Glass',
+      descId: 'Kaca bening berkilau dengan pantulan cahaya paruh atas, bingkai kristal ganda & nuansa biru langit modern.',
+      descEn: 'Crystal-clear glossy glass with upper-half sheen reflection, double specular bevels & modern sky-sapphire glow.',
+      perfNoteId: 'Impact in performance — efek kaca glossy berlapis lebih berat di beberapa perangkat.',
+      perfNoteEn: 'Impact in performance — layered glossy glass blur may affect smoothness on some devices.',
+    },
   ];
 
   const previewContrastFg = computeContrastForeground(accentColor);
+  const isAeroTheme = uiTheme === 'aeroglass';
+  const isMaterialYouTheme = uiTheme === 'material-you';
+  const isFrostedTheme = uiTheme === 'midnight-frosted';
+  const isCarbonTheme = uiTheme === 'carbon-forge';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Header */}
       {!embeddedInModal && (
-        <div className="border-b border-white/10 pb-5">
+        <div className="border-b border-white/10 pb-4">
+          <motion.span
+            layoutId={prefersReducedMotion ? undefined : SHARED_IDS.pageAccentBar}
+            transition={TAB_INDICATOR_SPRING}
+            aria-hidden="true"
+            className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
+          />
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
             {t('Pengaturan Aplikasi', 'App Settings')}
           </h1>
           <p className="mt-1 text-sm text-[#9CA3AF]">
             {t(
-              'Atur bahasa aplikasi, sistem jam 12 atau 24 jam, tema tampilan Hari Ini, serta preferensi alarm dan istirahat.',
-              'Configure app language, 12-hour or 24-hour clock format, Today display theme, and alarm preferences.'
+              'Kelola profil maskot, tema material, alarm latihan, dan sistem aplikasi dalam 4 kategori rapi.',
+              'Manage your profile, material theme, workout alarms, and app system across 4 clean categories.'
             )}
           </p>
         </div>
       )}
 
-      {/* 0. Mascot Call Name & Profile */}
-      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">
-        <div>
-          <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-            {t('Nama Panggilan & Sapaan Karakter', 'Nickname & Companion Greeting')}
-          </h2>
-          <p className="mt-0.5 text-xs text-[#9CA3AF]">
-            {t(
-              'Nama ini dipakai oleh karakter maskot untuk menyapamu setiap kali membuka IronPulse.',
-              'Your workout companion uses this name to greet you whenever you open IronPulse.'
-            )}
-          </p>
-        </div>
-
-        <form onSubmit={handleSaveDisplayName} className="flex flex-col gap-2.5 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label
-              htmlFor="settings-display-name"
-              className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]"
+      {/* 4 Functional Sub-Tabs Segmented Bar */}
+      <div
+        role="tablist"
+        aria-label={t('Kategori Pengaturan', 'Settings Categories')}
+        className={`glass-surface-subtle grid grid-cols-4 gap-1 border p-1.5 ${
+          isMaterialYouTheme
+            ? 'rounded-full border-pulse/20'
+            : isAeroTheme
+              ? 'rounded-2xl border-sky-200/30'
+              : isCarbonTheme
+                ? 'rounded-xl border-white/12'
+                : 'rounded-2xl border-white/12'
+        }`}
+      >
+        {settingsSubTabItems.map(({ id, labelId, labelEn, Icon }) => {
+          const isActive = activeSection === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              data-haptic="none"
+              onClick={() => handleSelectSection(id)}
+              className={`relative flex min-h-[44px] items-center justify-center gap-1.5 px-2 py-2 text-[11px] font-bold transition-colors sm:gap-2 sm:px-3 sm:text-xs whitespace-nowrap ${
+                isMaterialYouTheme
+                  ? 'rounded-full'
+                  : isCarbonTheme
+                    ? 'rounded-lg'
+                    : 'rounded-xl'
+              } ${
+                isActive
+                  ? isAeroTheme
+                    ? 'text-[#F0F9FF]'
+                    : isMaterialYouTheme
+                      ? 'text-pulse'
+                      : 'text-pulse-fg'
+                  : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+              }`}
             >
-              <User className="h-4 w-4 text-pulse" />
-              <span>{t('Nama Panggilan Anda', 'Your Display Name')}</span>
-            </label>
-            <input
-              id="settings-display-name"
-              type="text"
-              maxLength={100}
-              value={nameInput}
-              onChange={(e) => {
-                setNameInput(e.target.value);
-                if (nameStatus) setNameStatus(null);
-              }}
-              placeholder={t('Masukkan nama panggilanmu', 'Enter your nickname')}
-              className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-sm font-semibold text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-pulse focus:outline-none"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={savingName || nameInput.trim() === profile.displayName.trim()}
-            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-pulse px-5 py-2.5 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
-          >
-            <Check className="h-4 w-4" strokeWidth={2.5} />
-            {savingName
-              ? t('Menyimpan...', 'Saving...')
-              : t('Simpan Nama', 'Save Name')}
-          </button>
-        </form>
-
-        {nameStatus && (
-          <p
-            className={`text-xs font-medium ${
-              nameStatus.type === 'success' ? 'text-pulse' : 'text-[#FCA5A5]'
-            }`}
-          >
-            {nameStatus.text}
-          </p>
-        )}
-      </section>
-
-      {/* 1. Material Theme & Color Studio */}
-      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-              {t('Tema Material & Warna Tampilan', 'Material Theme & Color Studio')}
-            </h2>
-            <p className="mt-0.5 text-xs text-[#9CA3AF]">
-              {t(
-                'Pilih karakter material kaca aplikasi serta atur bebas warna tombol dan warna dasar material kaca.',
-                'Choose your glass material style and customize button accent & glass surface tint colors.'
-              )}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            disabled={!isCustomColorActive}
-            onClick={resetThemeCustomization}
-            className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-white/12 bg-[#0A0B0E]/80 px-3 py-1.5 text-xs font-semibold text-[#D1D5DB] transition-colors hover:border-pulse/50 hover:text-pulse disabled:cursor-not-allowed disabled:opacity-45 whitespace-nowrap"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            {t('Reset Warna Bawaan', 'Reset Default Colors')}
-          </button>
-        </div>
-
-        {/* Three Visual Material Theme Cards */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {uiThemeOptions.map((item) => {
-            const active = uiTheme === item.id;
-            const isFrosted = item.id === 'midnight-frosted';
-            const isCarbon = item.id === 'carbon-forge';
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setUiTheme(item.id)}
-                className={`group flex flex-col justify-start rounded-2xl border p-3.5 text-left transition-all ${
-                  active
-                    ? 'border-pulse bg-pulse/10 shadow-[0_0_0_1px_rgba(var(--ip-accent-rgb),0.25)]'
-                    : 'border-white/12 bg-[#0A0B0E]/70 hover:border-white/25'
-                }`}
-              >
-                {/* Live Miniature Material Preview */}
-                <div
-                  className={`relative mb-3 h-24 w-full overflow-hidden border border-white/10 p-2.5 ${
-                    isCarbon ? 'rounded-lg' : 'rounded-xl'
+              {isActive && (
+                <motion.span
+                  layoutId={prefersReducedMotion ? undefined : SHARED_IDS.settingsSubTabPill}
+                  transition={TAB_INDICATOR_SPRING}
+                  aria-hidden="true"
+                  className={`pointer-events-none absolute inset-0 ${
+                    isMaterialYouTheme
+                      ? 'rounded-full bg-pulse/22 border border-pulse/35'
+                      : isAeroTheme
+                        ? 'rounded-xl border border-sky-100/50 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_4px_14px_rgba(14,165,233,0.28)]'
+                        : isFrostedTheme
+                          ? 'rounded-xl bg-pulse shadow-[0_6px_18px_rgba(var(--ip-accent-rgb),0.3)]'
+                          : isCarbonTheme
+                            ? 'rounded-lg bg-pulse'
+                            : 'rounded-xl bg-pulse'
                   }`}
-                  style={{
-                    backgroundColor: isFrosted
-                      ? '#05070C'
-                      : isCarbon
-                        ? '#07080A'
-                        : '#0A0B0E',
-                  }}
-                >
-                  {/* Ambient glow behind glass (suppressed on matte carbon) */}
-                  {!isCarbon && (
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -right-4 -top-4 h-16 w-24 rounded-full blur-xl"
-                      style={{
-                        background: isFrosted
-                          ? 'rgba(56, 189, 248, 0.35)'
-                          : 'rgba(129, 140, 248, 0.16)',
-                      }}
-                    />
-                  )}
-                  {isFrosted && (
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -bottom-3 left-2 h-12 w-20 rounded-full blur-xl"
-                      style={{
-                        background: 'rgba(var(--ip-accent-rgb), 0.25)',
-                      }}
-                    />
-                  )}
+                  style={
+                    isAeroTheme
+                      ? {
+                          backgroundColor: 'rgba(14, 165, 233, 0.34)',
+                          backgroundImage:
+                            'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.14) 48%, rgba(14,165,233,0.12) 50%, rgba(56,189,248,0.22) 100%)',
+                        }
+                      : undefined
+                  }
+                />
+              )}
+              <Icon className="relative z-10 h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+              <span className="relative z-10 truncate">{t(labelId, labelEn)}</span>
+            </button>
+          );
+        })}
+      </div>
 
-                  {/* Miniature Surface Panel */}
-                  <div
-                    className="relative flex h-full flex-col justify-between p-2"
-                    style={{
-                      borderRadius: isFrosted ? '14px' : isCarbon ? '6px' : '10px',
-                      backgroundColor: isCarbon ? `${effectiveMaterialTint}EE` : undefined,
-                      backgroundImage: isCarbon
-                        ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 4px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 4px)'
-                        : undefined,
-                      background: !isCarbon
-                        ? isFrosted
-                          ? `linear-gradient(145deg, rgba(255,255,255,0.14), ${effectiveMaterialTint}80)`
-                          : `${effectiveMaterialTint}D0`
-                        : undefined,
-                      backdropFilter: isFrosted
-                        ? 'blur(18px) saturate(185%)'
-                        : isCarbon
-                          ? 'none'
-                          : 'blur(10px)',
-                      boxShadow: isFrosted
-                        ? 'inset 0 1px 0 rgba(255,255,255,0.34), inset 1px 0 0 rgba(255,255,255,0.16)'
-                        : isCarbon
-                          ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.5)'
-                          : 'inset 0 1px 0 rgba(255,255,255,0.1)',
-                      border: isFrosted
-                        ? '1px solid rgba(255,255,255,0.2)'
-                        : isCarbon
-                          ? '1px solid rgba(255,255,255,0.14)'
-                          : '1px solid rgba(255,255,255,0.1)',
-                    }}
+      {/* Sub-Tab Panel Content */}
+      <AnimatePresence mode="wait" initial={false} custom={sectionDirection}>
+        <motion.div
+          key={activeSection}
+          role="tabpanel"
+          custom={sectionDirection}
+          initial={
+            prefersReducedMotion
+              ? { opacity: 0 }
+              : { opacity: 0, x: sectionDirection * 14 }
+          }
+          animate={{ opacity: 1, x: 0 }}
+          exit={
+            prefersReducedMotion
+              ? { opacity: 0 }
+              : { opacity: 0, x: sectionDirection * -14 }
+          }
+          transition={{
+            duration: prefersReducedMotion ? 0.12 : 0.2,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="space-y-5"
+        >
+          {/* SUB-TAB 1: PROFIL */}
+          {activeSection === 'profile' && (
+            <>
+              {/* Mascot Call Name & Profile */}
+              <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">
+                <div>
+                  <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+                    {t('Nama Panggilan & Sapaan Karakter', 'Nickname & Companion Greeting')}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-[#9CA3AF]">
+                    {t(
+                      'Nama ini dipakai oleh karakter maskot untuk menyapamu setiap kali membuka IronPulse.',
+                      'Your workout companion uses this name to greet you whenever you open IronPulse.'
+                    )}
+                  </p>
+                </div>
+
+                <form onSubmit={handleSaveDisplayName} className="flex flex-col gap-2.5 sm:flex-row sm:items-end">
+                  <div className="flex-1">
+                    <label
+                      htmlFor="settings-display-name"
+                      className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]"
+                    >
+                      <User className="h-4 w-4 text-pulse" />
+                      <span>{t('Nama Panggilan Anda', 'Your Display Name')}</span>
+                    </label>
+                    <input
+                      id="settings-display-name"
+                      type="text"
+                      maxLength={100}
+                      value={nameInput}
+                      onChange={(e) => {
+                        setNameInput(e.target.value);
+                        if (nameStatus) setNameStatus(null);
+                      }}
+                      placeholder={t('Masukkan nama panggilanmu', 'Enter your nickname')}
+                      className="h-11 w-full rounded-xl border border-white/10 bg-[#0A0B0E] px-3.5 text-sm font-semibold text-[#F4F5F7] placeholder:text-[#6B7280] focus:border-pulse focus:outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={savingName || nameInput.trim() === profile.displayName.trim()}
+                    className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-xl bg-pulse px-5 py-2.5 text-xs font-bold text-pulse-fg transition-transform hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 whitespace-nowrap"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="h-2 w-10 rounded-full bg-white/25" />
-                      <span
-                        className={`px-2 py-0.5 text-[9px] font-extrabold ${
-                          isFrosted
-                            ? 'rounded-full'
-                            : isCarbon
-                              ? 'rounded-[4px]'
-                              : 'rounded-md'
+                    <Check className="h-4 w-4" strokeWidth={2.5} />
+                    {savingName
+                      ? t('Menyimpan...', 'Saving...')
+                      : t('Simpan Nama', 'Save Name')}
+                  </button>
+                </form>
+
+                {nameStatus && (
+                  <p
+                    className={`text-xs font-medium ${
+                      nameStatus.type === 'success' ? 'text-pulse' : 'text-[#FCA5A5]'
+                    }`}
+                  >
+                    {nameStatus.text}
+                  </p>
+                )}
+              </section>
+
+              {/* Account & Cloud Session */}
+              <section className="glass-surface rounded-2xl border border-white/12 p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
+                      {t('Akun Sinkronisasi Cloud', 'Cloud Synced Account')}
+                    </p>
+                    <p className="mt-1 truncate text-base font-bold text-[#F4F5F7]">
+                      {profile.displayName}
+                    </p>
+                    <p className="truncate text-xs text-[#9CA3AF]">{profile.email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onSignOut}
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#1A1E26] px-4 py-2 text-xs font-semibold text-[#D1D5DB] hover:border-[#DC2626]/50 hover:text-[#FCA5A5] shrink-0"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    {t('Keluar Akun', 'Sign Out')}
+                  </button>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* SUB-TAB 2: TAMPILAN */}
+          {activeSection === 'appearance' && (
+            <>
+              {/* Material Theme & Color Studio */}
+              <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+                      {t('Tema Material & Warna Tampilan', 'Material Theme & Color Studio')}
+                    </h2>
+                    <p className="mt-0.5 text-xs text-[#9CA3AF]">
+                      {t(
+                        'Pilih karakter material kaca aplikasi serta atur bebas warna tombol dan warna dasar material kaca.',
+                        'Choose your glass material style and customize button accent & glass surface tint colors.'
+                      )}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={!isCustomColorActive}
+                    onClick={resetThemeCustomization}
+                    className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-white/12 bg-[#0A0B0E]/80 px-3 py-1.5 text-xs font-semibold text-[#D1D5DB] transition-colors hover:border-pulse/50 hover:text-pulse disabled:cursor-not-allowed disabled:opacity-45 whitespace-nowrap"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    {t('Reset Warna Bawaan', 'Reset Default Colors')}
+                  </button>
+                </div>
+
+                {/* Five Visual Material Theme Cards */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {uiThemeOptions.map((item) => {
+                    const active = uiTheme === item.id;
+                    const isFrosted = item.id === 'midnight-frosted';
+                    const isCarbon = item.id === 'carbon-forge';
+                    const isMaterialYou = item.id === 'material-you';
+                    const isAero = item.id === 'aeroglass';
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setUiTheme(item.id)}
+                        className={`group flex flex-col justify-start rounded-2xl border p-3.5 text-left transition-all ${
+                          active
+                            ? 'border-pulse bg-pulse/10 shadow-[0_0_0_1px_rgba(var(--ip-accent-rgb),0.25)]'
+                            : 'border-white/12 bg-[#0A0B0E]/70 hover:border-white/25'
                         }`}
-                        style={{
-                          backgroundColor: accentColor,
-                          color: previewContrastFg,
-                        }}
                       >
-                        {t('Aksi', 'Action')}
+                        {/* Live Miniature Material Preview */}
+                        <div
+                          className={`relative mb-3 h-24 w-full overflow-hidden border p-2.5 ${
+                            isMaterialYou
+                              ? 'rounded-[20px] border-white/10'
+                              : isAero
+                                ? 'rounded-xl border-sky-200/30'
+                                : isCarbon
+                                  ? 'rounded-lg border-white/10'
+                                  : 'rounded-xl border-white/10'
+                          }`}
+                          style={{
+                            backgroundColor: isMaterialYou
+                              ? '#111015'
+                              : isAero
+                                ? '#06101B'
+                                : isFrosted
+                                  ? '#05070C'
+                                  : isCarbon
+                                    ? '#07080A'
+                                    : '#0A0B0E',
+                          }}
+                        >
+                          {/* Ambient glow behind glass (suppressed on matte carbon & tonal Material You) */}
+                          {!isCarbon && !isMaterialYou && (
+                            <div
+                              aria-hidden="true"
+                              className="pointer-events-none absolute -right-4 -top-4 h-16 w-24 rounded-full blur-xl"
+                              style={{
+                                backgroundColor: isAero
+                                  ? 'rgba(56, 189, 248, 0.52)'
+                                  : isFrosted
+                                    ? 'rgba(56, 189, 248, 0.35)'
+                                    : 'rgba(129, 140, 248, 0.16)',
+                              }}
+                            />
+                          )}
+                          {(isFrosted || isAero) && (
+                            <div
+                              aria-hidden="true"
+                              className="pointer-events-none absolute -bottom-3 left-2 h-12 w-24 rounded-full blur-xl"
+                              style={{
+                                backgroundColor: isAero
+                                  ? 'rgba(14, 165, 233, 0.38)'
+                                  : 'rgba(var(--ip-accent-rgb), 0.25)',
+                              }}
+                            />
+                          )}
+
+                          {/* Miniature Surface Panel */}
+                          <div
+                            className="relative flex h-full flex-col justify-between p-2"
+                            style={{
+                              borderRadius: isMaterialYou
+                                ? '18px'
+                                : isFrosted
+                                  ? '14px'
+                                  : isAero
+                                    ? '11px'
+                                    : isCarbon
+                                      ? '6px'
+                                      : '10px',
+                              backgroundColor: isCarbon
+                                ? `${effectiveMaterialTint}EE`
+                                : isMaterialYou
+                                  ? effectiveMaterialTint
+                                  : isAero
+                                    ? `${effectiveMaterialTint}8A`
+                                    : isFrosted
+                                      ? 'transparent'
+                                      : `${effectiveMaterialTint}D0`,
+                              backgroundImage: isCarbon
+                                ? 'repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 4px), repeating-linear-gradient(-45deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 4px)'
+                                : isMaterialYou
+                                  ? 'linear-gradient(180deg, rgba(var(--ip-accent-rgb), 0.12), rgba(var(--ip-accent-rgb), 0.06))'
+                                  : isAero
+                                    ? 'linear-gradient(180deg, rgba(255,255,255,0.34) 0%, rgba(255,255,255,0.12) 45%, rgba(255,255,255,0.02) 47%, rgba(56,189,248,0.12) 100%)'
+                                    : isFrosted
+                                      ? `linear-gradient(145deg, rgba(255,255,255,0.14), ${effectiveMaterialTint}80)`
+                                      : 'none',
+                              backdropFilter: isAero
+                                ? 'blur(16px) saturate(165%)'
+                                : isFrosted
+                                  ? 'blur(18px) saturate(185%)'
+                                  : isCarbon || isMaterialYou
+                                    ? 'none'
+                                    : 'blur(10px)',
+                              boxShadow: isMaterialYou
+                                ? 'inset 0 1px 0 rgba(255,255,255,0.06)'
+                                : isAero
+                                  ? 'inset 0 1px 0 rgba(255,255,255,0.62), inset 0 0 0 1px rgba(255,255,255,0.18), 0 6px 14px rgba(0,8,20,0.45)'
+                                  : isFrosted
+                                    ? 'inset 0 1px 0 rgba(255,255,255,0.34), inset 1px 0 0 rgba(255,255,255,0.16)'
+                                    : isCarbon
+                                      ? 'inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.5)'
+                                      : 'inset 0 1px 0 rgba(255,255,255,0.1)',
+                              border: isMaterialYou
+                                ? '1px solid rgba(var(--ip-accent-rgb), 0.24)'
+                                : isAero
+                                  ? '1px solid rgba(186,230,253,0.45)'
+                                  : isFrosted
+                                    ? '1px solid rgba(255,255,255,0.2)'
+                                    : isCarbon
+                                      ? '1px solid rgba(255,255,255,0.14)'
+                                      : '1px solid rgba(255,255,255,0.1)',
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span
+                                className={`h-2 w-10 rounded-full ${
+                                  isAero ? 'bg-sky-100/45' : 'bg-white/25'
+                                }`}
+                              />
+                              <span
+                                className={`px-2 py-0.5 text-[9px] font-extrabold ${
+                                  isFrosted || isMaterialYou
+                                    ? 'rounded-full'
+                                    : isAero
+                                      ? 'rounded-md border border-white/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)]'
+                                      : isCarbon
+                                        ? 'rounded-[4px]'
+                                        : 'rounded-md'
+                                }`}
+                                style={{
+                                  backgroundColor: accentColor,
+                                  backgroundImage: isAero
+                                    ? 'linear-gradient(180deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.12) 48%, rgba(0,0,0,0.1) 50%, rgba(255,255,255,0.06) 100%)'
+                                    : 'none',
+                                  color: previewContrastFg,
+                                }}
+                              >
+                                {t('Aksi', 'Action')}
+                              </span>
+                            </div>
+
+                            {/* Mini Navigation Dock Comparison */}
+                            <div
+                              className={`flex items-center justify-around px-2 py-1 ${
+                                isMaterialYou
+                                  ? 'rounded-full border border-pulse/20 bg-pulse/[0.08]'
+                                  : isAero
+                                    ? 'rounded-lg border border-sky-200/35 bg-sky-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.42)]'
+                                    : isFrosted
+                                      ? 'mx-1 rounded-full border border-white/20 bg-white/10'
+                                      : isCarbon
+                                        ? 'rounded-[4px] border border-white/12 bg-black/55'
+                                        : 'rounded-lg border border-white/10 bg-black/35'
+                              }`}
+                            >
+                              {isMaterialYou ? (
+                                <span
+                                  className="flex h-2.5 w-7 items-center justify-center rounded-full"
+                                  style={{ backgroundColor: 'rgba(var(--ip-accent-rgb), 0.28)' }}
+                                >
+                                  <span
+                                    className="h-1 w-3 rounded-full"
+                                    style={{ backgroundColor: accentColor }}
+                                  />
+                                </span>
+                              ) : isAero ? (
+                                <span
+                                  className="flex h-2.5 w-7 items-center justify-center rounded border border-sky-100/55"
+                                  style={{
+                                    backgroundColor: 'rgba(56, 189, 248, 0.35)',
+                                    backgroundImage:
+                                      'linear-gradient(180deg, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.05) 55%)',
+                                  }}
+                                >
+                                  <span className="h-1 w-3 rounded-full bg-white" />
+                                </span>
+                              ) : (
+                                <span
+                                  className={`h-1 w-5 ${isCarbon ? 'rounded-none' : 'rounded-full'}`}
+                                  style={{ backgroundColor: accentColor }}
+                                />
+                              )}
+                              <span className="h-1 w-4 rounded-full bg-white/25" />
+                              <span className="h-1 w-4 rounded-full bg-white/25" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-1.5 text-sm font-bold text-[#F4F5F7]">
+                              {isAero ? (
+                                <Droplets className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#7DD3FC]'}`} />
+                              ) : isMaterialYou ? (
+                                <Palette className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`} />
+                              ) : isFrosted ? (
+                                <Sparkles className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`} />
+                              ) : isCarbon ? (
+                                <Hexagon className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`} />
+                              ) : (
+                                <Layers className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`} />
+                              )}
+                              <span className="truncate">{item.name}</span>
+                            </span>
+                            {active && (
+                              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pulse text-pulse-fg">
+                                <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-mono text-[11px] font-semibold text-pulse">
+                            {t(item.badgeId, item.badgeEn)}
+                          </p>
+                          <p className="text-xs leading-relaxed text-[#9CA3AF]">
+                            {t(item.descId, item.descEn)}
+                          </p>
+                          {item.perfNoteId && item.perfNoteEn && (
+                            <p className="pt-1 text-[11px] font-semibold text-[#FBBF24]">
+                              {t(item.perfNoteId, item.perfNoteEn)}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Colors: Primary Buttons & Glass Material Tint */}
+                <div className="grid grid-cols-1 gap-4 border-t border-white/10 pt-4 sm:grid-cols-2">
+                  {/* Button & Accent Color Picker */}
+                  <div className="space-y-3 rounded-xl border border-white/10 bg-[#0A0B0E]/75 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
+                        <Palette className="h-4 w-4 text-pulse" />
+                        <span>{t('Warna Tombol & Aksen', 'Button & Accent Color')}</span>
+                      </div>
+                      <span className="font-mono text-[11px] font-bold uppercase text-pulse">
+                        {accentColor}
                       </span>
                     </div>
 
-                    {/* Mini Navigation Dock Comparison */}
-                    <div
-                      className={`flex items-center justify-around px-2 py-1 ${
-                        isFrosted
-                          ? 'mx-1 rounded-full border border-white/20 bg-white/10'
-                          : isCarbon
-                            ? 'rounded-[4px] border border-white/12 bg-black/55'
-                            : 'rounded-lg border border-white/10 bg-black/35'
-                      }`}
-                    >
-                      <span
-                        className={`h-1 w-5 ${isCarbon ? 'rounded-none' : 'rounded-full'}`}
-                        style={{ backgroundColor: accentColor }}
-                      />
-                      <span className="h-1 w-4 rounded-full bg-white/25" />
-                      <span className="h-1 w-4 rounded-full bg-white/25" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {ACCENT_COLOR_PRESETS.map((preset) => {
+                        const selected = accentColor.toUpperCase() === preset.hex.toUpperCase();
+                        const fg = computeContrastForeground(preset.hex);
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            title={t(preset.labelId, preset.labelEn)}
+                            aria-label={`${t('Pilih warna tombol', 'Select button color')} ${t(
+                              preset.labelId,
+                              preset.labelEn
+                            )}`}
+                            onClick={() => setAccentColor(preset.hex)}
+                            className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-transform hover:scale-105 ${
+                              selected
+                                ? 'border-white ring-2 ring-white/30'
+                                : 'border-white/20'
+                            }`}
+                            style={{ backgroundColor: preset.hex, color: fg }}
+                          >
+                            {selected && <Check className="h-4 w-4" strokeWidth={3} />}
+                          </button>
+                        );
+                      })}
+
+                      <label
+                        className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-[#F4F5F7] hover:border-pulse/60"
+                        title={t('Pilih warna bebas', 'Pick any custom color')}
+                      >
+                        <input
+                          type="color"
+                          aria-label={t('Pemilih warna kustom tombol', 'Custom button color picker')}
+                          value={accentColor}
+                          onChange={(e) => setAccentColor(e.target.value)}
+                          className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+                        />
+                        <span>{t('Bebas', 'Custom')}</span>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="text-[11px] text-[#9CA3AF]">
+                        {t('Pratinjau tombol:', 'Button preview:')}
+                      </span>
+                      <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg bg-pulse px-3 py-1 text-xs font-bold text-pulse-fg">
+                        <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
+                        {t('Mulai Latihan', 'Start Workout')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Glass Material Tint Picker */}
+                  <div className="space-y-3 rounded-xl border border-white/10 bg-[#0A0B0E]/75 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
+                        <Layers className="h-4 w-4 text-pulse" />
+                        <span>{t('Warna Material Kaca', 'Glass Material Tint')}</span>
+                      </div>
+                      <span className="font-mono text-[11px] font-bold uppercase text-[#D1D5DB]">
+                        {effectiveMaterialTint}
+                        {materialTintColor === null ? ` · ${t('Default', 'Default')}` : ''}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {MATERIAL_TINT_PRESETS.map((preset) => {
+                        const selected =
+                          effectiveMaterialTint.toUpperCase() === preset.hex.toUpperCase();
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            title={t(preset.labelId, preset.labelEn)}
+                            aria-label={`${t('Pilih warna material kaca', 'Select glass tint')} ${t(
+                              preset.labelId,
+                              preset.labelEn
+                            )}`}
+                            onClick={() => setMaterialTintColor(preset.hex)}
+                            className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-transform hover:scale-105 ${
+                              selected
+                                ? 'border-pulse ring-2 ring-pulse/35'
+                                : 'border-white/25'
+                            }`}
+                            style={{ backgroundColor: preset.hex, color: '#FFFFFF' }}
+                          >
+                            {selected && <Check className="h-4 w-4" strokeWidth={3} />}
+                          </button>
+                        );
+                      })}
+
+                      <label
+                        className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-[#F4F5F7] hover:border-pulse/60"
+                        title={t('Pilih warna kaca bebas', 'Pick any custom glass tint')}
+                      >
+                        <input
+                          type="color"
+                          aria-label={t('Pemilih warna kustom material kaca', 'Custom glass tint picker')}
+                          value={effectiveMaterialTint}
+                          onChange={(e) => setMaterialTintColor(e.target.value)}
+                          className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
+                        />
+                        <span>{t('Bebas', 'Custom')}</span>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="text-[11px] text-[#9CA3AF]">
+                        {t(
+                          `Default tema: ${DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]}`,
+                          `Theme default: ${DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]}`
+                        )}
+                      </span>
+                      {materialTintColor !== null && (
+                        <button
+                          type="button"
+                          onClick={() => setMaterialTintColor(null)}
+                          className="text-[11px] font-semibold text-pulse hover:underline"
+                        >
+                          {t('Ikuti Default Tema', 'Use Theme Default')}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
+              </section>
 
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 text-sm font-bold text-[#F4F5F7]">
-                      {isFrosted ? (
-                        <Sparkles className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`} />
-                      ) : isCarbon ? (
-                        <Hexagon className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`} />
-                      ) : (
-                        <Layers className={`h-4 w-4 shrink-0 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`} />
-                      )}
-                      <span className="truncate">{item.name}</span>
+              {/* Today Tab Time-of-Day Mood */}
+              <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">
+                <div>
+                  <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+                    {t('Tema Suasana Tab Hari Ini', 'Today Tab Time Theme')}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-[#9CA3AF]">
+                    {t(
+                      'Default Auto mengikuti jam asli perangkat secara otomatis, atau kunci ke Pagi, Siang, atau Malam.',
+                      'Auto follows your real device clock by default, or lock Morning, Afternoon, or Night mood.'
+                    )}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                  {themeOptions.map((item) => {
+                    const active = todayThemeMode === item.id;
+                    const Icon = item.Icon;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setTodayThemeMode(item.id)}
+                        className={`flex min-h-[56px] flex-col justify-between rounded-xl border p-3 text-left transition-colors ${
+                          active
+                            ? 'border-pulse bg-pulse/12'
+                            : 'border-white/10 bg-[#0A0B0E] hover:border-white/25'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-[#F4F5F7]">
+                            {t(item.labelId, item.labelEn)}
+                          </span>
+                          <Icon
+                            className={`h-4 w-4 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`}
+                          />
+                        </div>
+                        <span className="mt-1 font-mono text-[11px] text-[#9CA3AF]">
+                          {t(item.descId, item.descEn)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* SUB-TAB 3: ALARM */}
+          {activeSection === 'alarm' && (
+            <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+                  {t('Preferensi Alarm, Timer & Notifikasi', 'Alarm, Timer & Notification Preferences')}
+                </h2>
+                <button
+                  type="button"
+                  onClick={onOpenRingtones}
+                  className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-white/10 bg-[#0A0B0E] px-3 py-1.5 text-xs font-semibold text-[#D1D5DB] hover:border-pulse/50 hover:text-pulse whitespace-nowrap"
+                >
+                  <Music className="h-3.5 w-3.5 text-pulse" />
+                  {t('Kelola Ringtone', 'Manage Ringtones')}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div>
+                  <div className="mb-2 flex items-center justify-between text-xs font-medium text-[#D1D5DB]">
+                    <span className="flex items-center gap-2">
+                      <Volume2 className="h-4 w-4 text-pulse" />
+                      {t('Volume Alarm & Timer', 'Alarm & Timer Volume')}
                     </span>
-                    {active && (
-                      <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-pulse text-pulse-fg">
-                        <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    <span className="font-mono tabular-nums text-pulse">
+                      {Math.round(profile.volume * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.1}
+                    max={1}
+                    step={0.05}
+                    value={profile.volume}
+                    onChange={(e) =>
+                      onUpdateProfile({ volume: parseFloat(e.target.value) })
+                    }
+                    className="h-2 w-full cursor-pointer accent-pulse"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-[#D1D5DB]">
+                    {t('Durasi Tunda Alarm (Snooze)', 'Snooze Duration')}
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[5, 10, 15].map((mins) => (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => onUpdateProfile({ snoozeMinutes: mins })}
+                        className={`min-h-[42px] rounded-xl border text-xs font-bold font-mono tabular-nums transition-colors ${
+                          profile.snoozeMinutes === mins
+                            ? 'border-pulse bg-pulse text-pulse-fg'
+                            : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:text-[#F4F5F7]'
+                        }`}
+                      >
+                        {mins} {t('Menit', 'Min')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-2">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
+                  <div>
+                    <p className="text-sm font-semibold text-[#F4F5F7]">
+                      {t('Timer Istirahat Otomatis', 'Auto-Start Rest Timer')}
+                    </p>
+                    <p className="text-xs text-[#9CA3AF]">
+                      {t(
+                        'Mulai hitung mundur saat set dicentang selesai.',
+                        'Start rest countdown whenever a set is checked off.'
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onUpdateProfile({ autoStartRestTimer: !profile.autoStartRestTimer })
+                    }
+                    className={`min-h-[38px] rounded-lg px-3.5 text-xs font-bold whitespace-nowrap ${
+                      profile.autoStartRestTimer
+                        ? 'bg-pulse text-pulse-fg'
+                        : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF]'
+                    }`}
+                  >
+                    {profile.autoStartRestTimer ? t('Aktif', 'Active') : 'Manual'}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
+                  <div>
+                    <p className="text-sm font-semibold text-[#F4F5F7]">
+                      {runningNativeAndroid
+                        ? t('Notifikasi Perangkat', 'Device Notifications')
+                        : t('Notifikasi Desktop', 'Desktop Notifications')}
+                    </p>
+                    <p className="text-xs text-[#9CA3AF]">
+                      {isNotifGranted
+                        ? t('Izin notifikasi sudah aktif.', 'Notifications are allowed.')
+                        : !runningNativeAndroid && notifPermission === 'denied'
+                          ? t(
+                              'Diblokir browser. Aktifkan izin notifikasi di setelan situs browser Anda.',
+                              'Blocked by browser. Enable notifications in your browser site settings.'
+                            )
+                          : t(
+                              'Tampilkan pengingat saat jam latihan tiba.',
+                              'Show alert popup when alarm triggers.'
+                            )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRequestNotifications}
+                    className={`inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold whitespace-nowrap ${
+                      isNotifGranted
+                        ? 'border border-[#16A34A]/50 bg-[#16A34A]/20 text-[#4ADE80]'
+                        : 'bg-[#1A1E26] border border-white/15 text-[#F4F5F7] hover:bg-[#252C38]'
+                    }`}
+                  >
+                    <Bell className="h-3.5 w-3.5" />
+                    {isNotifGranted ? t('Diizinkan', 'Allowed') : t('Izinkan', 'Allow')}
+                  </button>
+                </div>
+
+                <div className="flex flex-col justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5 sm:col-span-2 sm:flex-row sm:items-center">
+                  <div className="flex items-start gap-2.5">
+                    <Vibrate className="mt-0.5 h-4 w-4 shrink-0 text-pulse" />
+                    <div>
+                      <p className="text-sm font-semibold text-[#F4F5F7]">
+                        {t('Umpan Balik Haptik (Getaran Taktil)', 'Haptic Feedback (Tactile Vibration)')}
+                      </p>
+                      <p className="text-xs text-[#9CA3AF]">
+                        {t(
+                          'Respon getaran fisik saat menekan tombol, menyelesaikan set, hitung mundur 3-2-1, dan akhir timer.',
+                          'Physical tactile vibration for button presses, set completion, 3-2-1 countdowns, and timer alerts.'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {hapticsEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => haptics.testPattern()}
+                        className="inline-flex min-h-[38px] items-center gap-1.5 rounded-lg border border-white/15 bg-[#1A1E26] px-3 text-xs font-semibold text-[#D1D5DB] transition-colors hover:border-pulse/50 hover:text-pulse whitespace-nowrap"
+                      >
+                        {t('Uji Getaran', 'Test Pulse')}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      data-haptic={hapticsEnabled ? 'none' : undefined}
+                      onClick={() => {
+                        const next = !hapticsEnabled;
+                        setHapticsEnabled(next);
+                        if (next) {
+                          haptics.toggle();
+                        }
+                      }}
+                      className={`min-h-[38px] rounded-lg px-3.5 text-xs font-bold whitespace-nowrap transition-colors ${
+                        hapticsEnabled
+                          ? 'bg-pulse text-pulse-fg'
+                          : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF]'
+                      }`}
+                    >
+                      {hapticsEnabled ? t('Aktif', 'Active') : t('Nonaktif', 'Off')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Android APK Native Background Alarm Diagnostics */}
+              {runningNativeAndroid && (
+                <div className="space-y-3 border-t border-white/10 pt-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-sm font-bold text-[#F4F5F7]">
+                      <Smartphone className="h-4 w-4 text-pulse" />
+                      <span>{t('Diagnostik Alarm Android', 'Android Alarm Diagnostics')}</span>
+                    </div>
+                    {androidDiag && (
+                      <span className="font-mono text-xs tabular-nums text-pulse">
+                        {androidDiag.pendingCount} {t('Jadwal Aktif', 'Pending')}
                       </span>
                     )}
                   </div>
-                  <p className="font-mono text-[11px] font-semibold text-pulse">
-                    {t(item.badgeId, item.badgeEn)}
-                  </p>
-                  <p className="text-xs leading-relaxed text-[#9CA3AF]">
-                    {t(item.descId, item.descEn)}
-                  </p>
-                  {item.perfNoteId && item.perfNoteEn && (
-                    <p className="pt-1 text-[11px] font-semibold text-[#FBBF24]">
-                      {t(item.perfNoteId, item.perfNoteEn)}
-                    </p>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {androidDiag?.exactAlarmPermission === 'granted' ? (
+                          <ShieldCheck className="h-4 w-4 shrink-0 text-[#4ADE80]" />
+                        ) : (
+                          <ShieldAlert className="h-4 w-4 shrink-0 text-[#FBBF24]" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-[#F4F5F7]">Exact Alarm</p>
+                          <p className="text-[11px] text-[#9CA3AF]">
+                            {androidDiag?.exactAlarmPermission === 'granted'
+                              ? t('Presisi tepat waktu', 'Exact timing active')
+                              : t('Perlu diaktifkan di sistem', 'Enable in system settings')}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleOpenExactSettings}
+                        className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-[#1A1E26] px-2.5 text-xs font-semibold text-[#F4F5F7]"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                        {t('Atur', 'Settings')}
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={schedulingTest}
+                      onClick={handleScheduleTestNotification}
+                      className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2 text-xs font-bold text-pulse-fg hover:brightness-105 disabled:opacity-60"
+                    >
+                      <BellRing className="h-4 w-4" />
+                      {schedulingTest
+                        ? t('Menjadwalkan...', 'Scheduling...')
+                        : t('Uji Notifikasi 5 Detik', '5s Notification Test')}
+                    </button>
+                  </div>
+
+                  {testNotifStatus && (
+                    <p className="text-xs font-medium text-pulse">{testNotifStatus}</p>
                   )}
                 </div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Custom Colors: Primary Buttons & Glass Material Tint */}
-        <div className="grid grid-cols-1 gap-4 border-t border-white/10 pt-4 sm:grid-cols-2">
-          {/* Button & Accent Color Picker */}
-          <div className="space-y-3 rounded-xl border border-white/10 bg-[#0A0B0E]/75 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
-                <Palette className="h-4 w-4 text-pulse" />
-                <span>{t('Warna Tombol & Aksen', 'Button & Accent Color')}</span>
-              </div>
-              <span className="font-mono text-[11px] font-bold uppercase text-pulse">
-                {accentColor}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {ACCENT_COLOR_PRESETS.map((preset) => {
-                const selected = accentColor.toUpperCase() === preset.hex.toUpperCase();
-                const fg = computeContrastForeground(preset.hex);
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    title={t(preset.labelId, preset.labelEn)}
-                    aria-label={`${t('Pilih warna tombol', 'Select button color')} ${t(
-                      preset.labelId,
-                      preset.labelEn
-                    )}`}
-                    onClick={() => setAccentColor(preset.hex)}
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-transform hover:scale-105 ${
-                      selected
-                        ? 'border-white ring-2 ring-white/30'
-                        : 'border-white/20'
-                    }`}
-                    style={{ backgroundColor: preset.hex, color: fg }}
-                  >
-                    {selected && <Check className="h-4 w-4" strokeWidth={3} />}
-                  </button>
-                );
-              })}
-
-              <label
-                className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-[#F4F5F7] hover:border-pulse/60"
-                title={t('Pilih warna bebas', 'Pick any custom color')}
-              >
-                <input
-                  type="color"
-                  aria-label={t('Pemilih warna kustom tombol', 'Custom button color picker')}
-                  value={accentColor}
-                  onChange={(e) => setAccentColor(e.target.value)}
-                  className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
-                />
-                <span>{t('Bebas', 'Custom')}</span>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <span className="text-[11px] text-[#9CA3AF]">
-                {t('Pratinjau tombol:', 'Button preview:')}
-              </span>
-              <span className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg bg-pulse px-3 py-1 text-xs font-bold text-pulse-fg">
-                <Check className="h-3.5 w-3.5" strokeWidth={2.6} />
-                {t('Mulai Latihan', 'Start Workout')}
-              </span>
-            </div>
-          </div>
-
-          {/* Glass Material Tint Picker */}
-          <div className="space-y-3 rounded-xl border border-white/10 bg-[#0A0B0E]/75 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
-                <Layers className="h-4 w-4 text-pulse" />
-                <span>{t('Warna Material Kaca', 'Glass Material Tint')}</span>
-              </div>
-              <span className="font-mono text-[11px] font-bold uppercase text-[#D1D5DB]">
-                {effectiveMaterialTint}
-                {materialTintColor === null ? ` · ${t('Default', 'Default')}` : ''}
-              </span>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {MATERIAL_TINT_PRESETS.map((preset) => {
-                const selected =
-                  effectiveMaterialTint.toUpperCase() === preset.hex.toUpperCase();
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    title={t(preset.labelId, preset.labelEn)}
-                    aria-label={`${t('Pilih warna material kaca', 'Select glass tint')} ${t(
-                      preset.labelId,
-                      preset.labelEn
-                    )}`}
-                    onClick={() => setMaterialTintColor(preset.hex)}
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-transform hover:scale-105 ${
-                      selected
-                        ? 'border-pulse ring-2 ring-pulse/35'
-                        : 'border-white/25'
-                    }`}
-                    style={{ backgroundColor: preset.hex, color: '#FFFFFF' }}
-                  >
-                    {selected && <Check className="h-4 w-4" strokeWidth={3} />}
-                  </button>
-                );
-              })}
-
-              <label
-                className="inline-flex min-h-[36px] cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[11px] font-semibold text-[#F4F5F7] hover:border-pulse/60"
-                title={t('Pilih warna kaca bebas', 'Pick any custom glass tint')}
-              >
-                <input
-                  type="color"
-                  aria-label={t('Pemilih warna kustom material kaca', 'Custom glass tint picker')}
-                  value={effectiveMaterialTint}
-                  onChange={(e) => setMaterialTintColor(e.target.value)}
-                  className="h-5 w-5 cursor-pointer rounded border-0 bg-transparent p-0"
-                />
-                <span>{t('Bebas', 'Custom')}</span>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <span className="text-[11px] text-[#9CA3AF]">
-                {t(
-                  `Default tema: ${DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]}`,
-                  `Theme default: ${DEFAULT_MATERIAL_TINT_BY_THEME[uiTheme]}`
-                )}
-              </span>
-              {materialTintColor !== null && (
-                <button
-                  type="button"
-                  onClick={() => setMaterialTintColor(null)}
-                  className="text-[11px] font-semibold text-pulse hover:underline"
-                >
-                  {t('Ikuti Default Tema', 'Use Theme Default')}
-                </button>
               )}
-            </div>
-          </div>
-        </div>
-      </section>
+            </section>
+          )}
 
-      {/* 2. Language & Clock System */}
-      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
-        <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-          {t('Bahasa & Sistem Jam', 'Language & Clock System')}
-        </h2>
+          {/* SUB-TAB 4: SISTEM */}
+          {activeSection === 'system' && (
+            <>
+              {/* Language & Clock System */}
+              <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
+                <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
+                  {t('Bahasa & Sistem Jam', 'Language & Clock System')}
+                </h2>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          {/* Language Switcher */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
-              <Globe className="h-4 w-4 text-pulse" />
-              <span>{t('Bahasa Antarmuka', 'Interface Language')}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setLang('id')}
-                className={`min-h-[48px] rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
-                  lang === 'id'
-                    ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
-                    : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
-                }`}
-              >
-                <p className="text-xs font-bold text-[#F4F5F7]">Bahasa Indonesia</p>
-                <p className="mt-0.5 font-mono text-[11px] text-[#9CA3AF]">ID · Default</p>
-              </button>
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  {/* Language Switcher */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
+                      <Globe className="h-4 w-4 text-pulse" />
+                      <span>{t('Bahasa Antarmuka', 'Interface Language')}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setLang('id')}
+                        className={`min-h-[48px] rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                          lang === 'id'
+                            ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
+                            : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold text-[#F4F5F7]">Bahasa Indonesia</p>
+                        <p className="mt-0.5 font-mono text-[11px] text-[#9CA3AF]">ID · Default</p>
+                      </button>
 
-              <button
-                type="button"
-                onClick={() => setLang('en')}
-                className={`min-h-[48px] rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
-                  lang === 'en'
-                    ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
-                    : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
-                }`}
-              >
-                <p className="text-xs font-bold text-[#F4F5F7]">English</p>
-                <p className="mt-0.5 font-mono text-[11px] text-[#9CA3AF]">EN · International</p>
-              </button>
-            </div>
-          </div>
+                      <button
+                        type="button"
+                        onClick={() => setLang('en')}
+                        className={`min-h-[48px] rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                          lang === 'en'
+                            ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
+                            : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold text-[#F4F5F7]">English</p>
+                        <p className="mt-0.5 font-mono text-[11px] text-[#9CA3AF]">EN · International</p>
+                      </button>
+                    </div>
+                  </div>
 
-          {/* 12h / 24h Clock System */}
-          <div className="space-y-2.5">
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
-              <Clock className="h-4 w-4 text-pulse" />
-              <span>{t('Sistem Format Jam', 'Clock Display Format')}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setClockFormat('24h')}
-                className={`min-h-[48px] rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
-                  clockFormat === '24h'
-                    ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
-                    : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
-                }`}
-              >
-                <p className="text-xs font-bold text-[#F4F5F7]">
-                  {t('24 Jam (00–23)', '24-Hour (00–23)')}
-                </p>
-                <p className="mt-0.5 font-mono text-[11px] tabular-nums text-pulse">
-                  {preview24.timeText}
-                </p>
-              </button>
+                  {/* 12h / 24h Clock System */}
+                  <div className="space-y-2.5">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-[#D1D5DB]">
+                      <Clock className="h-4 w-4 text-pulse" />
+                      <span>{t('Sistem Format Jam', 'Clock Display Format')}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setClockFormat('24h')}
+                        className={`min-h-[48px] rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                          clockFormat === '24h'
+                            ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
+                            : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold text-[#F4F5F7]">
+                          {t('24 Jam (00–23)', '24-Hour (00–23)')}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[11px] tabular-nums text-pulse">
+                          {preview24.timeText}
+                        </p>
+                      </button>
 
-              <button
-                type="button"
-                onClick={() => setClockFormat('12h')}
-                className={`min-h-[48px] rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
-                  clockFormat === '12h'
-                    ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
-                    : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
-                }`}
-              >
-                <p className="text-xs font-bold text-[#F4F5F7]">
-                  {t('12 Jam (AM / PM)', '12-Hour (AM / PM)')}
-                </p>
-                <p className="mt-0.5 font-mono text-[11px] tabular-nums text-pulse">
-                  {preview12.timeText} {preview12.meridiem}
-                </p>
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 3. Display Theme & Tutorial */}
-      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-              {t('Tema Suasana Tab Hari Ini', 'Today Tab Time Theme')}
-            </h2>
-            <p className="mt-0.5 text-xs text-[#9CA3AF]">
-              {t(
-                'Default Auto mengikuti jam asli perangkat secara otomatis, atau kunci ke Pagi, Siang, atau Malam.',
-                'Auto follows your real device clock by default, or lock Morning, Afternoon, or Night mood.'
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          {themeOptions.map((item) => {
-            const active = todayThemeMode === item.id;
-            const Icon = item.Icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setTodayThemeMode(item.id)}
-                className={`flex min-h-[56px] flex-col justify-between rounded-xl border p-3 text-left transition-colors ${
-                  active
-                    ? 'border-pulse bg-pulse/12'
-                    : 'border-white/10 bg-[#0A0B0E] hover:border-white/25'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-[#F4F5F7]">
-                    {t(item.labelId, item.labelEn)}
-                  </span>
-                  <Icon
-                    className={`h-4 w-4 ${active ? 'text-pulse' : 'text-[#9CA3AF]'}`}
-                  />
-                </div>
-                <span className="mt-1 font-mono text-[11px] text-[#9CA3AF]">
-                  {t(item.descId, item.descEn)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-[#F4F5F7]">
-              {t('Panduan Fitur IronPulse', 'IronPulse Feature Guide')}
-            </p>
-            <p className="text-xs text-[#9CA3AF]">
-              {t(
-                'Buka kembali tur 5 langkah untuk melihat penjelasan tiap tab dan tombol.',
-                'Reopen the 5-step interactive tour explaining each tab and control.'
-              )}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onOpenTutorial}
-            className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-xl border border-pulse/40 bg-pulse/10 px-4 py-2 text-xs font-bold text-pulse hover:bg-pulse hover:text-pulse-fg whitespace-nowrap"
-          >
-            <HelpCircle className="h-4 w-4" />
-            {t('Buka Panduan Fitur', 'Open Feature Guide')}
-          </button>
-        </div>
-      </section>
-
-      {/* 4. Alarm, Timer & Notification Preferences */}
-      <section className="glass-surface rounded-2xl border border-white/12 p-5 space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-xl font-bold text-[#F4F5F7]">
-            {t('Preferensi Alarm, Timer & Notifikasi', 'Alarm, Timer & Notification Preferences')}
-          </h2>
-          <button
-            type="button"
-            onClick={onOpenRingtones}
-            className="inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border border-white/10 bg-[#0A0B0E] px-3 py-1.5 text-xs font-semibold text-[#D1D5DB] hover:border-pulse/50 hover:text-pulse whitespace-nowrap"
-          >
-            <Music className="h-3.5 w-3.5 text-pulse" />
-            {t('Kelola Ringtone', 'Manage Ringtones')}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <div>
-            <div className="mb-2 flex items-center justify-between text-xs font-medium text-[#D1D5DB]">
-              <span className="flex items-center gap-2">
-                <Volume2 className="h-4 w-4 text-pulse" />
-                {t('Volume Alarm & Timer', 'Alarm & Timer Volume')}
-              </span>
-              <span className="font-mono tabular-nums text-pulse">
-                {Math.round(profile.volume * 100)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0.1}
-              max={1}
-              step={0.05}
-              value={profile.volume}
-              onChange={(e) =>
-                onUpdateProfile({ volume: parseFloat(e.target.value) })
-              }
-              className="h-2 w-full cursor-pointer accent-pulse"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-xs font-medium text-[#D1D5DB]">
-              {t('Durasi Tunda Alarm (Snooze)', 'Snooze Duration')}
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {[5, 10, 15].map((mins) => (
-                <button
-                  key={mins}
-                  type="button"
-                  onClick={() => onUpdateProfile({ snoozeMinutes: mins })}
-                  className={`min-h-[42px] rounded-xl border text-xs font-bold font-mono tabular-nums transition-colors ${
-                    profile.snoozeMinutes === mins
-                      ? 'border-pulse bg-pulse text-pulse-fg'
-                      : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:text-[#F4F5F7]'
-                  }`}
-                >
-                  {mins} {t('Menit', 'Min')}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 border-t border-white/10 pt-4 sm:grid-cols-2">
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
-            <div>
-              <p className="text-sm font-semibold text-[#F4F5F7]">
-                {t('Timer Istirahat Otomatis', 'Auto-Start Rest Timer')}
-              </p>
-              <p className="text-xs text-[#9CA3AF]">
-                {t(
-                  'Mulai hitung mundur saat set dicentang selesai.',
-                  'Start rest countdown whenever a set is checked off.'
-                )}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                onUpdateProfile({ autoStartRestTimer: !profile.autoStartRestTimer })
-              }
-              className={`min-h-[38px] rounded-lg px-3.5 text-xs font-bold whitespace-nowrap ${
-                profile.autoStartRestTimer
-                  ? 'bg-pulse text-pulse-fg'
-                  : 'border border-white/15 bg-[#1A1E26] text-[#9CA3AF]'
-              }`}
-            >
-              {profile.autoStartRestTimer ? t('Aktif', 'Active') : 'Manual'}
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3.5">
-            <div>
-              <p className="text-sm font-semibold text-[#F4F5F7]">
-                {runningNativeAndroid
-                  ? t('Notifikasi Perangkat', 'Device Notifications')
-                  : t('Notifikasi Desktop', 'Desktop Notifications')}
-              </p>
-              <p className="text-xs text-[#9CA3AF]">
-                {isNotifGranted
-                  ? t('Izin notifikasi sudah aktif.', 'Notifications are allowed.')
-                  : !runningNativeAndroid && notifPermission === 'denied'
-                    ? t(
-                        'Diblokir browser. Aktifkan izin notifikasi di setelan situs browser Anda.',
-                        'Blocked by browser. Enable notifications in your browser site settings.'
-                      )
-                    : t(
-                        'Tampilkan pengingat saat jam latihan tiba.',
-                        'Show alert popup when alarm triggers.'
-                      )}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleRequestNotifications}
-              className={`inline-flex min-h-[38px] items-center gap-1.5 rounded-lg px-3.5 text-xs font-bold whitespace-nowrap ${
-                isNotifGranted
-                  ? 'border border-[#16A34A]/50 bg-[#16A34A]/20 text-[#4ADE80]'
-                  : 'bg-[#1A1E26] border border-white/15 text-[#F4F5F7] hover:bg-[#252C38]'
-              }`}
-            >
-              <Bell className="h-3.5 w-3.5" />
-              {isNotifGranted ? t('Diizinkan', 'Allowed') : t('Izinkan', 'Allow')}
-            </button>
-          </div>
-        </div>
-
-        {/* Android APK Native Background Alarm Diagnostics */}
-        {runningNativeAndroid && (
-          <div className="space-y-3 border-t border-white/10 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm font-bold text-[#F4F5F7]">
-                <Smartphone className="h-4 w-4 text-pulse" />
-                <span>{t('Diagnostik Alarm Android', 'Android Alarm Diagnostics')}</span>
-              </div>
-              {androidDiag && (
-                <span className="font-mono text-xs tabular-nums text-pulse">
-                  {androidDiag.pendingCount} {t('Jadwal Aktif', 'Pending')}
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#0A0B0E] p-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  {androidDiag?.exactAlarmPermission === 'granted' ? (
-                    <ShieldCheck className="h-4 w-4 shrink-0 text-[#4ADE80]" />
-                  ) : (
-                    <ShieldAlert className="h-4 w-4 shrink-0 text-[#FBBF24]" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-[#F4F5F7]">Exact Alarm</p>
-                    <p className="text-[11px] text-[#9CA3AF]">
-                      {androidDiag?.exactAlarmPermission === 'granted'
-                        ? t('Presisi tepat waktu', 'Exact timing active')
-                        : t('Perlu diaktifkan di sistem', 'Enable in system settings')}
-                    </p>
+                      <button
+                        type="button"
+                        onClick={() => setClockFormat('12h')}
+                        className={`min-h-[48px] rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
+                          clockFormat === '12h'
+                            ? 'border-pulse bg-pulse/12 text-[#F4F5F7]'
+                            : 'border-white/10 bg-[#0A0B0E] text-[#9CA3AF] hover:border-white/25 hover:text-[#F4F5F7]'
+                        }`}
+                      >
+                        <p className="text-xs font-bold text-[#F4F5F7]">
+                          {t('12 Jam (AM / PM)', '12-Hour (AM / PM)')}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[11px] tabular-nums text-pulse">
+                          {preview12.timeText} {preview12.meridiem}
+                        </p>
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleOpenExactSettings}
-                  className="inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-[#1A1E26] px-2.5 text-xs font-semibold text-[#F4F5F7]"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  {t('Atur', 'Settings')}
-                </button>
-              </div>
+              </section>
 
-              <button
-                type="button"
-                disabled={schedulingTest}
-                onClick={handleScheduleTestNotification}
-                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-pulse px-4 py-2 text-xs font-bold text-pulse-fg hover:brightness-105 disabled:opacity-60"
-              >
-                <BellRing className="h-4 w-4" />
-                {schedulingTest
-                  ? t('Menjadwalkan...', 'Scheduling...')
-                  : t('Uji Notifikasi 5 Detik', '5s Notification Test')}
-              </button>
-            </div>
-
-            {testNotifStatus && (
-              <p className="text-xs font-medium text-pulse">{testNotifStatus}</p>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* 5. Account & Cloud Session */}
-      <section className="glass-surface rounded-2xl border border-white/12 p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#9CA3AF]">
-              {t('Akun Sinkronisasi Cloud', 'Cloud Synced Account')}
-            </p>
-            <p className="mt-1 truncate text-base font-bold text-[#F4F5F7]">
-              {profile.displayName}
-            </p>
-            <p className="truncate text-xs text-[#9CA3AF]">{profile.email}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-[#1A1E26] px-4 py-2 text-xs font-semibold text-[#D1D5DB] hover:border-[#DC2626]/50 hover:text-[#FCA5A5] shrink-0"
-          >
-            <LogOut className="h-4 w-4" />
-            {t('Keluar Akun', 'Sign Out')}
-          </button>
-        </div>
-      </section>
+              {/* Feature Guide */}
+              <section className="glass-surface rounded-2xl border border-white/12 p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="font-display text-lg font-bold text-[#F4F5F7]">
+                      {t('Panduan Fitur IronPulse', 'IronPulse Feature Guide')}
+                    </h2>
+                    <p className="mt-0.5 text-xs text-[#9CA3AF]">
+                      {t(
+                        'Buka kembali tur 5 langkah untuk melihat penjelasan tiap tab dan tombol.',
+                        'Reopen the 5-step interactive tour explaining each tab and control.'
+                      )}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onOpenTutorial}
+                    className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-xl border border-pulse/40 bg-pulse/10 px-4 py-2 text-xs font-bold text-pulse hover:bg-pulse hover:text-pulse-fg whitespace-nowrap"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                    {t('Buka Panduan Fitur', 'Open Feature Guide')}
+                  </button>
+                </div>
+              </section>
+            </>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

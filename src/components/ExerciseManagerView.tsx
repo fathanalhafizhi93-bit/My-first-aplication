@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   ArrowDown,
   ArrowUp,
@@ -15,7 +16,9 @@ import {
 } from 'lucide-react';
 import { EXERCISE_LIBRARY } from '../data/presets';
 import { formatCompactDuration } from '../lib/dateUtils';
+import { haptics } from '../lib/haptics';
 import { DAY_LABELS, MUSCLE_LABELS, useI18n } from '../lib/i18n';
+import { SHARED_IDS, TAB_INDICATOR_SPRING } from '../lib/motionTokens';
 import { ConfirmDeleteModal, GlassModal } from './GlassModal';
 import {
   DAY_LIST,
@@ -91,6 +94,7 @@ export function ExerciseManagerView({
   onMoveExercise,
 }: ExerciseManagerViewProps) {
   const { lang, t } = useI18n();
+  const prefersReducedMotion = useReducedMotion();
   const [searchQuery, setSearchQuery] = useState('');
   const [muscleFilter, setMuscleFilter] = useState<'Semua' | MuscleGroup>('Semua');
   const [showLibraryModal, setShowLibraryModal] = useState(false);
@@ -343,6 +347,12 @@ export function ExerciseManagerView({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
+          <motion.span
+            layoutId={prefersReducedMotion ? undefined : SHARED_IDS.pageAccentBar}
+            transition={TAB_INDICATOR_SPRING}
+            aria-hidden="true"
+            className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
+          />
           <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
             {t('Daftar & Pustaka Gerakan', 'Exercises & Movement Library')}
           </h1>
@@ -396,14 +406,27 @@ export function ExerciseManagerView({
             <button
               key={day.key}
               type="button"
-              onClick={() => onSelectDayKey(day.key)}
-              className={`min-h-[40px] flex-1 rounded-lg px-3 py-2 text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
+              onClick={() => {
+                if (!active) haptics.tabSwitch();
+                onSelectDayKey(day.key);
+              }}
+              className={`relative min-h-[40px] flex-1 rounded-lg px-3 py-2 text-xs transition-colors whitespace-nowrap shrink-0 ${
                 active
-                  ? 'bg-pulse text-pulse-fg font-bold'
-                  : 'text-[#9CA3AF] hover:text-[#F4F5F7]'
+                  ? 'text-pulse-fg font-bold'
+                  : 'font-semibold text-[#9CA3AF] hover:text-[#F4F5F7]'
               }`}
             >
-              {DAY_LABELS[lang][day.key].label} ({count})
+              {active && (
+                <motion.span
+                  layoutId={prefersReducedMotion ? undefined : SHARED_IDS.exerciseDayPill}
+                  transition={TAB_INDICATOR_SPRING}
+                  style={{ borderRadius: 8 }}
+                  className="absolute inset-0 bg-pulse"
+                />
+              )}
+              <span className="relative z-10">
+                {DAY_LABELS[lang][day.key].label} ({count})
+              </span>
             </button>
           );
         })}

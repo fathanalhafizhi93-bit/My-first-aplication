@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   CalendarDays,
   ChevronLeft,
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react';
 import { formatCompactDuration, formatLocalDateKey } from '../lib/dateUtils';
 import { DAY_LABELS, MUSCLE_LABELS, useI18n } from '../lib/i18n';
+import { SHARED_IDS, TAB_INDICATOR_SPRING } from '../lib/motionTokens';
 import {
   DAY_LIST,
   resolveExerciseTrackingMode,
@@ -74,6 +76,7 @@ export function HistoryProgressView({
   onGoToToday,
 }: HistoryProgressViewProps) {
   const { lang, t } = useI18n();
+  const prefersReducedMotion = useReducedMotion();
   const locale = lang === 'en' ? 'en-US' : 'id-ID';
   const todayKey = todayDateKey || formatLocalDateKey();
   const today = useMemo(() => parseDateKey(todayKey), [todayKey]);
@@ -208,6 +211,12 @@ export function HistoryProgressView({
     <div className="space-y-6">
       {/* Header */}
       <div className="border-b border-white/10 pb-5">
+        <motion.span
+          layoutId={prefersReducedMotion ? undefined : SHARED_IDS.pageAccentBar}
+          transition={TAB_INDICATOR_SPRING}
+          aria-hidden="true"
+          className="mb-2 block h-[3px] w-10 rounded-full bg-pulse"
+        />
         <h1 className="font-display text-3xl font-extrabold tracking-tight text-[#F4F5F7]">
           {t('Riwayat & Kalender Latihan', 'Workout History & Calendar')}
         </h1>

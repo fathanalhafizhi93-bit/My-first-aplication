@@ -4,12 +4,13 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
+import { AnimatePresence, LayoutGroup, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { AboutView } from './components/AboutView';
 import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
 import { AuthGate } from './components/AuthGate';
 import { ExerciseManagerView } from './components/ExerciseManagerView';
 import { FeatureTutorialModal } from './components/FeatureTutorialModal';
+import { FloatingMascotDock } from './components/FloatingMascotDock';
 import { GlassModal } from './components/GlassModal';
 import { HistoryProgressView } from './components/HistoryProgressView';
 import { LaunchIntro } from './components/LaunchIntro';
@@ -23,19 +24,24 @@ import { TopBar } from './components/TopBar';
 import { WeeklyScheduleView } from './components/WeeklyScheduleView';
 import { WorkoutSessionView } from './components/WorkoutSessionView';
 import { useGymData } from './hooks/useGymData';
+import { MascotMood, useMascotCompanion } from './hooks/useMascotCompanion';
 import { audioEngine, BUILTIN_RINGTONES } from './lib/audioEngine';
 import {
   computeNextAlarm,
   formatHHMM,
   formatLocalDateKey,
+  formatRestDuration,
   getTodayDayKey,
 } from './lib/dateUtils';
 import {
+  DAY_LABELS,
   LanguageProvider,
   PHASE_THEME_TOKENS,
   resolveDayTimePhase,
   useI18n,
 } from './lib/i18n';
+import { attachGlobalButtonHaptics, haptics } from './lib/haptics';
+import { TAB_GLIDE_SPRING } from './lib/motionTokens';
 import { syncNativeWeeklyAlarms } from './lib/nativeAlarmBridge';
 import {
   AppTab,
@@ -71,7 +77,7 @@ const TAB_ORDER: Record<AppTab, number> = {
 
 const TAB_SLIDE_VARIANTS = {
   enter: (direction: number) => ({
-    x: direction > 0 ? 36 : direction < 0 ? -36 : 0,
+    x: direction > 0 ? 28 : direction < 0 ? -28 : 0,
     opacity: 0,
   }),
   center: {
@@ -79,9 +85,15 @@ const TAB_SLIDE_VARIANTS = {
     opacity: 1,
   },
   exit: (direction: number) => ({
-    x: direction > 0 ? -36 : direction < 0 ? 36 : 0,
+    x: direction > 0 ? -28 : direction < 0 ? 28 : 0,
     opacity: 0,
   }),
+};
+
+const SHARED_PAIR_VARIANTS = {
+  enter: { opacity: 0.94 },
+  center: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 const REDUCED_TAB_VARIANTS = {
@@ -95,6 +107,8 @@ function AppContent() {
   const prefersReducedMotion = useReducedMotion();
   const isFrosted = uiTheme === 'midnight-frosted';
   const isCarbon = uiTheme === 'carbon-forge';
+  const isMaterialYou = uiTheme === 'material-you';
+  const isAero = uiTheme === 'aeroglass';
   const {
     user,
     authReady,
@@ -126,14 +140,34 @@ function AppContent() {
     deleteCustomRingtone,
   } = useGymData();
 
-  const [[activeTab, tabDirection], setTabState] = useState<[AppTab, number]>(['today', 0]);
-  const [activePopup, setActivePopup] = useState<'settings' | 'about' | null>(null);
+  const [tabState, setTabState] = useState<{
+    activeTab: AppTab;
+    prevTab: AppTab;
+    direction: number;
+  }>({
+    activeTab: 'today',
+    prevTab: 'today',
+    direction: 0,
+  });
+  const { activeTab, prevTab, direction: tabDirection } = tabState;
+  const isSharedPairTransition =
+    (prevTab === 'today' && activeTab === 'workout') ||
+    (prevTab === 'workout' && activeTab === 'today');
+  const [activePopup, setActivePopup] = useState<'about' | null>(null);
+  const [heroMascotVisible, setHeroMascotVisible] = useState<boolean>(true);
+  const [floatingOrbPresent, setFloatingOrbPresent] = useState<boolean>(false);
+  const heroOrbAnchorRef = useRef<HTMLButtonElement | null>(null);
 
   const navigateToTab = useCallback((nextTab: AppTab) => {
-    setTabState(([prevTab]) => {
-      if (prevTab === nextTab) return [prevTab, 0];
-      const dir = TAB_ORDER[nextTab] >= TAB_ORDER[prevTab] ? 1 : -1;
-      return [nextTab, dir];
+    setTabState((curr) => {
+      if (curr.activeTab === nextTab) return curr;
+      haptics.tabSwitch();
+      const dir = TAB_ORDER[nextTab] >= TAB_ORDER[curr.activeTab] ? 1 : -1;
+      return {
+        activeTab: nextTab,
+        prevTab: curr.activeTab,
+        direction: dir,
+      };
     });
   }, []);
   const [showIntro, setShowIntro] = useState(true);
@@ -172,6 +206,7 @@ function AppContent() {
   const restEndAtRef = useRef<number | null>(null);
   const restShouldChimeRef = useRef(false);
   const restBannerTimeoutRef = useRef<number | null>(null);
+  const lastRestTickHapticRef = useRef<number | null>(null);
 
   // Per-exercise timer state (Countdown & Count-Up for timed movements like Plank / Incline Walk)
   const [exerciseTimers, setExerciseTimers] = useState<Record<string, ExerciseTimerState>>({});
@@ -222,6 +257,11 @@ function AppContent() {
       window.removeEventListener('pointerdown', unlockOnce);
       window.removeEventListener('keydown', unlockOnce);
     };
+  }, []);
+
+  // Global tactile button click haptics (automatically yields to richer semantic haptics)
+  useEffect(() => {
+    return attachGlobalButtonHaptics();
   }, []);
 
   // Cleanup mascot clap & rest banner timeouts on unmount
@@ -288,6 +328,7 @@ function AppContent() {
         ringtoneName: tone.name,
         isTest,
       });
+      haptics.alarmAlert();
 
       void audioEngine.play(tone.id, {
         volume: profile?.volume ?? 0.85,
@@ -384,7 +425,10 @@ function AppContent() {
 
   // Rest timer countdown loop (wall-clock anchored so backgrounding never drifts)
   useEffect(() => {
-    if (!restRunning) return;
+    if (!restRunning) {
+      lastRestTickHapticRef.current = null;
+      return;
+    }
     if (restEndAtRef.current === null) {
       restEndAtRef.current = Date.now() + restRemaining * 1000;
     }
@@ -393,8 +437,13 @@ function AppContent() {
       if (endAt === null) return;
       const rem = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
       setRestRemaining(rem);
+      if (rem >= 1 && rem <= 3 && lastRestTickHapticRef.current !== rem) {
+        lastRestTickHapticRef.current = rem;
+        haptics.timerCountdownTick();
+      }
       if (rem <= 0) {
         restEndAtRef.current = null;
+        lastRestTickHapticRef.current = null;
         setRestRunning(false);
       }
     };
@@ -409,6 +458,7 @@ function AppContent() {
     if (restRunning || restRemaining !== 0 || !restShouldChimeRef.current) return;
     restShouldChimeRef.current = false;
     setRestFinishedBanner(true);
+    haptics.timerFinished();
 
     const restToneId = profile?.restRingtoneId || 'builtin_kettlebell_chime';
     void audioEngine.play(restToneId, {
@@ -427,8 +477,11 @@ function AppContent() {
   }, [restRunning, restRemaining, profile, customRingtones]);
 
   const startRestTimer = useCallback(
-    (seconds: number, label?: string) => {
+    (seconds: number, label?: string, silentHaptic = false) => {
       void handleUnlockAudio();
+      if (!silentHaptic) {
+        haptics.timerStart();
+      }
       if (restBannerTimeoutRef.current !== null) {
         window.clearTimeout(restBannerTimeoutRef.current);
         restBannerTimeoutRef.current = null;
@@ -436,6 +489,7 @@ function AppContent() {
       const safeSec = Math.max(10, Math.min(600, seconds));
       restEndAtRef.current = Date.now() + safeSec * 1000;
       restShouldChimeRef.current = true;
+      lastRestTickHapticRef.current = null;
       setRestFinishedBanner(false);
       setRestTotalSeconds(safeSec);
       setRestRemaining(safeSec);
@@ -453,6 +507,20 @@ function AppContent() {
       playCompletionChime: boolean
     ) => {
       const safeDuration = Math.max(1, Math.min(10800, Math.round(durationSeconds)));
+      const finishedAll = willFinishAllSets(
+        effectiveTodayEntriesRef.current,
+        exerciseId,
+        setNumber
+      );
+
+      if (finishedAll) {
+        haptics.workoutComplete();
+      } else if (playCompletionChime) {
+        haptics.timerFinished();
+      } else {
+        haptics.setComplete();
+      }
+
       const becameCompleted = await completeTimerSet(exerciseId, setNumber, safeDuration);
 
       // Advance active set selector to next incomplete set if available
@@ -485,11 +553,6 @@ function AppContent() {
       }
 
       if (becameCompleted) {
-        const finishedAll = willFinishAllSets(
-          effectiveTodayEntriesRef.current,
-          exerciseId,
-          setNumber
-        );
         setDayJustChanged(false);
         setIsOpeningGreeting(false);
         triggerClapBurst(finishedAll);
@@ -497,7 +560,7 @@ function AppContent() {
         if (profile?.autoStartRestTimer && schedules && nextIncomplete && !finishedAll) {
           const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
           if (spec) {
-            startRestTimer(spec.restSeconds, spec.name);
+            startRestTimer(spec.restSeconds, spec.name, true);
           }
         }
       }
@@ -550,6 +613,12 @@ function AppContent() {
             durationSeconds: state.targetSeconds,
           });
         } else {
+          if (state.direction === 'countdown') {
+            const remAfterTick = state.targetSeconds - nextElapsed;
+            if (remAfterTick >= 1 && remAfterTick <= 3) {
+              haptics.timerCountdownTick();
+            }
+          }
           nextMap[id] = {
             ...state,
             elapsedSeconds: nextElapsed,
@@ -597,6 +666,13 @@ function AppContent() {
   const handleToggleExerciseTimer = useCallback(
     (entry: WorkoutLogEntry) => {
       void handleUnlockAudio();
+      const existing = exerciseTimersRef.current[entry.exerciseId];
+      const willRun = !(existing?.running ?? false);
+      if (willRun) {
+        haptics.timerStart();
+      } else {
+        haptics.timerPause();
+      }
       setExerciseTimers((prev) => {
         const cur = prev[entry.exerciseId] || buildInitialExerciseTimer(entry);
         const setObj = entry.sets.find((s) => s.setNumber === cur.activeSetNumber);
@@ -619,6 +695,7 @@ function AppContent() {
 
   const handleResetExerciseTimer = useCallback(
     (entry: WorkoutLogEntry) => {
+      haptics.timerReset();
       setExerciseTimers((prev) => {
         const cur = prev[entry.exerciseId] || buildInitialExerciseTimer(entry);
         const updated = {
@@ -638,6 +715,7 @@ function AppContent() {
 
   const handleChangeExerciseTimerDirection = useCallback(
     (entry: WorkoutLogEntry, direction: TimerDirection) => {
+      haptics.toggle();
       setExerciseTimers((prev) => {
         const cur = prev[entry.exerciseId] || buildInitialExerciseTimer(entry);
         const updated = {
@@ -658,6 +736,7 @@ function AppContent() {
 
   const handleSelectExerciseTimerSet = useCallback(
     (entry: WorkoutLogEntry, setNumber: number) => {
+      haptics.tabSwitch();
       const setObj = entry.sets.find((s) => s.setNumber === setNumber);
       const spec = schedules?.[todayDayKey]?.exercises.find((e) => e.id === entry.exerciseId);
       const targetSec =
@@ -700,11 +779,13 @@ function AppContent() {
 
   const handleToggleRestPause = useCallback(() => {
     void handleUnlockAudio();
+    lastRestTickHapticRef.current = null;
     if (restBannerTimeoutRef.current !== null) {
       window.clearTimeout(restBannerTimeoutRef.current);
       restBannerTimeoutRef.current = null;
     }
     if (restRemaining === 0) {
+      haptics.timerStart();
       restEndAtRef.current = Date.now() + restTotalSeconds * 1000;
       restShouldChimeRef.current = true;
       setRestRemaining(restTotalSeconds);
@@ -712,18 +793,21 @@ function AppContent() {
       setRestFinishedBanner(false);
       return;
     }
-    setRestRunning((currentlyRunning) => {
-      if (currentlyRunning) {
-        restEndAtRef.current = null;
-        return false;
-      }
+    if (restRunning) {
+      haptics.timerPause();
+      restEndAtRef.current = null;
+      setRestRunning(false);
+    } else {
+      haptics.timerStart();
       restEndAtRef.current = Date.now() + restRemaining * 1000;
       restShouldChimeRef.current = true;
-      return true;
-    });
-  }, [handleUnlockAudio, restRemaining, restTotalSeconds]);
+      setRestRunning(true);
+    }
+  }, [handleUnlockAudio, restRemaining, restRunning, restTotalSeconds]);
 
   const handleResetRest = useCallback(() => {
+    haptics.timerReset();
+    lastRestTickHapticRef.current = null;
     if (restBannerTimeoutRef.current !== null) {
       window.clearTimeout(restBannerTimeoutRef.current);
       restBannerTimeoutRef.current = null;
@@ -737,6 +821,8 @@ function AppContent() {
 
   const handleAdjustRest = useCallback(
     (delta: number) => {
+      haptics.timerAdjust();
+      lastRestTickHapticRef.current = null;
       const nextRemaining = Math.max(0, Math.min(600, restRemaining + delta));
       setRestRemaining(nextRemaining);
       setRestTotalSeconds((prev) =>
@@ -762,6 +848,7 @@ function AppContent() {
 
       // Block rapid subsequent check-offs during the 30s cooldown unless bypassed
       if (!isCurrentlyCompleted && cooldownRemaining > 0) {
+        haptics.cooldownBlocked();
         setCooldownAlertTarget({ exerciseId, setNumber, exerciseName });
         return;
       }
@@ -769,6 +856,17 @@ function AppContent() {
       const willAllFinish =
         !isCurrentlyCompleted &&
         willFinishAllSets(effectiveTodayEntries, exerciseId, setNumber);
+
+      // Fire crisp tactile response immediately for zero-latency physical feel
+      if (!isCurrentlyCompleted) {
+        if (willAllFinish) {
+          haptics.workoutComplete();
+        } else {
+          haptics.setComplete();
+        }
+      } else {
+        haptics.setUncheck();
+      }
 
       const becameCompleted = await toggleSetComplete(exerciseId, setNumber);
       if (becameCompleted) {
@@ -781,7 +879,7 @@ function AppContent() {
         if (profile?.autoStartRestTimer && schedules && !willAllFinish) {
           const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
           if (spec) {
-            startRestTimer(spec.restSeconds, spec.name);
+            startRestTimer(spec.restSeconds, spec.name, true);
           }
         }
       } else if (isCurrentlyCompleted) {
@@ -810,6 +908,11 @@ function AppContent() {
       exerciseId,
       setNumber
     );
+    if (willAllFinish) {
+      haptics.workoutComplete();
+    } else {
+      haptics.setComplete();
+    }
     const becameCompleted = await toggleSetComplete(exerciseId, setNumber);
     setCooldownAlertTarget(null);
 
@@ -822,7 +925,7 @@ function AppContent() {
       if (profile?.autoStartRestTimer && schedules && !willAllFinish) {
         const spec = schedules[todayDayKey]?.exercises.find((e) => e.id === exerciseId);
         if (spec) {
-          startRestTimer(spec.restSeconds, spec.name);
+          startRestTimer(spec.restSeconds, spec.name, true);
         }
       }
     }
@@ -846,6 +949,7 @@ function AppContent() {
   }, [schedules, todayDayKey, handleUnlockAudio, triggerAlarm]);
 
   const handleDismissAlarm = useCallback(() => {
+    haptics.toggle();
     audioEngine.stop();
     setActiveAlarm(null);
     setSnoozeTargetMs(null);
@@ -853,6 +957,7 @@ function AppContent() {
   }, []);
 
   const handleSnoozeAlarm = useCallback(() => {
+    haptics.timerReset();
     audioEngine.stop();
     const mins = profile?.snoozeMinutes ?? 5;
     if (activeAlarm) {
@@ -866,6 +971,7 @@ function AppContent() {
   }, [profile, activeAlarm]);
 
   const handleStartWorkoutFromAlarm = useCallback(() => {
+    haptics.timerStart();
     audioEngine.stop();
     setActiveAlarm(null);
     setSnoozeTargetMs(null);
@@ -971,15 +1077,97 @@ function AppContent() {
 
   const handleSelectTab = useCallback(
     (tab: AppTab) => {
-      if (tab === 'settings' || tab === 'about') {
-        setActivePopup(tab);
+      if (tab === 'about') {
+        setActivePopup('about');
         return;
       }
       setActivePopup(null);
       navigateToTab(tab);
+      if (tab === 'settings') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     },
     [navigateToTab]
   );
+
+  const handleOpenSettingsTab = useCallback(() => {
+    setActivePopup(null);
+    if (activeTab === 'settings') {
+      navigateToTab('today');
+    } else {
+      navigateToTab('settings');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [activeTab, navigateToTab]);
+
+  // Shared live companion state powering both the Hero inline orb and the Floating Corner Orb
+  const todayScheduleForMascot = schedules?.[todayDayKey];
+  const todayDayLabel = DAY_LABELS[lang][todayDayKey].label;
+  const totalTodaySets = useMemo(
+    () => effectiveTodayEntries.reduce((acc, e) => acc + e.sets.length, 0),
+    [effectiveTodayEntries]
+  );
+  const completedTodaySets = useMemo(
+    () =>
+      effectiveTodayEntries.reduce(
+        (acc, e) => acc + e.sets.filter((s) => s.completed).length,
+        0
+      ),
+    [effectiveTodayEntries]
+  );
+  const todayProgressPct =
+    totalTodaySets > 0 ? Math.round((completedTodaySets / totalTodaySets) * 100) : 0;
+  const activeTimerEntryForMascot = useMemo(
+    () => effectiveTodayEntries.find((e) => exerciseTimers[e.exerciseId]?.running),
+    [effectiveTodayEntries, exerciseTimers]
+  );
+
+  let mascotMood: MascotMood = 'ready';
+  if (justClapped) {
+    if (totalTodaySets > 0 && completedTodaySets === totalTodaySets) {
+      mascotMood = 'celebrate';
+    } else if (todayProgressPct >= 50) {
+      mascotMood = 'milestone';
+    } else {
+      mascotMood = 'clap';
+    }
+  } else if (activeTimerEntryForMascot) {
+    mascotMood = 'timerActive';
+  } else if (restRunning) {
+    mascotMood = 'rest';
+  } else if (todayScheduleForMascot && !todayScheduleForMascot.isGymDay) {
+    mascotMood = 'restday';
+  } else {
+    mascotMood = 'ready';
+  }
+
+  const companion = useMascotCompanion({
+    mood: mascotMood,
+    timePhase,
+    hour: now.getHours(),
+    restRemainingFormatted: restRunning ? formatRestDuration(restRemaining) : undefined,
+    activeTimerExerciseName: activeTimerEntryForMascot?.name,
+    progressPct: todayProgressPct,
+    completedSets: completedTodaySets,
+    totalSets: totalTodaySets,
+    dayLabel: todayDayLabel,
+    userName: profile?.displayName,
+    dayJustChanged,
+  });
+
+  const getHeroOrbRect = useCallback(() => {
+    return heroOrbAnchorRef.current ? heroOrbAnchorRef.current.getBoundingClientRect() : null;
+  }, []);
+
+  const shouldFloatCompanion =
+    activeTab !== 'today' || !heroMascotVisible;
+  const suppressFloatingCompanion =
+    showIntro ||
+    Boolean(activeAlarm) ||
+    activePopup !== null ||
+    !nameConfirmed ||
+    tutorialOpen ||
+    Boolean(cooldownAlertTarget);
 
   const renderBody = () => {
     if (!authReady) {
@@ -1002,9 +1190,7 @@ function AppContent() {
             activePopup={activePopup}
             timePhase={timePhase}
             onSelectTab={handleSelectTab}
-            onOpenSettings={() =>
-              setActivePopup((prev) => (prev === 'settings' ? null : 'settings'))
-            }
+            onOpenSettings={handleOpenSettingsTab}
             onOpenAbout={() =>
               setActivePopup((prev) => (prev === 'about' ? null : 'about'))
             }
@@ -1040,51 +1226,71 @@ function AppContent() {
         <div
           aria-hidden="true"
           className={`pointer-events-none fixed inset-x-0 top-0 z-0 h-[440px] transition-opacity duration-500 ${
-            isCarbon ? 'opacity-45' : 'opacity-100'
+            isCarbon || isMaterialYou ? 'opacity-40' : 'opacity-100'
           }`}
-          style={{ background: phaseToken.ambientGlow }}
+          style={{
+            backgroundImage: isAero
+              ? 'radial-gradient(ellipse 88% 58% at 50% -10%, rgba(56, 189, 248, 0.34), rgba(14, 165, 233, 0.1) 50%, transparent 78%)'
+              : phaseToken.ambientGlow,
+          }}
         />
         <div
           aria-hidden="true"
           className={`pointer-events-none fixed -left-24 top-28 z-0 rounded-full transition-all duration-500 ${
-            isFrosted ? 'h-96 w-96 opacity-45' : isCarbon ? 'h-72 w-72 opacity-10' : 'h-80 w-80 opacity-25'
+            isAero
+              ? 'h-[26rem] w-[26rem] opacity-55'
+              : isFrosted
+                ? 'h-96 w-96 opacity-45'
+                : isCarbon || isMaterialYou
+                  ? 'h-72 w-72 opacity-10'
+                  : 'h-80 w-80 opacity-25'
           }`}
           style={{
-            background: isFrosted
-              ? `radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.72) 0%, ${phaseToken.accent}52 42%, transparent 74%)`
-              : `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
+            backgroundImage: isAero
+              ? 'radial-gradient(circle, rgba(125, 211, 252, 0.42) 0%, rgba(14, 165, 233, 0.22) 45%, transparent 74%)'
+              : isFrosted
+                ? `radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.72) 0%, ${phaseToken.accent}52 42%, transparent 74%)`
+                : `radial-gradient(circle, ${phaseToken.accent}55 0%, transparent 70%)`,
           }}
         />
         <div
           aria-hidden="true"
           className={`pointer-events-none fixed -right-24 top-44 z-0 rounded-full transition-all duration-500 ${
-            isFrosted ? 'h-[28rem] w-[28rem] opacity-35' : isCarbon ? 'h-80 w-80 opacity-8' : 'h-96 w-96 opacity-20'
+            isAero
+              ? 'h-[28rem] w-[28rem] opacity-42'
+              : isFrosted
+                ? 'h-[28rem] w-[28rem] opacity-35'
+                : isCarbon || isMaterialYou
+                  ? 'h-80 w-80 opacity-8'
+                  : 'h-96 w-96 opacity-20'
           }`}
           style={{
-            background: isFrosted
-              ? `radial-gradient(circle, rgba(var(--ip-accent-rgb), 0.24) 0%, ${phaseToken.accentBright}35 44%, transparent 74%)`
-              : `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
+            backgroundImage: isAero
+              ? 'radial-gradient(circle, rgba(56, 189, 248, 0.32) 0%, rgba(var(--ip-accent-rgb), 0.16) 44%, transparent 74%)'
+              : isFrosted
+                ? `radial-gradient(circle, rgba(var(--ip-accent-rgb), 0.24) 0%, ${phaseToken.accentBright}35 44%, transparent 74%)`
+                : `radial-gradient(circle, ${phaseToken.accentBright}44 0%, transparent 72%)`,
           }}
         />
-        {isFrosted && (
+        {(isFrosted || isAero) && (
           <div
             aria-hidden="true"
-            className="pointer-events-none fixed bottom-10 left-1/3 z-0 h-80 w-80 rounded-full opacity-30 transition-all duration-500"
+            className="pointer-events-none fixed bottom-10 left-1/3 z-0 h-80 w-80 rounded-full opacity-32 transition-all duration-500"
             style={{
-              background:
-                'radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.65) 0%, rgba(var(--ip-accent-rgb), 0.14) 48%, transparent 75%)',
+              backgroundImage: isAero
+                ? 'radial-gradient(circle, rgba(186, 230, 253, 0.26) 0%, rgba(14, 165, 233, 0.12) 48%, transparent 75%)'
+                : 'radial-gradient(circle, rgba(var(--ip-glass-rgb), 0.65) 0%, rgba(var(--ip-accent-rgb), 0.14) 48%, transparent 75%)',
             }}
           />
         )}
 
+        <LayoutGroup id="ironpulse-shell">
         <TopBar
           activeTab={activeTab}
           activePopup={activePopup}
           timePhase={timePhase}
           onSelectTab={handleSelectTab}
-          onOpenSettings={() =>
-            setActivePopup((prev) => (prev === 'settings' ? null : 'settings'))
-          }
+          onOpenSettings={handleOpenSettingsTab}
           onOpenAbout={() =>
             setActivePopup((prev) => (prev === 'about' ? null : 'about'))
           }
@@ -1109,14 +1315,25 @@ function AppContent() {
               <motion.div
                 key={activeTab}
                 custom={tabDirection}
-                variants={prefersReducedMotion ? REDUCED_TAB_VARIANTS : TAB_SLIDE_VARIANTS}
+                variants={
+                  prefersReducedMotion
+                    ? REDUCED_TAB_VARIANTS
+                    : isSharedPairTransition
+                      ? SHARED_PAIR_VARIANTS
+                      : TAB_SLIDE_VARIANTS
+                }
                 initial="enter"
                 animate="center"
                 exit="exit"
                 transition={
                   prefersReducedMotion
                     ? { duration: 0.12 }
-                    : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                    : isSharedPairTransition
+                      ? { duration: 0.18, ease: [0.22, 1, 0.36, 1] }
+                      : {
+                          x: TAB_GLIDE_SPRING,
+                          opacity: { duration: 0.18, ease: 'easeOut' },
+                        }
                 }
                 className="w-full will-change-transform"
               >
@@ -1133,11 +1350,10 @@ function AppContent() {
                     restRemaining={restRemaining}
                     restRunning={restRunning}
                     restExerciseLabel={restExerciseLabel}
-                    justClapped={justClapped}
-                    dayJustChanged={dayJustChanged}
-                    userName={profile.displayName}
-                    isOpeningGreeting={isOpeningGreeting}
-                    exerciseTimers={exerciseTimers}
+                    companion={companion}
+                    heroOrbAnchorRef={heroOrbAnchorRef}
+                    hideHeroOrbVisual={floatingOrbPresent}
+                    onHeroMascotVisibilityChange={setHeroMascotVisible}
                     onToggleRestPause={handleToggleRestPause}
                     onResetRest={handleResetRest}
                     onAdjustRest={handleAdjustRest}
@@ -1237,6 +1453,19 @@ function AppContent() {
                     onDeleteRingtone={deleteCustomRingtone}
                   />
                 )}
+
+                {activeTab === 'settings' && (
+                  <SettingsView
+                    now={now}
+                    profile={profile}
+                    onUpdateProfile={updateProfile}
+                    onOpenRingtones={() => navigateToTab('ringtones')}
+                    onOpenTutorial={handleOpenTutorialFromUi}
+                    onSignOut={async () => {
+                      await signOutUser();
+                    }}
+                  />
+                )}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -1248,6 +1477,16 @@ function AppContent() {
           onSelectTab={handleSelectTab}
           restRemaining={restRemaining}
           restRunning={restRunning}
+        />
+        </LayoutGroup>
+
+        <FloatingMascotDock
+          companion={companion}
+          shouldFloat={shouldFloatCompanion}
+          suppressed={suppressFloatingCompanion}
+          activeTab={activeTab}
+          getHeroOrbRect={getHeroOrbRect}
+          onFloatingPresenceChange={setFloatingOrbPresent}
         />
 
         {activeAlarm && (
@@ -1261,38 +1500,6 @@ function AppContent() {
             onDismiss={handleDismissAlarm}
           />
         )}
-
-        <GlassModal
-          open={activePopup === 'settings'}
-          onClose={() => setActivePopup(null)}
-          title={t('Pengaturan Aplikasi', 'App Settings')}
-          subtitle={t(
-            'Atur tema material, warna tombol, bahasa, format jam, dan preferensi alarm.',
-            'Configure material theme, button colors, language, clock format, and alarm preferences.'
-          )}
-          maxWidthClass="max-w-2xl"
-          accentBorderClass="border-pulse/30"
-          closeAriaLabel={t('Tutup Pengaturan', 'Close Settings')}
-        >
-          <SettingsView
-            now={now}
-            profile={profile}
-            embeddedInModal
-            onUpdateProfile={updateProfile}
-            onOpenRingtones={() => {
-              setActivePopup(null);
-              navigateToTab('ringtones');
-            }}
-            onOpenTutorial={() => {
-              setActivePopup(null);
-              handleOpenTutorialFromUi();
-            }}
-            onSignOut={async () => {
-              setActivePopup(null);
-              await signOutUser();
-            }}
-          />
-        </GlassModal>
 
         <GlassModal
           open={activePopup === 'about'}
