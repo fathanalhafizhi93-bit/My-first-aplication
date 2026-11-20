@@ -1,7 +1,5 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">IronPulse</string>
-    <string name="title_activity_main">IronPulse</string>
-    <string name="package_name">com.fathan.ironpulse</string>
-    <string name="custom_url_scheme">com.fathan.ironpulse</string>
+    <string name="default_web_client_id_fallback">665973010974-7jdegi3itd898lfmav78kbi265r7ilhb.apps.googleusercontent.com</string>
 </resources>
