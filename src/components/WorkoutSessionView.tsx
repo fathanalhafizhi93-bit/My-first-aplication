@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ArrowLeft,
@@ -110,7 +110,7 @@ interface BufferedNumberInputProps {
   onCommit: (nextValue: number) => void | Promise<void>;
 }
 
-function BufferedNumberInput({
+const BufferedNumberInput = memo(function BufferedNumberInput({
   value,
   min,
   max,
@@ -173,7 +173,7 @@ function BufferedNumberInput({
       className={className}
     />
   );
-}
+});
 
 interface TactileStepperControlProps {
   label: string;
@@ -188,7 +188,7 @@ interface TactileStepperControlProps {
   onCommit: (nextValue: number) => void | Promise<void>;
 }
 
-function TactileStepperControl({
+const TactileStepperControl = memo(function TactileStepperControl({
   label,
   unit,
   value,
@@ -265,14 +265,14 @@ function TactileStepperControl({
       </div>
     </div>
   );
-}
+});
 
 const MINI_RING_SIZE = 44;
 const MINI_RING_STROKE = 3.5;
 const MINI_RING_RADIUS = (MINI_RING_SIZE - MINI_RING_STROKE) / 2;
 const MINI_RING_CIRC = 2 * Math.PI * MINI_RING_RADIUS;
 
-export function WorkoutSessionView({
+export const WorkoutSessionView = memo(function WorkoutSessionView({
   now,
   todayDayKey,
   schedules,
@@ -409,19 +409,19 @@ export function WorkoutSessionView({
     }
   }, [selectedExerciseId, prefersReducedMotion, updateSwitcherScrollBounds]);
 
-  const totalSets = todayEntries.reduce((acc, e) => acc + e.sets.length, 0);
-  const completedSets = todayEntries.reduce(
-    (acc, e) => acc + e.sets.filter((s) => s.completed).length,
-    0
+  const specById = useMemo(
+    () => new Map(activeSchedule.exercises.map((e) => [e.id, e])),
+    [activeSchedule.exercises]
   );
-  const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
-  const allSessionCompleted =
-    activeSchedule.isGymDay && totalSets > 0 && completedSets === totalSets;
 
-  const totalVolumeKg = useMemo(() => {
+  const { totalSets, completedSets, totalVolumeKg, completedExercisesCount } = useMemo(() => {
+    let total = 0;
+    let done = 0;
     let volume = 0;
+    let finishedExercises = 0;
+
     for (const entry of todayEntries) {
-      const spec = activeSchedule.exercises.find((e) => e.id === entry.exerciseId);
+      const spec = specById.get(entry.exerciseId);
       const mode = resolveExerciseTrackingMode(spec || entry);
       const usesWeight = resolveExerciseUsesWeight({
         usesWeight: entry.usesWeight ?? spec?.usesWeight,
@@ -429,21 +429,34 @@ export function WorkoutSessionView({
         targetWeightKg: spec?.targetWeightKg ?? entry.sets[0]?.weightKg ?? 0,
         equipment: spec?.equipment,
       });
-      if (mode === 'timer' || !usesWeight) continue;
+
+      let entryDone = 0;
       for (const s of entry.sets) {
+        total += 1;
         if (s.completed) {
-          volume += Math.max(0, s.weightKg) * Math.max(0, s.reps);
+          done += 1;
+          entryDone += 1;
+          if (mode !== 'timer' && usesWeight) {
+            volume += Math.max(0, s.weightKg) * Math.max(0, s.reps);
+          }
         }
       }
+      if (entry.sets.length > 0 && entryDone === entry.sets.length) {
+        finishedExercises += 1;
+      }
     }
-    return Math.round(volume);
-  }, [todayEntries, activeSchedule.exercises]);
 
-  const completedExercisesCount = useMemo(
-    () =>
-      todayEntries.filter((e) => e.sets.length > 0 && e.sets.every((s) => s.completed)).length,
-    [todayEntries]
-  );
+    return {
+      totalSets: total,
+      completedSets: done,
+      totalVolumeKg: Math.round(volume),
+      completedExercisesCount: finishedExercises,
+    };
+  }, [todayEntries, specById]);
+
+  const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
+  const allSessionCompleted =
+    activeSchedule.isGymDay && totalSets > 0 && completedSets === totalSets;
 
   // Floating rest bar appears automatically when running, paused mid-way, finished, or manually opened
   const isRestMidway = restRemaining > 0 && restRemaining < restTotalSeconds;
@@ -479,7 +492,7 @@ export function WorkoutSessionView({
   };
 
   const renderExerciseCockpitCard = (entry: WorkoutLogEntry, index: number, isFocusCard: boolean) => {
-    const spec = activeSchedule.exercises.find((e) => e.id === entry.exerciseId);
+    const spec = specById.get(entry.exerciseId);
     const mode = resolveExerciseTrackingMode(spec || entry);
     const usesWeight = resolveExerciseUsesWeight({
       usesWeight: entry.usesWeight ?? spec?.usesWeight,
@@ -1646,4 +1659,4 @@ export function WorkoutSessionView({
       />
     </div>
   );
-}
+});

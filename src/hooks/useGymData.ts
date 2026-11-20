@@ -14,6 +14,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   limit,
   onSnapshot,
   query,
@@ -234,52 +235,91 @@ export function useGymData() {
       const uid = user.uid;
       const userRef = doc(db, 'users', uid);
 
-      try {
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          const initialProfile = {
-            userId: uid,
-            displayName: (user.displayName || 'Atlet IronPulse').slice(0, 100),
-            email: (user.email || '').slice(0, 200),
-            defaultRingtoneId: 'builtin_athletic_bell',
-            restRingtoneId: 'builtin_kettlebell_chime',
-            volume: 0.85,
-            notificationsEnabled: false,
-            snoozeMinutes: 5,
-            autoStartRestTimer: true,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-          };
-          await setDoc(userRef, initialProfile);
-        }
+      const schedulesQuery = query(
+        collection(db, 'users', uid, 'schedules'),
+        where('userId', '==', uid)
+      );
 
-        // Seed missing day schedules if first time
+      let userSnap;
+      let schedListSnap;
+      try {
+        [userSnap, schedListSnap] = await Promise.all([
+          getDoc(userRef).catch((err) => {
+            if (!cancelled) {
+              handleFirestoreError(err, OperationType.GET, `users/${uid}`);
+            }
+            throw err;
+          }),
+          getDocs(schedulesQuery).catch((err) => {
+            if (!cancelled) {
+              handleFirestoreError(err, OperationType.LIST, `users/${uid}/schedules`);
+            }
+            throw err;
+          }),
+        ]);
+      } catch {
+        return;
+      }
+
+      if (cancelled) return;
+
+      const writes: Promise<unknown>[] = [];
+
+      if (!userSnap.exists()) {
+        const initialProfile = {
+          userId: uid,
+          displayName: (user.displayName?.trim() || 'Atlet IronPulse').slice(0, 100),
+          email: (user.email || '').slice(0, 200),
+          defaultRingtoneId: 'builtin_athletic_bell',
+          restRingtoneId: 'builtin_kettlebell_chime',
+          volume: 0.85,
+          notificationsEnabled: false,
+          snoozeMinutes: 5,
+          autoStartRestTimer: true,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        writes.push(
+          setDoc(userRef, initialProfile).catch((err) => {
+            if (!cancelled) {
+              handleFirestoreError(err, OperationType.CREATE, `users/${uid}`);
+            }
+            throw err;
+          })
+        );
+      }
+
+      const existingScheduleIds = new Set(schedListSnap.docs.map((d) => d.id));
+      const missingDays = DAY_LIST.filter((d) => !existingScheduleIds.has(d.key));
+
+      if (missingDays.length > 0) {
         const defaults = createDefaultSchedules(uid);
         const batch = writeBatch(db);
-        let hasWrites = false;
-
-        for (const dayMeta of DAY_LIST) {
+        for (const dayMeta of missingDays) {
           const schedRef = doc(db, 'users', uid, 'schedules', dayMeta.key);
-          const schedSnap = await getDoc(schedRef);
-          if (!schedSnap.exists()) {
-            const def = defaults[dayMeta.key];
-            batch.set(schedRef, {
-              ...def,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp(),
-            });
-            hasWrites = true;
-          }
+          const def = defaults[dayMeta.key];
+          batch.set(schedRef, {
+            ...def,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
         }
+        writes.push(
+          batch.commit().catch((err) => {
+            if (!cancelled) {
+              handleFirestoreError(err, OperationType.WRITE, `users/${uid}/schedules`);
+            }
+            throw err;
+          })
+        );
+      }
 
-        if (hasWrites) {
-          await batch.commit();
+      if (writes.length > 0) {
+        try {
+          await Promise.all(writes);
+        } catch {
+          return;
         }
-      } catch (err) {
-        if (!cancelled) {
-          handleFirestoreError(err, OperationType.WRITE, `users/${uid}`);
-        }
-        return;
       }
 
       if (cancelled) return;
@@ -469,6 +509,26 @@ export function useGymData() {
         if (!cleaned) return;
         sanitizedPatch.displayName = cleaned;
       }
+      if (typeof sanitizedPatch.defaultRingtoneId === 'string') {
+        sanitizedPatch.defaultRingtoneId =
+          sanitizedPatch.defaultRingtoneId.trim().slice(0, 128) || 'builtin_athletic_bell';
+      }
+      if (typeof sanitizedPatch.restRingtoneId === 'string') {
+        sanitizedPatch.restRingtoneId =
+          sanitizedPatch.restRingtoneId.trim().slice(0, 128) || 'builtin_kettlebell_chime';
+      }
+      if (typeof sanitizedPatch.volume === 'number') {
+        sanitizedPatch.volume = Math.max(
+          0,
+          Math.min(1, Number.isFinite(sanitizedPatch.volume) ? sanitizedPatch.volume : 0.85)
+        );
+      }
+      if (typeof sanitizedPatch.snoozeMinutes === 'number') {
+        sanitizedPatch.snoozeMinutes = Math.max(
+          1,
+          Math.min(60, Math.round(Number.isFinite(sanitizedPatch.snoozeMinutes) ? sanitizedPatch.snoozeMinutes : 5))
+        );
+      }
       const path = `users/${user.uid}`;
       try {
         await updateDoc(doc(db, 'users', user.uid), {
@@ -497,6 +557,14 @@ export function useGymData() {
       if (typeof sanitizedPatch.focusTitle === 'string') {
         sanitizedPatch.focusTitle =
           sanitizedPatch.focusTitle.trim().slice(0, 80) || 'Sesi Latihan';
+      }
+      if (typeof sanitizedPatch.alarmTime === 'string') {
+        if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(sanitizedPatch.alarmTime)) {
+          delete sanitizedPatch.alarmTime;
+        }
+      }
+      if (typeof sanitizedPatch.ringtoneId === 'string') {
+        sanitizedPatch.ringtoneId = sanitizedPatch.ringtoneId.trim().slice(0, 128) || 'default';
       }
       if (sanitizedPatch.exercises) {
         sanitizedPatch.exercises = sanitizedPatch.exercises.slice(0, 30);
@@ -636,8 +704,7 @@ export function useGymData() {
         const allSets = trimmedEntries.flatMap((e) => e.sets);
         const isAllCompleted = allSets.length > 0 && allSets.every((s) => s.completed);
         const focusTitle = (
-          sched?.focusTitle ||
-          curLog?.focusTitle ||
+          (sched?.focusTitle || curLog?.focusTitle || 'Latihan Hari Ini').trim() ||
           'Latihan Hari Ini'
         ).slice(0, 80);
 
@@ -675,7 +742,11 @@ export function useGymData() {
             });
           }
         } catch (err) {
-          handleFirestoreError(err, OperationType.WRITE, path);
+          handleFirestoreError(
+            err,
+            existedBefore ? OperationType.UPDATE : OperationType.CREATE,
+            path
+          );
         }
       });
 
@@ -902,36 +973,70 @@ export function useGymData() {
     [user, profile, updateProfile, updateSchedule]
   );
 
-  return {
-    user,
-    authReady,
-    dataLoading,
-    authError,
-    profile,
-    schedules,
-    customRingtones,
-    todayDayKey,
-    todayDateKey,
-    todayLog,
-    workoutHistory,
-    historyLoading,
-    effectiveTodayEntries,
-    signInWithGoogle,
-    signOutUser,
-    updateProfile,
-    updateSchedule,
-    addExerciseToDay,
-    addExercisesToDay,
-    updateExerciseInDay,
-    removeExerciseFromDay,
-    moveExerciseInDay,
-    toggleSetComplete,
-    updateSetMetrics,
-    updateSetDuration,
-    completeTimerSet,
-    addSetToExercise,
-    removeSetFromExercise,
-    addCustomRingtone,
-    deleteCustomRingtone,
-  };
+  return useMemo(
+    () => ({
+      user,
+      authReady,
+      dataLoading,
+      authError,
+      profile,
+      schedules,
+      customRingtones,
+      todayDayKey,
+      todayDateKey,
+      todayLog,
+      workoutHistory,
+      historyLoading,
+      effectiveTodayEntries,
+      signInWithGoogle,
+      signOutUser,
+      updateProfile,
+      updateSchedule,
+      addExerciseToDay,
+      addExercisesToDay,
+      updateExerciseInDay,
+      removeExerciseFromDay,
+      moveExerciseInDay,
+      toggleSetComplete,
+      updateSetMetrics,
+      updateSetDuration,
+      completeTimerSet,
+      addSetToExercise,
+      removeSetFromExercise,
+      addCustomRingtone,
+      deleteCustomRingtone,
+    }),
+    [
+      user,
+      authReady,
+      dataLoading,
+      authError,
+      profile,
+      schedules,
+      customRingtones,
+      todayDayKey,
+      todayDateKey,
+      todayLog,
+      workoutHistory,
+      historyLoading,
+      effectiveTodayEntries,
+      signInWithGoogle,
+      signOutUser,
+      updateProfile,
+      updateSchedule,
+      addExerciseToDay,
+      addExercisesToDay,
+      updateExerciseInDay,
+      removeExerciseFromDay,
+      moveExerciseInDay,
+      toggleSetComplete,
+      updateSetMetrics,
+      updateSetDuration,
+      completeTimerSet,
+      addSetToExercise,
+      removeSetFromExercise,
+      addCustomRingtone,
+      deleteCustomRingtone,
+    ]
+  );
 }

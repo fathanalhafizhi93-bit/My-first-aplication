@@ -4,16 +4,11 @@
  */
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
-import { AboutView } from './components/AboutView';
-import { ActiveAlarmOverlay } from './components/ActiveAlarmOverlay';
+import { AnimatePresence, MotionConfig, useReducedMotion } from 'motion/react';
 import { AuthGate } from './components/AuthGate';
-import { FeatureTutorialModal } from './components/FeatureTutorialModal';
-import { FloatingMascotDock } from './components/FloatingMascotDock';
 import { GlassModal } from './components/GlassModal';
 import { LaunchIntro } from './components/LaunchIntro';
 import { MobileBottomNav } from './components/MobileBottomNav';
-import { NamePromptModal } from './components/NamePromptModal';
 import { OfflineIndicator, PWAInstallCard } from './components/PWAInstallBanner';
 import { ExerciseTimerState, TodayWorkoutView } from './components/TodayWorkoutView';
 import { TopBar } from './components/TopBar';
@@ -47,9 +42,6 @@ import {
 
 const loadWorkoutSessionView = () => import('./components/WorkoutSessionView');
 const loadWeeklyScheduleView = () => import('./components/WeeklyScheduleView');
-const loadHistoryProgressView = () => import('./components/HistoryProgressView');
-const loadExerciseManagerView = () => import('./components/ExerciseManagerView');
-const loadSettingsView = () => import('./components/SettingsView');
 
 const WorkoutSessionView = lazy(() =>
   loadWorkoutSessionView().then((m) => ({ default: m.WorkoutSessionView }))
@@ -58,13 +50,28 @@ const WeeklyScheduleView = lazy(() =>
   loadWeeklyScheduleView().then((m) => ({ default: m.WeeklyScheduleView }))
 );
 const HistoryProgressView = lazy(() =>
-  loadHistoryProgressView().then((m) => ({ default: m.HistoryProgressView }))
+  import('./components/HistoryProgressView').then((m) => ({ default: m.HistoryProgressView }))
 );
 const ExerciseManagerView = lazy(() =>
-  loadExerciseManagerView().then((m) => ({ default: m.ExerciseManagerView }))
+  import('./components/ExerciseManagerView').then((m) => ({ default: m.ExerciseManagerView }))
 );
 const SettingsView = lazy(() =>
-  loadSettingsView().then((m) => ({ default: m.SettingsView }))
+  import('./components/SettingsView').then((m) => ({ default: m.SettingsView }))
+);
+const AboutView = lazy(() =>
+  import('./components/AboutView').then((m) => ({ default: m.AboutView }))
+);
+const ActiveAlarmOverlay = lazy(() =>
+  import('./components/ActiveAlarmOverlay').then((m) => ({ default: m.ActiveAlarmOverlay }))
+);
+const FeatureTutorialModal = lazy(() =>
+  import('./components/FeatureTutorialModal').then((m) => ({ default: m.FeatureTutorialModal }))
+);
+const NamePromptModal = lazy(() =>
+  import('./components/NamePromptModal').then((m) => ({ default: m.NamePromptModal }))
+);
+const FloatingMascotDock = lazy(() =>
+  import('./components/FloatingMascotDock').then((m) => ({ default: m.FloatingMascotDock }))
 );
 
 interface TriggeredAlarmState {
@@ -171,6 +178,8 @@ function AppContent() {
   const restShouldChimeRef = useRef(false);
   const restBannerTimeoutRef = useRef<number | null>(null);
   const lastRestTickHapticRef = useRef<number | null>(null);
+  const lastRestRemainingRef = useRef<number>(90);
+  const lastCooldownRemainingRef = useRef<number>(0);
 
   // Per-exercise timer state (Countdown & Count-Up for timed movements like Plank / Incline Walk)
   const [exerciseTimers, setExerciseTimers] = useState<Record<string, ExerciseTimerState>>({});
@@ -318,26 +327,29 @@ function AppContent() {
     [resolveRingtoneMeta, profile, customRingtones, t]
   );
 
-  // Background-prefetch secondary tab chunks after launch splash ends
+  // Staggered idle prefetch of most likely next tabs so launch frame never stalls
   useEffect(() => {
     if (showIntro) return;
-    const prefetchAll = () => {
-      void loadWorkoutSessionView();
+    let idleId: number | undefined;
+    const t1 = globalThis.setTimeout(() => {
+      if (typeof window.requestIdleCallback === 'function') {
+        idleId = window.requestIdleCallback(() => {
+          void loadWorkoutSessionView();
+        });
+      } else {
+        void loadWorkoutSessionView();
+      }
+    }, 1200);
+    const t2 = globalThis.setTimeout(() => {
       void loadWeeklyScheduleView();
-      void loadHistoryProgressView();
-      void loadExerciseManagerView();
-      void loadSettingsView();
+    }, 2400);
+    return () => {
+      globalThis.clearTimeout(t1);
+      globalThis.clearTimeout(t2);
+      if (idleId !== undefined && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleId);
+      }
     };
-    if (typeof window.requestIdleCallback === 'function') {
-      const id = window.requestIdleCallback(prefetchAll);
-      return () => {
-        if (typeof window.cancelIdleCallback === 'function') {
-          window.cancelIdleCallback(id);
-        }
-      };
-    }
-    const timer = globalThis.setTimeout(prefetchAll, 300);
-    return () => globalThis.clearTimeout(timer);
   }, [showIntro]);
 
   // Minute-isolated root clock + midnight rollover + alarm watcher (avoids per-second root re-renders)
@@ -398,12 +410,18 @@ function AppContent() {
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   useEffect(() => {
     if (cooldownUntilMs === null) {
-      setCooldownRemaining(0);
+      if (lastCooldownRemainingRef.current !== 0) {
+        lastCooldownRemainingRef.current = 0;
+        setCooldownRemaining(0);
+      }
       return;
     }
     const tickCooldown = () => {
       const rem = Math.max(0, Math.ceil((cooldownUntilMs - Date.now()) / 1000));
-      setCooldownRemaining(rem);
+      if (rem !== lastCooldownRemainingRef.current) {
+        lastCooldownRemainingRef.current = rem;
+        setCooldownRemaining(rem);
+      }
       if (rem <= 0) {
         setCooldownUntilMs(null);
         setCooldownAlertTarget(null);
@@ -420,20 +438,23 @@ function AppContent() {
     void syncNativeWeeklyAlarms(schedules);
   }, [schedules]);
 
-  // Rest timer countdown loop (wall-clock anchored so backgrounding never drifts)
+  // Rest timer countdown loop (wall-clock anchored; only commits React state on whole-second changes)
   useEffect(() => {
     if (!restRunning) {
       lastRestTickHapticRef.current = null;
       return;
     }
     if (restEndAtRef.current === null) {
-      restEndAtRef.current = Date.now() + restRemaining * 1000;
+      restEndAtRef.current = Date.now() + lastRestRemainingRef.current * 1000;
     }
     const tick = () => {
       const endAt = restEndAtRef.current;
       if (endAt === null) return;
       const rem = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
-      setRestRemaining(rem);
+      if (rem !== lastRestRemainingRef.current) {
+        lastRestRemainingRef.current = rem;
+        setRestRemaining(rem);
+      }
       if (rem >= 1 && rem <= 3 && lastRestTickHapticRef.current !== rem) {
         lastRestTickHapticRef.current = rem;
         haptics.timerCountdownTick();
@@ -487,6 +508,7 @@ function AppContent() {
       restEndAtRef.current = Date.now() + safeSec * 1000;
       restShouldChimeRef.current = true;
       lastRestTickHapticRef.current = null;
+      lastRestRemainingRef.current = safeSec;
       setRestFinishedBanner(false);
       setRestTotalSeconds(safeSec);
       setRestRemaining(safeSec);
@@ -791,6 +813,7 @@ function AppContent() {
       haptics.timerStart();
       restEndAtRef.current = Date.now() + restTotalSeconds * 1000;
       restShouldChimeRef.current = true;
+      lastRestRemainingRef.current = restTotalSeconds;
       setRestRemaining(restTotalSeconds);
       setRestRunning(true);
       setRestFinishedBanner(false);
@@ -817,6 +840,7 @@ function AppContent() {
     }
     restShouldChimeRef.current = false;
     restEndAtRef.current = null;
+    lastRestRemainingRef.current = restTotalSeconds;
     setRestRunning(false);
     setRestRemaining(restTotalSeconds);
     setRestFinishedBanner(false);
@@ -830,6 +854,7 @@ function AppContent() {
       if (nextRemaining === 0) {
         restShouldChimeRef.current = false;
       }
+      lastRestRemainingRef.current = nextRemaining;
       setRestRemaining(nextRemaining);
       setRestTotalSeconds((prev) =>
         Math.max(15, Math.min(600, Math.max(nextRemaining, prev + delta)))
@@ -1102,6 +1127,52 @@ function AppContent() {
     }
   }, [activeTab, navigateToTab]);
 
+  const handleToggleAboutPopup = useCallback(() => {
+    setActivePopup((prev) => (prev === 'about' ? null : 'about'));
+  }, []);
+
+  const handleCloseAboutPopup = useCallback(() => {
+    setActivePopup(null);
+  }, []);
+
+  const handleStartWorkout = useCallback(
+    (exerciseId?: string) => {
+      setFocusedWorkoutExerciseId(exerciseId || null);
+      navigateToTab('workout');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [navigateToTab]
+  );
+
+  const handleBackToToday = useCallback(() => {
+    navigateToTab('today');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [navigateToTab]);
+
+  const handleOpenExerciseManagerForDay = useCallback(
+    (dayKey: DayKey) => {
+      setExerciseDayKey(dayKey);
+      navigateToTab('exercises');
+    },
+    [navigateToTab]
+  );
+
+  const handleOpenScheduleTab = useCallback(() => {
+    navigateToTab('schedule');
+  }, [navigateToTab]);
+
+  const handleGoToTodayTab = useCallback(() => {
+    navigateToTab('today');
+  }, [navigateToTab]);
+
+  const handleDismissCooldownAlert = useCallback(() => {
+    setCooldownAlertTarget(null);
+  }, []);
+
+  const handleSignOutAction = useCallback(async () => {
+    await signOutUser();
+  }, [signOutUser]);
+
   // Shared live companion state powering both the Hero inline orb and the Floating Corner Orb
   const todayScheduleForMascot = schedules?.[todayDayKey];
   const todayDayLabel = DAY_LABELS[lang][todayDayKey].label;
@@ -1317,9 +1388,7 @@ function AppContent() {
           timePhase={timePhase}
           onSelectTab={handleSelectTab}
           onOpenSettings={handleOpenSettingsTab}
-          onOpenAbout={() =>
-            setActivePopup((prev) => (prev === 'about' ? null : 'about'))
-          }
+          onOpenAbout={handleToggleAboutPopup}
           onTestAlarm={handleTestAlarm}
         />
 
@@ -1337,15 +1406,9 @@ function AppContent() {
             <PWAInstallCard />
           </div>
           <Suspense fallback={tabFallback}>
-            <motion.div
+            <div
               key={activeTab}
-              initial={disableAnim ? false : { opacity: 0.38 }}
-              animate={{ opacity: 1 }}
-              transition={{
-                duration: disableAnim ? 0 : 0.13,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              className="w-full"
+              className={disableAnim ? 'w-full' : 'w-full ip-tab-enter'}
             >
               {activeTab === 'today' && (
                 <TodayWorkoutView
@@ -1368,16 +1431,9 @@ function AppContent() {
                   onResetRest={handleResetRest}
                   onAdjustRest={handleAdjustRest}
                   onStartRestTimer={startRestTimer}
-                  onStartWorkout={(exerciseId) => {
-                    setFocusedWorkoutExerciseId(exerciseId || null);
-                    navigateToTab('workout');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  onOpenExerciseManager={(dayKey) => {
-                    setExerciseDayKey(dayKey);
-                    navigateToTab('exercises');
-                  }}
-                  onOpenScheduleManager={() => navigateToTab('schedule')}
+                  onStartWorkout={handleStartWorkout}
+                  onOpenExerciseManager={handleOpenExerciseManagerForDay}
+                  onOpenScheduleManager={handleOpenScheduleTab}
                 />
               )}
 
@@ -1395,17 +1451,14 @@ function AppContent() {
                   cooldownRemaining={cooldownRemaining}
                   cooldownAlertTarget={cooldownAlertTarget}
                   exerciseTimers={exerciseTimers}
-                  onBackToToday={() => {
-                    navigateToTab('today');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
+                  onBackToToday={handleBackToToday}
                   onToggleRestPause={handleToggleRestPause}
                   onResetRest={handleResetRest}
                   onAdjustRest={handleAdjustRest}
                   onStartRestTimer={startRestTimer}
                   onToggleSetComplete={handleToggleSetWithAutoRest}
                   onBypassCooldownAndComplete={handleBypassCooldownAndComplete}
-                  onDismissCooldownAlert={() => setCooldownAlertTarget(null)}
+                  onDismissCooldownAlert={handleDismissCooldownAlert}
                   onUpdateSetMetrics={updateSetMetrics}
                   onUpdateSetDuration={updateSetDuration}
                   onToggleExerciseTimer={handleToggleExerciseTimer}
@@ -1415,11 +1468,8 @@ function AppContent() {
                   onSaveExerciseTimerSet={handleSaveExerciseTimerSet}
                   onAddSet={addSetToExercise}
                   onRemoveSet={removeSetFromExercise}
-                  onOpenExerciseManager={(dayKey) => {
-                    setExerciseDayKey(dayKey);
-                    navigateToTab('exercises');
-                  }}
-                  onOpenScheduleManager={() => navigateToTab('schedule')}
+                  onOpenExerciseManager={handleOpenExerciseManagerForDay}
+                  onOpenScheduleManager={handleOpenScheduleTab}
                 />
               )}
 
@@ -1429,10 +1479,7 @@ function AppContent() {
                   schedules={schedules}
                   customRingtones={customRingtones}
                   onUpdateSchedule={updateSchedule}
-                  onOpenExerciseManager={(dayKey) => {
-                    setExerciseDayKey(dayKey);
-                    navigateToTab('exercises');
-                  }}
+                  onOpenExerciseManager={handleOpenExerciseManagerForDay}
                 />
               )}
 
@@ -1441,7 +1488,7 @@ function AppContent() {
                   workoutHistory={workoutHistory}
                   loading={historyLoading}
                   todayDateKey={todayDateKey}
-                  onGoToToday={() => navigateToTab('today')}
+                  onGoToToday={handleGoToTodayTab}
                 />
               )}
 
@@ -1467,12 +1514,10 @@ function AppContent() {
                   onUploadRingtone={addCustomRingtone}
                   onDeleteRingtone={deleteCustomRingtone}
                   onOpenTutorial={handleOpenTutorialFromUi}
-                  onSignOut={async () => {
-                    await signOutUser();
-                  }}
+                  onSignOut={handleSignOutAction}
                 />
               )}
-            </motion.div>
+            </div>
           </Suspense>
         </main>
 
@@ -1480,34 +1525,40 @@ function AppContent() {
           activeTab={activeTab}
           timePhase={timePhase}
           onSelectTab={handleSelectTab}
-          restRemaining={restRemaining}
+          restRemaining={restRunning ? restRemaining : 0}
           restRunning={restRunning}
         />
 
-        <FloatingMascotDock
-          companion={companion}
-          shouldFloat={shouldFloatCompanion}
-          suppressed={suppressFloatingCompanion}
-          activeTab={activeTab}
-          getHeroOrbRect={getHeroOrbRect}
-          onFloatingPresenceChange={setFloatingOrbPresent}
-        />
+        {!showIntro && (
+          <Suspense fallback={null}>
+            <FloatingMascotDock
+              companion={companion}
+              shouldFloat={shouldFloatCompanion}
+              suppressed={suppressFloatingCompanion}
+              activeTab={activeTab}
+              getHeroOrbRect={getHeroOrbRect}
+              onFloatingPresenceChange={setFloatingOrbPresent}
+            />
+          </Suspense>
+        )}
 
         {activeAlarm && (
-          <ActiveAlarmOverlay
-            schedule={activeAlarm.schedule}
-            snoozeMinutes={profile.snoozeMinutes}
-            ringtoneName={activeAlarm.ringtoneName}
-            isTest={activeAlarm.isTest}
-            onStartWorkout={handleStartWorkoutFromAlarm}
-            onSnooze={handleSnoozeAlarm}
-            onDismiss={handleDismissAlarm}
-          />
+          <Suspense fallback={null}>
+            <ActiveAlarmOverlay
+              schedule={activeAlarm.schedule}
+              snoozeMinutes={profile.snoozeMinutes}
+              ringtoneName={activeAlarm.ringtoneName}
+              isTest={activeAlarm.isTest}
+              onStartWorkout={handleStartWorkoutFromAlarm}
+              onSnooze={handleSnoozeAlarm}
+              onDismiss={handleDismissAlarm}
+            />
+          </Suspense>
         )}
 
         <GlassModal
           open={activePopup === 'about'}
-          onClose={() => setActivePopup(null)}
+          onClose={handleCloseAboutPopup}
           title="About IronPulse"
           subtitle={t(
             'Informasi pengembang, konsep, rilis, dan ringkasan aplikasi.',
@@ -1517,21 +1568,31 @@ function AppContent() {
           accentBorderClass="border-pulse/30"
           closeAriaLabel={t('Tutup Tentang Aplikasi', 'Close About')}
         >
-          <AboutView embeddedInModal />
+          <Suspense fallback={null}>
+            <AboutView embeddedInModal />
+          </Suspense>
         </GlassModal>
 
-        <NamePromptModal
-          open={!showIntro && !nameConfirmed}
-          initialName={profile.displayName}
-          onSaveName={handleSaveNameFromPrompt}
-        />
+        {!showIntro && !nameConfirmed && (
+          <Suspense fallback={null}>
+            <NamePromptModal
+              open={!showIntro && !nameConfirmed}
+              initialName={profile.displayName}
+              onSaveName={handleSaveNameFromPrompt}
+            />
+          </Suspense>
+        )}
 
-        <FeatureTutorialModal
-          open={tutorialOpen && nameConfirmed}
-          startAtLanguageStep={tutorialStartWithLang}
-          onComplete={handleCompleteTutorial}
-          onJumpToTab={handleSelectTab}
-        />
+        {tutorialOpen && nameConfirmed && (
+          <Suspense fallback={null}>
+            <FeatureTutorialModal
+              open={tutorialOpen && nameConfirmed}
+              startAtLanguageStep={tutorialStartWithLang}
+              onComplete={handleCompleteTutorial}
+              onJumpToTab={handleSelectTab}
+            />
+          </Suspense>
+        )}
 
         <OfflineIndicator />
       </div>

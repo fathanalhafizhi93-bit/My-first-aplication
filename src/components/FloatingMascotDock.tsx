@@ -1,4 +1,4 @@
-import { PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
 import {
   animate,
   AnimatePresence,
@@ -85,7 +85,7 @@ function resolveAnchorCoords(anchor: DockAnchor): { x: number; y: number } {
   return { x, y };
 }
 
-export function FloatingMascotDock({
+export const FloatingMascotDock = memo(function FloatingMascotDock({
   companion,
   shouldFloat,
   suppressed,
@@ -655,28 +655,23 @@ export function FloatingMascotDock({
                   } ${bubbleVerticalAlign === 'bottom' ? 'bottom-[20px]' : 'top-[20px]'}`}
                 />
 
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={companion.speechKey}
-                    initial={{ opacity: 0, y: 3 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -2 }}
-                    transition={{ duration: 0.14 }}
+                <div
+                  key={companion.speechKey}
+                  className={prefersReducedMotion ? '' : 'ip-speech-enter'}
+                >
+                  <p
+                    className="text-xs font-bold leading-snug"
+                    style={{ color: companion.phaseColor }}
                   >
-                    <p
-                      className="text-xs font-bold leading-snug"
-                      style={{ color: companion.phaseColor }}
-                    >
-                      {companion.activeLine.headline}
-                    </p>
-                    <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#E5E7EB]">
-                      {companion.activeLine.subline}
-                    </p>
-                    <p className="mt-1.5 text-[10px] font-medium text-[#9CA3AF]">
-                      {t('Ketuk orb lagi untuk reaksi lain', 'Tap orb again for another reaction')}
-                    </p>
-                  </motion.div>
-                </AnimatePresence>
+                    {companion.activeLine.headline}
+                  </p>
+                  <p className="mt-0.5 text-[11.5px] leading-relaxed text-[#E5E7EB]">
+                    {companion.activeLine.subline}
+                  </p>
+                  <p className="mt-1.5 text-[10px] font-medium text-[#9CA3AF]">
+                    {t('Ketuk orb lagi untuk reaksi lain', 'Tap orb again for another reaction')}
+                  </p>
+                </div>
 
                 {/* Subtle Phase Accent Bottom Hairline */}
                 <span
@@ -691,4 +686,4 @@ export function FloatingMascotDock({
       </div>
     </ModalPortal>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { CalendarDays, Dumbbell, History, PlayCircle } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { formatRestDuration } from '../lib/dateUtils';
@@ -13,7 +14,7 @@ interface MobileBottomNavProps {
   restRunning: boolean;
 }
 
-export function MobileBottomNav({
+export const MobileBottomNav = memo(function MobileBottomNav({
   activeTab,
   timePhase,
   onSelectTab,
@@ -149,4 +150,4 @@ export function MobileBottomNav({
       </div>
     </nav>
   );
-}
+});

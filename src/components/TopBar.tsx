@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Info, Settings } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { DayTimePhase, PHASE_THEME_TOKENS, useI18n } from '../lib/i18n';
@@ -14,7 +15,7 @@ interface TopBarProps {
   onTestAlarm: () => void;
 }
 
-export function TopBar({
+export const TopBar = memo(function TopBar({
   activeTab,
   activePopup,
   timePhase,
@@ -240,4 +241,4 @@ export function TopBar({
       </div>
     </header>
   );
-}
+});

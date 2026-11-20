@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Bell, BellOff, ChevronRight } from 'lucide-react';
 import { BUILTIN_RINGTONES } from '../lib/audioEngine';
 import { formatAlarmTime } from '../lib/dateUtils';
@@ -25,7 +26,7 @@ interface WeeklyScheduleViewProps {
   onOpenExerciseManager: (dayKey: DayKey) => void;
 }
 
-export function WeeklyScheduleView({
+export const WeeklyScheduleView = memo(function WeeklyScheduleView({
   todayDayKey,
   schedules,
   customRingtones,
@@ -259,4 +260,4 @@ export function WeeklyScheduleView({
       </div>
     </div>
   );
-}
+});

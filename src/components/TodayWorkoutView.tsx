@@ -1,4 +1,4 @@
-import { RefObject, useState } from 'react';
+import { memo, RefObject, useMemo, useState } from 'react';
 import {
   ArrowRight,
   Bell,
@@ -74,7 +74,7 @@ interface TodayWorkoutViewProps {
   onOpenScheduleManager: () => void;
 }
 
-export function TodayWorkoutView({
+export const TodayWorkoutView = memo(function TodayWorkoutView({
   now,
   todayDayKey,
   schedules,
@@ -108,16 +108,19 @@ export function TodayWorkoutView({
   const phaseToken = PHASE_THEME_TOKENS[timePhase];
   const formattedAlarm = formatAlarmTime(activeSchedule.alarmTime, clockFormat);
 
-  const totalSets = todayEntries.reduce((acc, e) => acc + e.sets.length, 0);
-  const completedSets = todayEntries.reduce(
-    (acc, e) => acc + e.sets.filter((s) => s.completed).length,
-    0
+  const specById = useMemo(
+    () => new Map(activeSchedule.exercises.map((ex) => [ex.id, ex])),
+    [activeSchedule.exercises]
   );
-  const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
 
-  const totalVolumeKg = Math.round(
-    todayEntries.reduce((acc, e) => {
-      const spec = activeSchedule.exercises.find((ex) => ex.id === e.exerciseId);
+  const { totalSets, completedSets, totalVolumeKg, totalTimedSeconds } = useMemo(() => {
+    let total = 0;
+    let completed = 0;
+    let volume = 0;
+    let timed = 0;
+
+    for (const e of todayEntries) {
+      const spec = specById.get(e.exerciseId);
       const mode = resolveExerciseTrackingMode(spec || e);
       const usesWeight = resolveExerciseUsesWeight({
         usesWeight: e.usesWeight ?? spec?.usesWeight,
@@ -125,25 +128,29 @@ export function TodayWorkoutView({
         targetWeightKg: spec?.targetWeightKg ?? e.sets[0]?.weightKg ?? 0,
         equipment: spec?.equipment,
       });
-      if (mode === 'timer' || !usesWeight) return acc;
-      return (
-        acc +
-        e.sets
-          .filter((s) => s.completed)
-          .reduce((sAcc, s) => sAcc + Math.max(0, s.weightKg) * Math.max(0, s.reps), 0)
-      );
-    }, 0)
-  );
 
-  const totalTimedSeconds = todayEntries.reduce((acc, e) => {
-    if (resolveExerciseTrackingMode(e) !== 'timer') return acc;
-    return (
-      acc +
-      e.sets
-        .filter((s) => s.completed)
-        .reduce((sAcc, s) => sAcc + (s.durationSeconds || 0), 0)
-    );
-  }, 0);
+      for (const s of e.sets) {
+        total += 1;
+        if (s.completed) {
+          completed += 1;
+          if (mode === 'timer') {
+            timed += Math.max(0, s.durationSeconds || 0);
+          } else if (usesWeight) {
+            volume += Math.max(0, s.weightKg) * Math.max(0, s.reps);
+          }
+        }
+      }
+    }
+
+    return {
+      totalSets: total,
+      completedSets: completed,
+      totalVolumeKg: Math.round(volume),
+      totalTimedSeconds: timed,
+    };
+  }, [todayEntries, specById]);
+
+  const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
 
   const restProgressRatio =
     restTotalSeconds > 0
@@ -178,6 +185,7 @@ export function TodayWorkoutView({
           <img
             src={gymArenaBackdrop}
             alt={t('Suasana ruang latihan gym', 'Gym training arena backdrop')}
+            decoding="async"
             referrerPolicy="no-referrer"
             onError={() => setImgFailed(true)}
             className="absolute inset-0 h-full w-full object-cover opacity-15"
@@ -573,7 +581,7 @@ export function TodayWorkoutView({
 
             <div className="divide-y divide-white/8">
               {todayEntries.map((entry, index) => {
-                const spec = activeSchedule.exercises.find((e) => e.id === entry.exerciseId);
+                const spec = specById.get(entry.exerciseId);
                 const mode = resolveExerciseTrackingMode(spec || entry);
                 const defaultTargetDuration = resolveTargetDurationSeconds(spec || entry);
                 const doneCount = entry.sets.filter((s) => s.completed).length;
@@ -637,4 +645,4 @@ export function TodayWorkoutView({
       </div>
     </div>
   );
-}
+});

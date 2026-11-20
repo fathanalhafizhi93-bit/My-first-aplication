@@ -567,19 +567,36 @@ export function useMascotCompanion({
 
   const speechKey = `${committedDialogue.pose}-${committedDialogue.phase}-${committedDialogue.line.id}-${committedDialogue.lang}-${speechEventId}`;
 
-  return {
-    mood,
-    timePhase,
-    visualPose,
-    phaseColor,
-    activeLine: committedDialogue.line,
-    speechKey,
-    speechEventId,
-    isUrgentSpeech: isCelebrationOrTimer,
-    isDialogueLocked,
-    isBlinking,
-    glance,
-    tapBounce,
-    triggerNextReaction,
-  };
+  return useMemo(
+    () => ({
+      mood,
+      timePhase,
+      visualPose,
+      phaseColor,
+      activeLine: committedDialogue.line,
+      speechKey,
+      speechEventId,
+      isUrgentSpeech: isCelebrationOrTimer,
+      isDialogueLocked,
+      isBlinking,
+      glance,
+      tapBounce,
+      triggerNextReaction,
+    }),
+    [
+      mood,
+      timePhase,
+      visualPose,
+      phaseColor,
+      committedDialogue.line,
+      speechKey,
+      speechEventId,
+      isCelebrationOrTimer,
+      isDialogueLocked,
+      isBlinking,
+      glance,
+      tapBounce,
+      triggerNextReaction,
+    ]
+  );
 }

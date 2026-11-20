@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   ArrowDown,
@@ -147,7 +147,7 @@ const EMPTY_FORM: ExerciseFormState = {
   notes: '',
 };
 
-export function ExerciseManagerView({
+export const ExerciseManagerView = memo(function ExerciseManagerView({
   selectedDayKey,
   onSelectDayKey,
   schedules,
@@ -1390,4 +1390,4 @@ export function ExerciseManagerView({
       />
     </div>
   );
-}
+});

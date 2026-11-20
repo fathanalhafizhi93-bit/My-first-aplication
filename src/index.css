@@ -470,26 +470,42 @@ html[data-ui-theme="material-you"] .glass-bar {
 
 /* Harmonize Recessed Dark Wells Across All Screens to Dynamic M3 Tonal Surfaces
    (Excludes isolated miniature theme cards marked with [data-theme-preview]) */
-html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#0A0B0E"] {
+html[data-ui-theme="material-you"] :not([data-theme-preview])[class*="bg-[#0A0B0E"] {
   background-color: var(--md-sys-color-surface-container-low);
 }
 
-html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#13161C"] {
+html[data-ui-theme="material-you"] :not([data-theme-preview])[class*="bg-[#13161C"] {
   background-color: var(--md-sys-color-surface-container);
 }
 
-html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#1A1E26"] {
+html[data-ui-theme="material-you"] :not([data-theme-preview])[class*="bg-[#1A1E26"] {
   background-color: var(--md-sys-color-surface-container-high);
 }
 
-html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="border-white/10"],
-html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="border-white/12"],
-html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="border-white/15"] {
+html[data-ui-theme="material-you"] :not([data-theme-preview])[class*="border-white/10"],
+html[data-ui-theme="material-you"] :not([data-theme-preview])[class*="border-white/12"],
+html[data-ui-theme="material-you"] :not([data-theme-preview])[class*="border-white/15"] {
   border-color: var(--md-sys-color-outline-variant);
 }
 
-html[data-ui-theme="material-you"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="text-[#9CA3AF]"] {
+html[data-ui-theme="material-you"] :not([data-theme-preview])[class*="text-[#9CA3AF]"] {
   color: var(--md-sys-color-on-surface-variant);
+}
+
+html[data-ui-theme="material-you"] [data-theme-preview] [class*="bg-[#0A0B0E"] {
+  background-color: #0A0B0E;
+}
+
+html[data-ui-theme="material-you"] [data-theme-preview] [class*="bg-[#13161C"] {
+  background-color: #13161C;
+}
+
+html[data-ui-theme="material-you"] [data-theme-preview] [class*="bg-[#1A1E26"] {
+  background-color: #1A1E26;
+}
+
+html[data-ui-theme="material-you"] [data-theme-preview] [class*="text-[#9CA3AF]"] {
+  color: #9CA3AF;
 }
 
 /* Authentic Material 3 Primary Filled Pill Actions + State-Layer Feedback */
@@ -510,7 +526,7 @@ html[data-ui-theme="material-you"] label.bg-pulse:hover {
 }
 
 /* Material 3 State-Layer Hover & Press for Tonal / Outlined Interactive Buttons */
-html[data-ui-theme="material-you"] .glass-surface button:not(.bg-pulse):not([data-theme-preview] *):not([role="tab"]):not(:disabled):hover {
+html[data-ui-theme="material-you"] .glass-surface button:not(.bg-pulse):not([data-theme-preview]):not([role="tab"]):not(:disabled):hover {
   background-image: linear-gradient(
     0deg,
     rgba(var(--md-sys-color-on-surface-rgb), 0.08),
@@ -518,7 +534,7 @@ html[data-ui-theme="material-you"] .glass-surface button:not(.bg-pulse):not([dat
   );
 }
 
-html[data-ui-theme="material-you"] .glass-surface button:not(.bg-pulse):not([data-theme-preview] *):not([role="tab"]):not(:disabled):active {
+html[data-ui-theme="material-you"] .glass-surface button:not(.bg-pulse):not([data-theme-preview]):not([role="tab"]):not(:disabled):active {
   background-image: linear-gradient(
     0deg,
     rgba(var(--md-sys-color-on-surface-rgb), 0.13),
@@ -744,20 +760,36 @@ html[data-ui-theme="ubuntu-yaru"] .glass-bar {
 }
 
 /* Harmonize recessed dark surfaces & muted secondary text to warm Ubuntu neutrals */
-html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#0A0B0E"] {
+html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview])[class*="bg-[#0A0B0E"] {
   background-color: #242424;
 }
 
-html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#13161C"] {
+html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview])[class*="bg-[#13161C"] {
   background-color: #2C2C2C;
 }
 
-html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="bg-[#1A1E26"] {
+html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview])[class*="bg-[#1A1E26"] {
   background-color: #353535;
 }
 
-html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview]):not([data-theme-preview] *)[class*="text-[#9CA3AF]"] {
+html[data-ui-theme="ubuntu-yaru"] :not([data-theme-preview])[class*="text-[#9CA3AF]"] {
   color: #B5B4B0;
+}
+
+html[data-ui-theme="ubuntu-yaru"] [data-theme-preview] [class*="bg-[#0A0B0E"] {
+  background-color: #0A0B0E;
+}
+
+html[data-ui-theme="ubuntu-yaru"] [data-theme-preview] [class*="bg-[#13161C"] {
+  background-color: #13161C;
+}
+
+html[data-ui-theme="ubuntu-yaru"] [data-theme-preview] [class*="bg-[#1A1E26"] {
+  background-color: #1A1E26;
+}
+
+html[data-ui-theme="ubuntu-yaru"] [data-theme-preview] [class*="text-[#9CA3AF]"] {
+  color: #9CA3AF;
 }
 
 /* Crisp GTK4 tactile button & control corners */
@@ -822,7 +854,11 @@ html[data-perf-no-glow="true"] body {
   background-image: none !important;
 }
 
-html[data-perf-no-glow="true"] * {
+html[data-perf-no-glow="true"] body,
+html[data-perf-no-glow="true"] .font-display,
+html[data-perf-no-glow="true"] .font-mono,
+html[data-perf-no-glow="true"] span,
+html[data-perf-no-glow="true"] button {
   text-shadow: none !important;
 }
 
@@ -833,6 +869,208 @@ html[data-perf-no-anim="true"] *::after {
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
+}
+
+/* ============================================================================
+   GPU-Composited Zero-JS Animations (Tabs, Clock Digits, Mascot Idle Motion)
+   ============================================================================ */
+@keyframes ipTabFadeIn {
+  from {
+    opacity: 0.42;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ip-tab-enter {
+  animation: ipTabFadeIn 130ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ipDigitPop {
+  from {
+    opacity: 0.25;
+    transform: translate3d(0, 34%, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.ip-digit-pop {
+  animation: ipDigitPop 170ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity;
+}
+
+@keyframes ipSpeechEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.ip-speech-enter {
+  animation: ipSpeechEnter 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ipOrbPulse {
+  0%, 100% {
+    transform: scale(0.97);
+    opacity: 0.36;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.1;
+  }
+}
+
+@keyframes ipOrbPulseCelebrate {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.72;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+@keyframes ipOrbFloat {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -2px, 0) scale(1.035);
+  }
+}
+
+@keyframes ipOrbFloatMusic {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate3d(0, -2.5px, 0) rotate(-3.5deg);
+  }
+  75% {
+    transform: translate3d(0, -1.8px, 0) rotate(3.5deg);
+  }
+}
+
+@keyframes ipOrbBounce {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  28% {
+    transform: translate3d(0, -3.5px, 0) scale(1.12);
+  }
+  60% {
+    transform: translate3d(0, 0, 0) scale(0.95);
+  }
+  82% {
+    transform: translate3d(0, -1px, 0) scale(1.04);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes ipOrbSteam {
+  0% {
+    transform: translate3d(0, 1.5px, 0);
+    opacity: 0.25;
+  }
+  55% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(0, -2.6px, 0);
+    opacity: 0.15;
+  }
+}
+
+@keyframes ipOrbTwinkle {
+  0%, 100% {
+    transform: scale(0.86);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.16);
+    opacity: 1;
+  }
+}
+
+@keyframes ipOrbBob {
+  0%, 100% {
+    transform: translate3d(0, 0.8px, 0);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translate3d(0, -2.2px, 0);
+    opacity: 1;
+  }
+}
+
+.ip-orb-pulse {
+  animation: ipOrbPulse 2.7s ease-out infinite;
+}
+
+.ip-orb-pulse-celebrate {
+  animation: ipOrbPulseCelebrate 0.85s ease-out infinite;
+}
+
+.ip-orb-float {
+  animation: ipOrbFloat 2.6s ease-in-out infinite;
+}
+
+.ip-orb-float-music {
+  animation: ipOrbFloatMusic 1.85s ease-in-out infinite;
+}
+
+.ip-orb-bounce {
+  animation: ipOrbBounce 0.62s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ip-orb-steam {
+  animation: ipOrbSteam 1.8s ease-in-out infinite;
+}
+
+.ip-orb-twinkle {
+  animation: ipOrbTwinkle 1.6s ease-in-out infinite;
+}
+
+.ip-orb-bob {
+  animation: ipOrbBob 2s ease-in-out infinite;
+}
+
+html[data-perf-static-mascot="true"] .ip-orb-pulse,
+html[data-perf-static-mascot="true"] .ip-orb-pulse-celebrate,
+html[data-perf-static-mascot="true"] .ip-orb-float,
+html[data-perf-static-mascot="true"] .ip-orb-float-music,
+html[data-perf-static-mascot="true"] .ip-orb-steam,
+html[data-perf-static-mascot="true"] .ip-orb-twinkle,
+html[data-perf-static-mascot="true"] .ip-orb-bob {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ip-tab-enter,
+  .ip-digit-pop,
+  .ip-speech-enter,
+  .ip-orb-pulse,
+  .ip-orb-pulse-celebrate,
+  .ip-orb-float,
+  .ip-orb-float-music,
+  .ip-orb-bounce,
+  .ip-orb-steam,
+  .ip-orb-twinkle,
+  .ip-orb-bob {
+    animation: none !important;
+  }
 }
 
 select option,

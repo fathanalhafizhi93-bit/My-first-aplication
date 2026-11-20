@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { FormEvent, memo, useCallback, useEffect, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   Bell,
@@ -83,7 +83,7 @@ interface SettingsViewProps {
   onSignOut: () => Promise<void>;
 }
 
-export function SettingsView({
+export const SettingsView = memo(function SettingsView({
   now,
   profile,
   customRingtones,
@@ -1847,4 +1847,4 @@ export function SettingsView({
         </motion.div>
     </div>
   );
-}
+});

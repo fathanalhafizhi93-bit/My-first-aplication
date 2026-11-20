@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays,
   ChevronLeft,
@@ -72,7 +72,7 @@ function getLogStats(log: WorkoutLog) {
   };
 }
 
-export function HistoryProgressView({
+export const HistoryProgressView = memo(function HistoryProgressView({
   workoutHistory,
   loading,
   todayDateKey,
@@ -113,16 +113,19 @@ export function HistoryProgressView({
     [locale]
   );
 
-  const logByDate = useMemo(() => {
-    const map = new Map<string, WorkoutLog>();
+  const { logByDate, statsByDate } = useMemo(() => {
+    const logs = new Map<string, WorkoutLog>();
+    const stats = new Map<string, ReturnType<typeof getLogStats>>();
     for (const log of workoutHistory) {
-      map.set(log.dateKey, log);
+      logs.set(log.dateKey, log);
+      stats.set(log.dateKey, getLogStats(log));
     }
-    return map;
+    return { logByDate: logs, statsByDate: stats };
   }, [workoutHistory]);
 
   const summary = useMemo(() => {
     let completedSessions = 0;
+    let totalLoggedDays = 0;
     const activeWeekSet = new Set<string>();
     const currentMonthPrefix = `${viewMonthDate.getFullYear()}-${String(
       viewMonthDate.getMonth() + 1
@@ -131,7 +134,10 @@ export function HistoryProgressView({
     let monthSessions = 0;
 
     for (const log of workoutHistory) {
-      const stats = getLogStats(log);
+      const stats = statsByDate.get(log.dateKey)!;
+      if (stats.completedSets > 0) {
+        totalLoggedDays += 1;
+      }
       if (stats.isFull || stats.completedSets > 0) {
         if (stats.isFull) completedSessions += 1;
         activeWeekSet.add(getIsoWeekKey(parseDateKey(log.dateKey)));
@@ -154,12 +160,12 @@ export function HistoryProgressView({
 
     return {
       completedSessions,
-      totalLoggedDays: workoutHistory.filter((l) => getLogStats(l).completedSets > 0).length,
+      totalLoggedDays,
       weeklyStreak,
       monthVolume,
       monthSessions,
     };
-  }, [workoutHistory, viewMonthDate, today]);
+  }, [workoutHistory, statsByDate, viewMonthDate, today]);
 
   const calendarCells = useMemo(() => {
     const year = viewMonthDate.getFullYear();
@@ -190,7 +196,7 @@ export function HistoryProgressView({
   }, [viewMonthDate]);
 
   const selectedLog = logByDate.get(selectedDateKey) || null;
-  const selectedLogStats = selectedLog ? getLogStats(selectedLog) : null;
+  const selectedLogStats = statsByDate.get(selectedDateKey) || null;
 
   const shiftMonth = (delta: number) => {
     setViewMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1));
@@ -341,8 +347,7 @@ export function HistoryProgressView({
               return <div key={cell.key} className="min-h-[46px]" />;
             }
 
-            const log = logByDate.get(cell.dateKey);
-            const stats = log ? getLogStats(log) : null;
+            const stats = statsByDate.get(cell.dateKey) || null;
             const isSelected = cell.dateKey === selectedDateKey;
             const isToday = cell.dateKey === todayKey;
 
@@ -518,4 +523,4 @@ export function HistoryProgressView({
       </section>
     </div>
   );
-}
+});

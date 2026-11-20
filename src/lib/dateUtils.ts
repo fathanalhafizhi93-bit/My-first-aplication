@@ -14,16 +14,26 @@ export function formatLocalDateKey(now: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-export function formatIndonesianDate(
-  now: Date = new Date(),
-  lang: AppLanguage = 'id'
-): string {
-  return new Intl.DateTimeFormat(lang === 'en' ? 'en-US' : 'id-ID', {
+const FULL_DATE_FORMATTERS: Record<AppLanguage, Intl.DateTimeFormat> = {
+  id: new Intl.DateTimeFormat('id-ID', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
-  }).format(now);
+  }),
+  en: new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }),
+};
+
+export function formatIndonesianDate(
+  now: Date = new Date(),
+  lang: AppLanguage = 'id'
+): string {
+  return FULL_DATE_FORMATTERS[lang].format(now);
 }
 
 export function formatHHMM(now: Date = new Date()): string {
