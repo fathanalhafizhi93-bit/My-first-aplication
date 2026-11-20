@@ -8,8 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.os.Build
 import android.os.IBinder
 import android.os.VibrationEffect
@@ -21,6 +19,9 @@ import androidx.core.content.ContextCompat
 import com.fathan.ironpulse.IronPulseApp
 import com.fathan.ironpulse.MainActivity
 import com.fathan.ironpulse.R
+import com.fathan.ironpulse.alarm.AlarmScheduler
+import com.fathan.ironpulse.audio.NativeAudioEngine
+import com.fathan.ironpulse.data.PreferencesStore
 import com.fathan.ironpulse.model.GymModelHelpers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,21 +46,30 @@ class RestTimerService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var countdownJob: Job? = null
+    private var finishStopJob: Job? = null
     private var endTimeMillis: Long = 0L
     private var totalSeconds: Int = 0
     private var exerciseName: String = ""
+    private var audioEngine: NativeAudioEngine? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        audioEngine = NativeAudioEngine(this)
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START -> {
-                val secs = intent.getIntExtra(EXTRA_SECONDS, 60).coerceIn(5, 600)
+                finishStopJob?.cancel()
+                audioEngine?.stop()
+                val secs = intent.getIntExtra(EXTRA_SECONDS, 60).coerceIn(1, 600)
                 val name = intent.getStringExtra(EXTRA_EXERCISE_NAME) ?: "Istirahat Set"
                 startCountdown(secs, name)
             }
             ACTION_ADD_15 -> addSeconds(15)
-            ACTION_STOP -> stopCountdown(playFinishChime = false)
+            ACTION_STOP -> stopCountdown()
         }
         return START_NOT_STICKY
     }
@@ -110,18 +120,20 @@ class RestTimerService : Service() {
             remainingSeconds = 0,
             completedEventTick = _state.value.completedEventTick + 1L
         )
-        stopSelfSafe()
+        countdownJob?.cancel()
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        finishStopJob?.cancel()
+        finishStopJob = serviceScope.launch {
+            delay(1800L)
+            stopSelf()
+        }
     }
 
-    private fun stopCountdown(playFinishChime: Boolean) {
+    private fun stopCountdown() {
         countdownJob?.cancel()
-        if (playFinishChime) triggerCompletionFeedback()
+        finishStopJob?.cancel()
+        audioEngine?.stop()
         _state.value = _state.value.copy(isActive = false, remainingSeconds = 0)
-        stopSelfSafe()
-    }
-
-    private fun stopSelfSafe() {
-        countdownJob?.cancel()
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -181,14 +193,20 @@ class RestTimerService : Service() {
     }
 
     private fun triggerCompletionFeedback() {
+        val (restToneId, volume) = AlarmScheduler.getRestRingtoneAndVolume(this)
+        val hapticsEnabled = PreferencesStore(this).state.value.hapticsEnabled
+
         runCatching {
-            val tg = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 85)
-            tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 350)
-            serviceScope.launch {
-                delay(500L)
-                tg.release()
-            }
+            audioEngine?.play(
+                ringtoneId = restToneId,
+                volume = volume,
+                loop = false,
+                useAlarmStream = false
+            )
         }
+
+        if (!hapticsEnabled) return
+
         val vib = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             getSystemService(VibratorManager::class.java)?.defaultVibrator
         } else {
@@ -208,6 +226,9 @@ class RestTimerService : Service() {
 
     override fun onDestroy() {
         countdownJob?.cancel()
+        finishStopJob?.cancel()
+        runCatching { audioEngine?.stop() }
+        audioEngine = null
         serviceScope.cancel()
         super.onDestroy()
     }

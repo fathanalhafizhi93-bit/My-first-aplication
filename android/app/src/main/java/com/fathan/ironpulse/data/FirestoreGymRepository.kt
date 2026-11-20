@@ -1,12 +1,14 @@
 package com.fathan.ironpulse.data
 
 import android.util.Log
+import com.fathan.ironpulse.model.CustomRingtone
 import com.fathan.ironpulse.model.DayKey
 import com.fathan.ironpulse.model.DaySchedule
 import com.fathan.ironpulse.model.ExerciseItem
 import com.fathan.ironpulse.model.ExerciseTrackingMode
 import com.fathan.ironpulse.model.GymModelHelpers
 import com.fathan.ironpulse.model.MuscleGroup
+import com.fathan.ironpulse.model.RingtoneStorageMode
 import com.fathan.ironpulse.model.TimerDirection
 import com.fathan.ironpulse.model.UserProfile
 import com.fathan.ironpulse.model.WorkoutLog
@@ -159,6 +161,55 @@ class FirestoreGymRepository {
         awaitClose { reg.remove() }
     }
 
+    fun observeRingtones(
+        uid: String,
+        onError: (Exception) -> Unit = {}
+    ): Flow<List<CustomRingtone>> = callbackFlow {
+        val reg: ListenerRegistration = db.collection("users").document(uid)
+            .collection("ringtones")
+            .whereEqualTo("userId", uid)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Ringtones listener error for users/$uid/ringtones: ${error.message}", error)
+                    onError(error)
+                    return@addSnapshotListener
+                }
+                val list = snapshot?.documents
+                    ?.mapNotNull { parseCustomRingtone(it, uid) }
+                    ?.sortedBy { it.name.lowercase() }
+                    ?: emptyList()
+                trySend(list)
+            }
+        awaitClose { reg.remove() }
+    }
+
+    suspend fun addCustomRingtone(uid: String, ringtone: CustomRingtone) {
+        val safeId = ringtone.id.replace(Regex("[^a-zA-Z0-9_-]"), "_").take(128)
+        db.collection("users").document(uid)
+            .collection("ringtones").document(safeId)
+            .set(
+                mapOf(
+                    "userId" to uid,
+                    "name" to ringtone.name.trim().take(80).ifEmpty { "Ringtone Kustom" },
+                    "mimeType" to ringtone.mimeType.trim().take(60).ifEmpty { "audio/mpeg" },
+                    "sizeBytes" to ringtone.sizeBytes.coerceIn(0L, 20_000_000L),
+                    "durationSeconds" to ringtone.durationSeconds.coerceIn(0, 3600),
+                    "storageMode" to ringtone.storageMode.wireValue,
+                    "audioDataUrl" to ringtone.audioDataUrl.take(650_000),
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            )
+            .await()
+    }
+
+    suspend fun deleteCustomRingtone(uid: String, ringtoneId: String) {
+        db.collection("users").document(uid)
+            .collection("ringtones").document(ringtoneId)
+            .delete()
+            .await()
+    }
+
     fun observeTodayLog(uid: String, dateKey: String): Flow<WorkoutLog?> = callbackFlow {
         val reg: ListenerRegistration = db.collection("users").document(uid)
             .collection("workoutLogs")
@@ -203,6 +254,8 @@ class FirestoreGymRepository {
     suspend fun updateProfile(
         uid: String,
         displayName: String? = null,
+        defaultRingtoneId: String? = null,
+        restRingtoneId: String? = null,
         volume: Double? = null,
         notificationsEnabled: Boolean? = null,
         snoozeMinutes: Int? = null,
@@ -213,9 +266,13 @@ class FirestoreGymRepository {
         )
         if (displayName != null) {
             val cleaned = displayName.trim().take(100)
-            if (cleaned.isNotEmpty()) {
-                updates["displayName"] = cleaned
-            }
+            if (cleaned.isNotEmpty()) updates["displayName"] = cleaned
+        }
+        if (!defaultRingtoneId.isNullOrBlank()) {
+            updates["defaultRingtoneId"] = defaultRingtoneId.trim().take(128)
+        }
+        if (!restRingtoneId.isNullOrBlank()) {
+            updates["restRingtoneId"] = restRingtoneId.trim().take(128)
         }
         if (volume != null) {
             updates["volume"] = volume.coerceIn(0.0, 1.0)
@@ -313,6 +370,19 @@ class FirestoreGymRepository {
             notificationsEnabled = doc.getBoolean("notificationsEnabled") ?: false,
             snoozeMinutes = (doc.getLong("snoozeMinutes")?.toInt() ?: 5).coerceIn(1, 60),
             autoStartRestTimer = doc.getBoolean("autoStartRestTimer") ?: true
+        )
+    }
+
+    private fun parseCustomRingtone(doc: DocumentSnapshot, uid: String): CustomRingtone {
+        return CustomRingtone(
+            id = doc.id,
+            userId = doc.getString("userId") ?: uid,
+            name = doc.getString("name") ?: "Ringtone Kustom",
+            mimeType = doc.getString("mimeType") ?: "audio/mpeg",
+            sizeBytes = (doc.getLong("sizeBytes") ?: 0L).coerceAtLeast(0L),
+            durationSeconds = (doc.getLong("durationSeconds")?.toInt() ?: 0).coerceIn(0, 3600),
+            storageMode = RingtoneStorageMode.fromWire(doc.getString("storageMode")),
+            audioDataUrl = doc.getString("audioDataUrl") ?: ""
         )
     }
 

@@ -21,6 +21,9 @@ class GymAlarmReceiver : BroadcastReceiver() {
         val alarmTime = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_TIME) ?: "06:30"
         val snoozeMin = intent.getIntExtra(AlarmScheduler.EXTRA_SNOOZE_MINUTES, 5)
         val volume = intent.getFloatExtra(AlarmScheduler.EXTRA_VOLUME, 0.85f)
+        val ringtoneId = intent.getStringExtra(AlarmScheduler.EXTRA_RINGTONE_ID)
+            ?.ifBlank { AlarmScheduler.getDefaultRingtoneId(context) }
+            ?: AlarmScheduler.getDefaultRingtoneId(context)
         val isSnooze = intent.getBooleanExtra(AlarmScheduler.EXTRA_IS_SNOOZE, false)
 
         if (!isSnooze) {
@@ -34,6 +37,7 @@ class GymAlarmReceiver : BroadcastReceiver() {
             putExtra(AlarmScheduler.EXTRA_ALARM_TIME, alarmTime)
             putExtra(AlarmScheduler.EXTRA_SNOOZE_MINUTES, snoozeMin)
             putExtra(AlarmScheduler.EXTRA_VOLUME, volume)
+            putExtra(AlarmScheduler.EXTRA_RINGTONE_ID, ringtoneId)
         }
 
         val fullScreenPi = PendingIntent.getActivity(
@@ -51,7 +55,7 @@ class GymAlarmReceiver : BroadcastReceiver() {
             val nm = context.getSystemService(NotificationManager::class.java)
             val notification = NotificationCompat.Builder(context, IronPulseApp.CHANNEL_GYM_ALARM)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle("Waktunya Latihan — $alarmTime")
+                .setContentTitle("IronPulse Alarm — $alarmTime")
                 .setContentText(focusTitle)
                 .setPriority(NotificationCompat.PRIORITY_MAX)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)

@@ -1,74 +1,292 @@
 package com.fathan.ironpulse.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fathan.ironpulse.data.AppPreferences
+import com.fathan.ironpulse.model.AppLanguage
+import com.fathan.ironpulse.model.ClockFormat
+import com.fathan.ironpulse.model.DayTimePhase
+import com.fathan.ironpulse.model.PerformancePreferences
+import com.fathan.ironpulse.model.UiTheme
 
-private val IronPulseDarkColors = darkColorScheme(
-    primary = Color(0xFFC8FF2E),
-    onPrimary = Color(0xFF101802),
-    primaryContainer = Color(0xFF283509),
-    onPrimaryContainer = Color(0xFFE0FF8C),
-    secondary = Color(0xFF7DD3FC),
-    onSecondary = Color(0xFF04202C),
-    secondaryContainer = Color(0xFF1A2B36),
-    onSecondaryContainer = Color(0xFFCDEEFF),
-    tertiary = Color(0xFF34D399),
-    onTertiary = Color(0xFF042117),
-    background = Color(0xFF111318),
-    onBackground = Color(0xFFF3F4F6),
-    surface = Color(0xFF111318),
-    onSurface = Color(0xFFF3F4F6),
-    surfaceVariant = Color(0xFF1E222B),
-    onSurfaceVariant = Color(0xFFA7B0BE),
-    surfaceContainerLowest = Color(0xFF0B0D11),
-    surfaceContainerLow = Color(0xFF161920),
-    surfaceContainer = Color(0xFF1B1F27),
-    surfaceContainerHigh = Color(0xFF232833),
-    surfaceContainerHighest = Color(0xFF2C323F),
-    outline = Color(0xFF373E4E),
-    outlineVariant = Color(0xFF282D39),
-    error = Color(0xFFF87171),
-    onError = Color(0xFF2F0808)
+@Immutable
+data class PhaseThemeTokens(
+    val phase: DayTimePhase,
+    val accentHex: String,
+    val accentBrightHex: String,
+    val accent: Color,
+    val accentBright: Color,
+    val heroStart: Color,
+    val heroMid: Color,
+    val heroEnd: Color,
+    val heroBorder: Color,
+    val headerBorder: Color,
+    val glowPrimary: Color,
+    val glowSecondary: Color
 )
 
-private val IronPulseLightColors = lightColorScheme(
-    primary = Color(0xFF3E6B00),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFD6F987),
-    onPrimaryContainer = Color(0xFF112200),
-    secondary = Color(0xFF0369A1),
-    onSecondary = Color(0xFFFFFFFF),
-    background = Color(0xFFF6F7FA),
-    onBackground = Color(0xFF12151C),
-    surface = Color(0xFFF6F7FA),
-    onSurface = Color(0xFF12151C),
-    surfaceVariant = Color(0xFFE8ECF4),
-    onSurfaceVariant = Color(0xFF4B5563),
-    surfaceContainer = Color(0xFFFFFFFF),
-    surfaceContainerHigh = Color(0xFFF0F3F9),
-    outline = Color(0xFFD1D8E4),
-    outlineVariant = Color(0xFFE3E8F0)
+fun resolvePhaseThemeTokens(phase: DayTimePhase): PhaseThemeTokens = when (phase) {
+    DayTimePhase.MORNING -> PhaseThemeTokens(
+        phase = phase,
+        accentHex = "#F59E0B",
+        accentBrightHex = "#FBBF24",
+        accent = Color(0xFFF59E0B),
+        accentBright = Color(0xFFFBBF24),
+        heroStart = Color(0xCC2A1B08),
+        heroMid = Color(0xB8181410),
+        heroEnd = Color(0xD612151C),
+        heroBorder = Color(0x52FBBF24),
+        headerBorder = Color(0x38F59E0B),
+        glowPrimary = Color(0x28FBBF24),
+        glowSecondary = Color(0x1AEAB308)
+    )
+    DayTimePhase.AFTERNOON -> PhaseThemeTokens(
+        phase = phase,
+        accentHex = "#38BDF8",
+        accentBrightHex = "#7DD3FC",
+        accent = Color(0xFF38BDF8),
+        accentBright = Color(0xFF7DD3FC),
+        heroStart = Color(0xCC0D2337),
+        heroMid = Color(0xB8121B28),
+        heroEnd = Color(0xD612151C),
+        heroBorder = Color(0x477DD3FC),
+        headerBorder = Color(0x3338BDF8),
+        glowPrimary = Color(0x2438BDF8),
+        glowSecondary = Color(0x160EA5E9)
+    )
+    DayTimePhase.NIGHT -> PhaseThemeTokens(
+        phase = phase,
+        accentHex = "#818CF8",
+        accentBrightHex = "#A5B4FC",
+        accent = Color(0xFF818CF8),
+        accentBright = Color(0xFFA5B4FC),
+        heroStart = Color(0xD6161432),
+        heroMid = Color(0xC2121321),
+        heroEnd = Color(0xDE0E1017),
+        heroBorder = Color(0x47A5B4FC),
+        headerBorder = Color(0x33818CF8),
+        glowPrimary = Color(0x26818CF8),
+        glowSecondary = Color(0x186366F1)
+    )
+}
+
+@Immutable
+data class IronPulseThemeTokens(
+    val uiTheme: UiTheme,
+    val palette: MaterialYouPalette,
+    val accentColor: Color,
+    val onAccentColor: Color,
+    val effectiveTintColor: Color,
+    val canvasBg: Color,
+    val surfaceBorderColor: Color,
+    val subtleBorderColor: Color,
+    val cardRadius: Dp,
+    val buttonRadius: Dp,
+    val inputRadius: Dp,
+    val timePhase: DayTimePhase,
+    val phaseTokens: PhaseThemeTokens,
+    val performance: PerformancePreferences,
+    val lang: AppLanguage,
+    val clockFormat: ClockFormat
 )
+
+private val DefaultPalette = MaterialYouColorEngine.generateMaterialYouPalette(
+    MaterialYouColorEngine.DEFAULT_ACCENT_COLOR,
+    null
+)
+
+val LocalIronPulseTokens = staticCompositionLocalOf {
+    IronPulseThemeTokens(
+        uiTheme = UiTheme.MATERIAL_YOU,
+        palette = DefaultPalette,
+        accentColor = DefaultPalette.primary,
+        onAccentColor = DefaultPalette.onPrimary,
+        effectiveTintColor = MaterialYouColorEngine.parseColor("#1C1B22"),
+        canvasBg = DefaultPalette.surface,
+        surfaceBorderColor = DefaultPalette.outlineVariant,
+        subtleBorderColor = DefaultPalette.outlineVariant.copy(alpha = 0.7f),
+        cardRadius = 24.dp,
+        buttonRadius = 999.dp,
+        inputRadius = 14.dp,
+        timePhase = DayTimePhase.MORNING,
+        phaseTokens = resolvePhaseThemeTokens(DayTimePhase.MORNING),
+        performance = PerformancePreferences(),
+        lang = AppLanguage.ID,
+        clockFormat = ClockFormat.H24
+    )
+}
+
+fun Modifier.ironGlassSurface(
+    tokens: IronPulseThemeTokens,
+    subtle: Boolean = false,
+    borderOverride: Color? = null,
+    radiusOverride: Dp? = null
+): Modifier {
+    val radius = radiusOverride ?: tokens.cardRadius
+    val shape = RoundedCornerShape(radius)
+    val tint = tokens.effectiveTintColor
+    val borderColor = borderOverride ?: if (subtle) tokens.subtleBorderColor else tokens.surfaceBorderColor
+
+    return when (tokens.uiTheme) {
+        UiTheme.MATERIAL_YOU -> {
+            val bg = if (subtle) tokens.palette.surfaceContainerLow else tokens.palette.surfaceContainer
+            this
+                .clip(shape)
+                .background(bg, shape)
+                .border(1.dp, borderColor, shape)
+        }
+        UiTheme.UBUNTU_YARU -> {
+            val bg = if (subtle) Color(0xFF242424) else Color(0xFF2C2C2C)
+            this
+                .clip(shape)
+                .background(bg, shape)
+                .border(1.dp, borderColor, shape)
+        }
+        UiTheme.CARBON_FORGE -> {
+            val baseBg = tint.copy(alpha = if (subtle) 0.90f else 0.95f)
+            this
+                .clip(shape)
+                .background(baseBg, shape)
+                .drawWithCache {
+                    val step = 6.dp.toPx()
+                    val highlight = Color.White.copy(alpha = 0.035f)
+                    val shadow = Color.Black.copy(alpha = 0.25f)
+                    onDrawBehind {
+                        var x = -size.height
+                        while (x < size.width + size.height) {
+                            drawLine(
+                                color = highlight,
+                                start = Offset(x, 0f),
+                                end = Offset(x + size.height, size.height),
+                                strokeWidth = 1.dp.toPx()
+                            )
+                            drawLine(
+                                color = shadow,
+                                start = Offset(x + step * 0.5f, size.height),
+                                end = Offset(x + step * 0.5f + size.height, 0f),
+                                strokeWidth = 1.dp.toPx()
+                            )
+                            x += step
+                        }
+                    }
+                }
+                .border(1.dp, borderColor, shape)
+        }
+        UiTheme.MIDNIGHT_FROSTED -> {
+            val topAlpha = if (subtle) 0.10f else 0.14f
+            val botAlpha = if (subtle) 0.58f else 0.68f
+            this
+                .clip(shape)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = topAlpha),
+                            tint.copy(alpha = botAlpha)
+                        ),
+                        start = Offset.Zero,
+                        end = Offset(900f, 900f)
+                    ),
+                    shape = shape
+                )
+                .border(1.dp, borderColor, shape)
+        }
+        UiTheme.AEROGLASS -> {
+            val baseAlpha = if (subtle) 0.48f else 0.60f
+            this
+                .clip(shape)
+                .background(tint.copy(alpha = baseAlpha), shape)
+                .background(
+                    brush = Brush.verticalGradient(
+                        0.0f to Color.White.copy(alpha = if (subtle) 0.18f else 0.26f),
+                        0.46f to Color.White.copy(alpha = 0.07f),
+                        0.48f to Color(0xFF0EA5E9).copy(alpha = 0.04f),
+                        1.0f to Color(0xFF38BDF8).copy(alpha = 0.11f)
+                    ),
+                    shape = shape
+                )
+                .border(1.dp, borderColor, shape)
+        }
+        UiTheme.OBSIDIAN -> {
+            val alpha = if (subtle) 0.72f else 0.84f
+            this
+                .clip(shape)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = if (subtle) 0.03f else 0.05f),
+                            tint.copy(alpha = alpha)
+                        )
+                    ),
+                    shape = shape
+                )
+                .border(1.dp, borderColor, shape)
+        }
+    }
+}
+
+fun Modifier.ironGlassBar(
+    tokens: IronPulseThemeTokens,
+    shapeRadius: Dp = 0.dp
+): Modifier {
+    val shape = RoundedCornerShape(shapeRadius)
+    val tint = tokens.effectiveTintColor
+    val bgModifier = when (tokens.uiTheme) {
+        UiTheme.MATERIAL_YOU -> Modifier.background(tokens.palette.surfaceContainerLow, shape)
+        UiTheme.UBUNTU_YARU -> Modifier.background(Color(0xFF262626), shape)
+        UiTheme.CARBON_FORGE -> Modifier.background(tint.copy(alpha = 0.96f), shape)
+        UiTheme.MIDNIGHT_FROSTED -> Modifier.background(
+            Brush.verticalGradient(
+                colors = listOf(
+                    tint.copy(alpha = 0.88f),
+                    tint.copy(alpha = 0.78f)
+                )
+            ),
+            shape
+        )
+        UiTheme.AEROGLASS -> Modifier
+            .background(tint.copy(alpha = 0.76f), shape)
+            .background(
+                Brush.verticalGradient(
+                    0.0f to Color.White.copy(alpha = 0.16f),
+                    0.5f to Color.White.copy(alpha = 0.04f),
+                    1.0f to Color(0xFF0EA5E9).copy(alpha = 0.09f)
+                ),
+                shape
+            )
+        UiTheme.OBSIDIAN -> Modifier.background(tint.copy(alpha = 0.90f), shape)
+    }
+    return this
+        .clip(shape)
+        .then(bgModifier)
+}
 
 private val IronPulseTypography = Typography(
     displaySmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 32.sp,
-        lineHeight = 38.sp,
+        lineHeight = 36.sp,
         fontFeatureSettings = "tnum"
     ),
     headlineSmall = TextStyle(
@@ -79,9 +297,9 @@ private val IronPulseTypography = Typography(
     ),
     titleLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.SemiBold,
+        fontWeight = FontWeight.Bold,
         fontSize = 19.sp,
-        lineHeight = 26.sp
+        lineHeight = 25.sp
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
@@ -108,6 +326,13 @@ private val IronPulseTypography = Typography(
         lineHeight = 20.sp,
         fontFeatureSettings = "tnum"
     ),
+    labelMedium = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        fontFeatureSettings = "tnum"
+    ),
     labelSmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Medium,
@@ -119,22 +344,131 @@ private val IronPulseTypography = Typography(
 
 @Composable
 fun IronPulseTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    prefs: AppPreferences = AppPreferences(),
+    timePhase: DayTimePhase = DayTimePhase.MORNING,
     content: @Composable () -> Unit
 ) {
-    val context = LocalContext.current
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> IronPulseDarkColors
-        else -> IronPulseLightColors
+    val uiTheme = prefs.uiTheme
+    val effectiveAccentHex = if (uiTheme == UiTheme.UBUNTU_YARU &&
+        prefs.accentColorHex.equals(MaterialYouColorEngine.DEFAULT_ACCENT_COLOR, ignoreCase = true)
+    ) {
+        MaterialYouColorEngine.YARU_ORANGE_ACCENT
+    } else {
+        prefs.accentColorHex
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = IronPulseTypography,
-        content = content
-    )
+    val effectiveTintHex = prefs.materialTintColorHex
+        ?: MaterialYouColorEngine.defaultTintForTheme(uiTheme)
+
+    val palette = remember(effectiveAccentHex, prefs.materialTintColorHex, uiTheme) {
+        MaterialYouColorEngine.generateMaterialYouPalette(
+            seedHex = effectiveAccentHex,
+            surfaceTintOverrideHex = prefs.materialTintColorHex
+        )
+    }
+
+    val phaseTokens = remember(timePhase) { resolvePhaseThemeTokens(timePhase) }
+
+    val tokens = remember(uiTheme, palette, effectiveTintHex, timePhase, phaseTokens, prefs) {
+        val canvasBg = when (uiTheme) {
+            UiTheme.MATERIAL_YOU -> palette.surface
+            UiTheme.UBUNTU_YARU -> Color(0xFF1E1E1E)
+            UiTheme.CARBON_FORGE -> Color(0xFF07080A)
+            UiTheme.MIDNIGHT_FROSTED -> Color(0xFF05070C)
+            UiTheme.AEROGLASS -> Color(0xFF06101B)
+            UiTheme.OBSIDIAN -> Color(0xFF0A0B0E)
+        }
+        val borderColor = when (uiTheme) {
+            UiTheme.MATERIAL_YOU -> palette.outlineVariant
+            UiTheme.AEROGLASS -> Color(0x5EB8E6FE)
+            UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.22f)
+            UiTheme.CARBON_FORGE -> Color.White.copy(alpha = 0.14f)
+            UiTheme.UBUNTU_YARU -> Color.White.copy(alpha = 0.11f)
+            UiTheme.OBSIDIAN -> Color.White.copy(alpha = 0.12f)
+        }
+        val subtleBorder = when (uiTheme) {
+            UiTheme.MATERIAL_YOU -> palette.outlineVariant.copy(alpha = 0.7f)
+            UiTheme.AEROGLASS -> Color(0x45BAE6FD)
+            UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.15f)
+            else -> Color.White.copy(alpha = 0.10f)
+        }
+        val cardRadius = when (uiTheme) {
+            UiTheme.MATERIAL_YOU -> 24.dp
+            UiTheme.MIDNIGHT_FROSTED -> 22.dp
+            UiTheme.CARBON_FORGE -> 10.dp
+            UiTheme.UBUNTU_YARU -> 12.dp
+            UiTheme.AEROGLASS -> 16.dp
+            UiTheme.OBSIDIAN -> 16.dp
+        }
+        val buttonRadius = when (uiTheme) {
+            UiTheme.MATERIAL_YOU, UiTheme.MIDNIGHT_FROSTED -> 999.dp
+            UiTheme.CARBON_FORGE -> 8.dp
+            UiTheme.UBUNTU_YARU -> 10.dp
+            UiTheme.AEROGLASS -> 12.dp
+            UiTheme.OBSIDIAN -> 12.dp
+        }
+        val inputRadius = when (uiTheme) {
+            UiTheme.CARBON_FORGE -> 8.dp
+            UiTheme.UBUNTU_YARU -> 10.dp
+            else -> 12.dp
+        }
+        IronPulseThemeTokens(
+            uiTheme = uiTheme,
+            palette = palette,
+            accentColor = palette.primary,
+            onAccentColor = palette.onPrimary,
+            effectiveTintColor = MaterialYouColorEngine.parseColor(effectiveTintHex, Color(0xFF161A23)),
+            canvasBg = canvasBg,
+            surfaceBorderColor = borderColor,
+            subtleBorderColor = subtleBorder,
+            cardRadius = cardRadius,
+            buttonRadius = buttonRadius,
+            inputRadius = inputRadius,
+            timePhase = timePhase,
+            phaseTokens = phaseTokens,
+            performance = prefs.performance,
+            lang = prefs.lang,
+            clockFormat = prefs.clockFormat
+        )
+    }
+
+    val colorScheme = remember(tokens) {
+        darkColorScheme(
+            primary = tokens.palette.primary,
+            onPrimary = tokens.palette.onPrimary,
+            primaryContainer = tokens.palette.primaryContainer,
+            onPrimaryContainer = tokens.palette.onPrimaryContainer,
+            secondary = tokens.palette.secondary,
+            onSecondary = tokens.palette.onSecondary,
+            secondaryContainer = tokens.palette.secondaryContainer,
+            onSecondaryContainer = tokens.palette.onSecondaryContainer,
+            tertiary = tokens.palette.tertiary,
+            onTertiary = tokens.palette.onTertiary,
+            tertiaryContainer = tokens.palette.tertiaryContainer,
+            onTertiaryContainer = tokens.palette.onTertiaryContainer,
+            background = tokens.canvasBg,
+            onBackground = tokens.palette.onSurface,
+            surface = tokens.canvasBg,
+            onSurface = tokens.palette.onSurface,
+            surfaceVariant = tokens.palette.surfaceContainerHigh,
+            onSurfaceVariant = tokens.palette.onSurfaceVariant,
+            surfaceContainerLowest = tokens.palette.surfaceContainerLowest,
+            surfaceContainerLow = tokens.palette.surfaceContainerLow,
+            surfaceContainer = tokens.palette.surfaceContainer,
+            surfaceContainerHigh = tokens.palette.surfaceContainerHigh,
+            surfaceContainerHighest = tokens.palette.surfaceContainerHighest,
+            outline = tokens.palette.outline,
+            outlineVariant = tokens.palette.outlineVariant,
+            error = Color(0xFFF87171),
+            onError = Color(0xFF2F0808)
+        )
+    }
+
+    CompositionLocalProvider(LocalIronPulseTokens provides tokens) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = IronPulseTypography,
+            content = content
+        )
+    }
 }

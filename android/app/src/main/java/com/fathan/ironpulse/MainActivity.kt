@@ -3,6 +3,7 @@ package com.fathan.ironpulse
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -11,7 +12,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -20,8 +20,10 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.fathan.ironpulse.alarm.AlarmScheduler
 import com.fathan.ironpulse.ui.IronPulseRoot
 import com.fathan.ironpulse.ui.theme.IronPulseTheme
+import com.fathan.ironpulse.ui.viewmodel.AppTab
 import com.fathan.ironpulse.ui.viewmodel.GymViewModel
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
@@ -34,35 +36,81 @@ class MainActivity : ComponentActivity() {
 
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { _ ->
-        // Permission result handled gracefully by AlarmScheduler / RestTimerService
+    ) { granted ->
+        viewModel.refreshDiagnostics(
+            hasNotificationPermission = hasNotificationPermission(),
+            canScheduleExactAlarms = AlarmScheduler.canScheduleExactAlarms(this)
+        )
+        if (granted) {
+            viewModel.updateProfile(notificationsEnabled = true)
+        }
+    }
+
+    private val audioPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            runCatching {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            viewModel.importCustomRingtone(uri)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        handleIncomingIntent(intent)
 
         setContent {
             val state by viewModel.uiState.collectAsStateWithLifecycle()
             IronPulseTheme(
-                darkTheme = isSystemInDarkTheme(),
-                dynamicColor = true
+                prefs = state.appPrefs,
+                timePhase = state.timePhase
             ) {
                 IronPulseRoot(
                     state = state,
                     viewModel = viewModel,
                     onRequestGoogleSignIn = ::launchGoogleSignIn,
                     onRequestNotificationPermission = ::requestNotificationPermissionIfNeeded,
-                    onOpenExactAlarmSettings = ::openExactAlarmSettings
+                    onOpenExactAlarmSettings = ::openExactAlarmSettings,
+                    onPickCustomRingtone = ::launchAudioFilePicker
                 )
             }
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
     override fun onResume() {
         super.onResume()
         viewModel.refreshDateClock()
+        viewModel.refreshDiagnostics(
+            hasNotificationPermission = hasNotificationPermission(),
+            canScheduleExactAlarms = AlarmScheduler.canScheduleExactAlarms(this)
+        )
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_WORKOUT, false) == true) {
+            viewModel.selectTab(AppTab.WORKOUT)
+        }
+    }
+
+    private fun hasNotificationPermission(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun resolveWebClientId(): String {
@@ -115,15 +163,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun launchAudioFilePicker() {
+        audioPickerLauncher.launch(arrayOf("audio/*"))
+    }
+
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val granted = ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-            if (!granted) {
+            if (!hasNotificationPermission()) {
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                viewModel.updateProfile(notificationsEnabled = true)
             }
+        } else {
+            viewModel.updateProfile(notificationsEnabled = true)
         }
     }
 
@@ -133,5 +185,9 @@ class MainActivity : ComponentActivity() {
                 startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM))
             }
         }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_WORKOUT = "extra_open_workout"
     }
 }
