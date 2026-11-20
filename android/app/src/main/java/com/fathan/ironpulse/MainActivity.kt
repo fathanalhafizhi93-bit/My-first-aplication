@@ -18,7 +18,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
-import androidx.credentials.exceptions.NoCredentialException
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.fathan.ironpulse.ui.IronPulseRoot
@@ -91,7 +90,9 @@ class MainActivity : ComponentActivity() {
 
                 val response = try {
                     credentialManager.getCredential(this@MainActivity, request)
-                } catch (e: NoCredentialException) {
+                } catch (e: GetCredentialCancellationException) {
+                    throw e
+                } catch (_: Exception) {
                     val fallbackOption = GetSignInWithGoogleOption.Builder(serverClientId).build()
                     val fallbackRequest = GetCredentialRequest.Builder()
                         .addCredentialOption(fallbackOption)

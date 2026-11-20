@@ -155,10 +155,19 @@ object AlarmScheduler {
         )
 
         if (canScheduleExactAlarms(context)) {
-            val info = AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent)
-            am.setAlarmClock(info, operationPi)
+            val scheduled = runCatching {
+                val info = AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent)
+                am.setAlarmClock(info, operationPi)
+            }.isSuccess
+            if (!scheduled) {
+                runCatching {
+                    am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operationPi)
+                }
+            }
         } else {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operationPi)
+            runCatching {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, operationPi)
+            }
         }
     }
 

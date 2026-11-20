@@ -115,11 +115,15 @@ class FirestoreGymRepository {
         }
     }
 
-    fun observeProfile(uid: String): Flow<UserProfile?> = callbackFlow {
+    fun observeProfile(
+        uid: String,
+        onError: (Exception) -> Unit = {}
+    ): Flow<UserProfile?> = callbackFlow {
         val reg: ListenerRegistration = db.collection("users").document(uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Profile listener error for users/$uid: ${error.message}", error)
+                    onError(error)
                     return@addSnapshotListener
                 }
                 if (snapshot != null && snapshot.exists()) {
@@ -129,13 +133,18 @@ class FirestoreGymRepository {
         awaitClose { reg.remove() }
     }
 
-    fun observeSchedules(uid: String): Flow<Map<DayKey, DaySchedule>> = callbackFlow {
+    fun observeSchedules(
+        uid: String,
+        onError: (Exception) -> Unit = {}
+    ): Flow<Map<DayKey, DaySchedule>> = callbackFlow {
         val reg: ListenerRegistration = db.collection("users").document(uid)
             .collection("schedules")
             .whereEqualTo("userId", uid)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "Schedules listener error for users/$uid/schedules: ${error.message}", error)
+                    onError(error)
+                    trySend(GymPresets.createDefaultSchedules(uid))
                     return@addSnapshotListener
                 }
                 val defaults = GymPresets.createDefaultSchedules(uid).toMutableMap()
@@ -168,7 +177,10 @@ class FirestoreGymRepository {
         awaitClose { reg.remove() }
     }
 
-    fun observeWorkoutHistory(uid: String): Flow<List<WorkoutLog>> = callbackFlow {
+    fun observeWorkoutHistory(
+        uid: String,
+        onError: (Exception) -> Unit = {}
+    ): Flow<List<WorkoutLog>> = callbackFlow {
         val reg: ListenerRegistration = db.collection("users").document(uid)
             .collection("workoutLogs")
             .whereEqualTo("userId", uid)
@@ -176,6 +188,7 @@ class FirestoreGymRepository {
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     Log.e(TAG, "History listener error for users/$uid/workoutLogs: ${error.message}", error)
+                    onError(error)
                     return@addSnapshotListener
                 }
                 val logs = snapshot?.documents

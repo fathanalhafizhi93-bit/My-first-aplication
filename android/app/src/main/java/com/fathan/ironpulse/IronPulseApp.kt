@@ -6,12 +6,28 @@ import android.app.NotificationManager
 import android.media.AudioAttributes
 import android.net.Uri
 import android.os.Build
+import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseOptions
 
 class IronPulseApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannels()
+        ensureFirebaseInitialized()
+        runCatching { createNotificationChannels() }
+    }
+
+    private fun ensureFirebaseInitialized() {
+        if (FirebaseApp.getApps(this).isEmpty()) {
+            val options = FirebaseOptions.Builder()
+                .setProjectId("gen-lang-client-0024790154")
+                .setApplicationId("1:665973010974:android:3f04e185a0083073e6b40f")
+                .setApiKey("AIzaSyDCmTbDu9dt1PXrnPCAsEP7iYFXTqFtwVg")
+                .setStorageBucket("gen-lang-client-0024790154.firebasestorage.app")
+                .setGcmSenderId("665973010974")
+                .build()
+            FirebaseApp.initializeApp(this, options)
+        }
     }
 
     private fun createNotificationChannels() {

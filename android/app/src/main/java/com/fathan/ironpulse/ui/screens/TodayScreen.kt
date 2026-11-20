@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Alarm
@@ -269,7 +269,7 @@ fun TodayScreen(
                 }
             }
         } else {
-            items(entries, key = { it.exerciseId }) { entry ->
+            itemsIndexed(entries, key = { idx, item -> "${item.exerciseId}_$idx" }) { _, entry ->
                 val doneCount = entry.sets.count { it.completed }
                 val allDone = entry.sets.isNotEmpty() && doneCount == entry.sets.size
                 val summaryLine = if (entry.trackingMode == ExerciseTrackingMode.TIMER) {

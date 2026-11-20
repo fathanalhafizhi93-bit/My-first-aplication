@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -56,6 +57,7 @@ data class IronPulseUiState(
     val historyLoading: Boolean = true,
     val authLoading: Boolean = false,
     val authError: String? = null,
+    val syncError: String? = null,
     val isOffline: Boolean = false,
     val profile: UserProfile? = null,
     val schedules: Map<DayKey, DaySchedule> = emptyMap(),
@@ -79,6 +81,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     private val _historyLoading = MutableStateFlow(true)
     private val _authLoading = MutableStateFlow(false)
     private val _authError = MutableStateFlow<String?>(null)
+    private val _syncError = MutableStateFlow<String?>(null)
     private val _isOffline = MutableStateFlow(false)
 
     private val _profile = MutableStateFlow<UserProfile?>(null)
@@ -99,18 +102,19 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
         combine(_authReady, _user, _dataLoading, _historyLoading, _authLoading) { ready, user, dLoad, hLoad, aLoad ->
             Tuple5(ready, user, dLoad, hLoad, aLoad)
         },
-        combine(_authError, _isOffline, _profile, _schedules, _todayDayKey) { aErr, offline, prof, scheds, dKey ->
-            Tuple5(aErr, offline, prof, scheds, dKey)
+        combine(_authError, _syncError, _isOffline, _profile, _schedules) { aErr, sErr, offline, prof, scheds ->
+            Tuple5(aErr, sErr, offline, prof, scheds)
         },
-        combine(_todayDateKey, _todayLog, _workoutHistory, _exerciseTimers, RestTimerService.state) { dateKey, tLog, hist, exTimers, rest ->
-            Tuple5(dateKey, tLog, hist, exTimers, rest)
-        }
-    ) { g1, g2, g3 ->
-        val todaySched = g2.fourth[g2.fifth]
+        combine(_todayDayKey, _todayDateKey, _todayLog, _workoutHistory, _exerciseTimers) { dKey, dateKey, tLog, hist, exTimers ->
+            Tuple5(dKey, dateKey, tLog, hist, exTimers)
+        },
+        RestTimerService.state
+    ) { g1, g2, g3, rest ->
+        val todaySched = g2.fifth[g3.first]
         val entries = if (todaySched != null) {
             GymModelHelpers.buildEntriesFromSchedule(
                 exercises = todaySched.exercises,
-                existingEntries = g3.second?.entries ?: emptyList()
+                existingEntries = g3.third?.entries ?: emptyList()
             )
         } else {
             emptyList()
@@ -122,16 +126,17 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
             historyLoading = g1.fourth,
             authLoading = g1.fifth,
             authError = g2.first,
-            isOffline = g2.second,
-            profile = g2.third,
-            schedules = g2.fourth,
-            todayDayKey = g2.fifth,
-            todayDateKey = g3.first,
-            todayLog = g3.second,
+            syncError = g2.second,
+            isOffline = g2.third,
+            profile = g2.fourth,
+            schedules = g2.fifth,
+            todayDayKey = g3.first,
+            todayDateKey = g3.second,
+            todayLog = g3.third,
             effectiveTodayEntries = entries,
-            workoutHistory = g3.third,
-            exerciseTimers = g3.fourth,
-            restTimer = g3.fifth
+            workoutHistory = g3.fourth,
+            exerciseTimers = g3.fifth,
+            restTimer = rest
         )
     }.stateIn(
         scope = viewModelScope,
@@ -147,23 +152,25 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun observeConnectivity() {
-        val cm = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return
-        val activeCaps = cm.getNetworkCapabilities(cm.activeNetwork)
-        _isOffline.value = activeCaps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) != true
-
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
         runCatching {
+            val cm = getApplication<Application>().getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return
+            val activeCaps = cm.getNetworkCapabilities(cm.activeNetwork)
+            _isOffline.value = activeCaps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) != true
+
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
             cm.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     _isOffline.value = false
                 }
 
                 override fun onLost(network: Network) {
-                    val currentCaps = cm.getNetworkCapabilities(cm.activeNetwork)
-                    _isOffline.value = currentCaps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) != true
+                    runCatching {
+                        val currentCaps = cm.getNetworkCapabilities(cm.activeNetwork)
+                        _isOffline.value = currentCaps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) != true
+                    }
                 }
             })
         }
@@ -189,41 +196,57 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun retrySync() {
+        val current = _user.value ?: return
+        userSyncJob?.cancel()
+        startUserFirestoreSync(current)
+    }
+
     private fun startUserFirestoreSync(firebaseUser: FirebaseUser) {
         _dataLoading.value = true
         _historyLoading.value = true
+        _syncError.value = null
         userSyncJob = viewModelScope.launch {
             val uid = firebaseUser.uid
             try {
                 repo.ensureUserInitialized(firebaseUser)
             } catch (e: Exception) {
+                _syncError.value = "Sinkronisasi cloud tertunda: ${e.localizedMessage ?: "Periksa koneksi internet."}"
+                if (_schedules.value.isEmpty()) {
+                    _schedules.value = com.fathan.ironpulse.data.GymPresets.createDefaultSchedules(uid)
+                }
                 _dataLoading.value = false
-                _historyLoading.value = false
-                _authError.value = "Gagal sinkronisasi akun: ${e.localizedMessage ?: "Periksa koneksi/izin."}"
-                return@launch
             }
 
             launch {
-                repo.observeProfile(uid).collect { prof ->
+                repo.observeProfile(uid) { err ->
+                    _syncError.value = "Gagal memuat profil: ${err.localizedMessage ?: "Coba lagi."}"
+                }.collect { prof ->
                     _profile.value = prof
                     syncNativeAlarmsIfReady()
                 }
             }
             launch {
-                repo.observeSchedules(uid).collect { scheds ->
+                repo.observeSchedules(uid) { err ->
+                    _syncError.value = "Gagal memuat jadwal: ${err.localizedMessage ?: "Coba lagi."}"
+                    _dataLoading.value = false
+                }.collect { scheds ->
                     _schedules.value = scheds
                     _dataLoading.value = false
                     syncNativeAlarmsIfReady()
                 }
             }
             launch {
-                repo.observeWorkoutHistory(uid).collect { hist ->
+                repo.observeWorkoutHistory(uid) { err ->
+                    _syncError.value = "Gagal memuat riwayat: ${err.localizedMessage ?: "Coba lagi."}"
+                    _historyLoading.value = false
+                }.collect { hist ->
                     _workoutHistory.value = hist
                     _historyLoading.value = false
                 }
             }
             launch {
-                _todayDateKey.collect { dateKey ->
+                _todayDateKey.collectLatest { dateKey ->
                     repo.observeTodayLog(uid, dateKey).collect { log ->
                         _todayLog.value = log
                     }
@@ -236,13 +259,15 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
         val scheds = _schedules.value
         if (scheds.isEmpty()) return
         val prof = _profile.value
-        AlarmScheduler.syncWeeklyAlarms(
-            context = getApplication(),
-            schedules = scheds,
-            masterEnabled = prof?.notificationsEnabled ?: true,
-            snoozeMinutes = prof?.snoozeMinutes ?: 5,
-            volume = prof?.volume ?: 0.85
-        )
+        runCatching {
+            AlarmScheduler.syncWeeklyAlarms(
+                context = getApplication(),
+                schedules = scheds,
+                masterEnabled = prof?.notificationsEnabled ?: true,
+                snoozeMinutes = prof?.snoozeMinutes ?: 5,
+                volume = prof?.volume ?: 0.85
+            )
+        }
     }
 
     private fun startDateRolloverMonitor() {

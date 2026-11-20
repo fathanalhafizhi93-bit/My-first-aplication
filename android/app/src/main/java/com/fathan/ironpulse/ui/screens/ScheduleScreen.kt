@@ -270,7 +270,7 @@ fun ScheduleScreen(
                     }
                 }
             } else {
-                itemsIndexed(schedule.exercises, key = { _, ex -> ex.id }) { idx, ex ->
+                itemsIndexed(schedule.exercises, key = { idx, ex -> "${ex.id}_$idx" }) { idx, ex ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(18.dp),
