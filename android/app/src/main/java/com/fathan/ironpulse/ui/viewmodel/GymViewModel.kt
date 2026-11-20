@@ -7,6 +7,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fathan.ironpulse.alarm.AlarmScheduler
@@ -44,6 +45,7 @@ import com.fathan.ironpulse.timer.RestTimerService
 import com.fathan.ironpulse.timer.RestTimerState
 import com.fathan.ironpulse.ui.theme.resolvePhaseThemeTokens
 import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -52,12 +54,15 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
 import java.util.UUID
@@ -72,6 +77,7 @@ enum class AppTab {
     SETTINGS
 }
 
+@Immutable
 data class ExerciseTimerUiState(
     val activeSetNumber: Int = 1,
     val running: Boolean = false,
@@ -81,12 +87,22 @@ data class ExerciseTimerUiState(
     val lastStartedEpochMs: Long = 0L
 )
 
+@Immutable
+data class RestTimerDisplayState(
+    val isActive: Boolean = false,
+    val remainingSeconds: Int = 60,
+    val totalSeconds: Int = 60,
+    val exerciseName: String = ""
+)
+
+@Immutable
 data class CooldownTarget(
     val exerciseId: String,
     val exerciseName: String,
     val setNumber: Int
 )
 
+@Immutable
 data class ActiveTestAlarmState(
     val timeLabel: String,
     val focusTitle: String,
@@ -94,6 +110,15 @@ data class ActiveTestAlarmState(
     val ringtoneName: String
 )
 
+@Immutable
+data class MascotEyeState(
+    val isBlinking: Boolean = false,
+    val glanceX: Float = 0f,
+    val glanceY: Float = 0f,
+    val tapBounce: Boolean = false
+)
+
+@Immutable
 data class MascotUiState(
     val mood: MascotMood = MascotMood.READY,
     val timePhase: DayTimePhase = DayTimePhase.MORNING,
@@ -102,16 +127,21 @@ data class MascotUiState(
     val phaseColorHex: String = "#FBBF24",
     val activeLine: MascotSpeechLine = MascotSpeechLine("init", "Siap Latihan!", "Ayo bangun momentum hari ini."),
     val speechEventId: Int = 0,
-    val isDialogueLocked: Boolean = false,
-    val isBlinking: Boolean = false,
-    val glanceX: Float = 0f,
-    val glanceY: Float = 0f,
-    val tapBounce: Boolean = false
+    val isDialogueLocked: Boolean = false
 )
 
+@Immutable
+data class ThemeUiSpec(
+    val prefs: AppPreferences = AppPreferences(),
+    val timePhase: DayTimePhase = DayTimePhase.MORNING
+)
+
+@Immutable
 data class IronPulseUiState(
     val authReady: Boolean = false,
-    val user: FirebaseUser? = null,
+    val userUid: String? = null,
+    val userEmail: String? = null,
+    val userDisplayName: String? = null,
     val dataLoading: Boolean = true,
     val historyLoading: Boolean = true,
     val authLoading: Boolean = false,
@@ -123,16 +153,11 @@ data class IronPulseUiState(
     val customRingtones: List<CustomRingtone> = emptyList(),
     val todayDayKey: DayKey = GymModelHelpers.getTodayDayKey(),
     val todayDateKey: String = GymModelHelpers.formatLocalDateKey(),
-    val nowMillis: Long = System.currentTimeMillis(),
     val timePhase: DayTimePhase = DayTimePhase.MORNING,
     val todayLog: WorkoutLog? = null,
     val effectiveTodayEntries: List<WorkoutLogEntry> = emptyList(),
     val workoutHistory: List<WorkoutLog> = emptyList(),
-    val exerciseTimers: Map<String, ExerciseTimerUiState> = emptyMap(),
-    val restTimer: RestTimerState = RestTimerState(),
-    val restIdleRemainingSeconds: Int = 60,
-    val restIdleTotalSeconds: Int = 60,
-    val restIdleExerciseLabel: String = "",
+    val weeklyStreak: Int = 0,
     val appPrefs: AppPreferences = AppPreferences(),
     val activeTab: AppTab = AppTab.TODAY,
     val focusedWorkoutExerciseId: String? = null,
@@ -143,14 +168,15 @@ data class IronPulseUiState(
     val tutorialStartWithLang: Boolean = true,
     val showAboutDialog: Boolean = false,
     val activeTestAlarm: ActiveTestAlarmState? = null,
-    val cooldownRemainingSeconds: Int = 0,
     val cooldownAlertTarget: CooldownTarget? = null,
     val previewingRingtoneId: String? = null,
     val uploadingRingtone: Boolean = false,
     val hasNotificationPermission: Boolean = true,
     val canScheduleExactAlarms: Boolean = true,
     val mascot: MascotUiState = MascotUiState()
-)
+) {
+    val isSignedIn: Boolean get() = userUid != null
+}
 
 class GymViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -175,9 +201,13 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     private val _customRingtones = MutableStateFlow<List<CustomRingtone>>(emptyList())
     private val _todayDayKey = MutableStateFlow(GymModelHelpers.getTodayDayKey())
     private val _todayDateKey = MutableStateFlow(GymModelHelpers.formatLocalDateKey())
-    private val _nowMillis = MutableStateFlow(System.currentTimeMillis())
+    private val _timePhase = MutableStateFlow(
+        GymModelHelpers.resolveDayTimePhase(prefsStore.state.value.todayThemeMode, Calendar.getInstance())
+    )
+    private val _clockSeconds = MutableStateFlow(System.currentTimeMillis() / 1000L)
     private val _todayLog = MutableStateFlow<WorkoutLog?>(null)
     private val _workoutHistory = MutableStateFlow<List<WorkoutLog>>(emptyList())
+    private val _weeklyStreak = MutableStateFlow(0)
     private val _exerciseTimers = MutableStateFlow<Map<String, ExerciseTimerUiState>>(emptyMap())
 
     private val _restIdleRemaining = MutableStateFlow(60)
@@ -194,6 +224,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     private val _showAboutDialog = MutableStateFlow(false)
     private val _activeTestAlarm = MutableStateFlow<ActiveTestAlarmState?>(null)
     private val _cooldownUntilMs = MutableStateFlow(0L)
+    private val _cooldownSeconds = MutableStateFlow(0)
     private val _cooldownAlertTarget = MutableStateFlow<CooldownTarget?>(null)
     private val _previewingRingtoneId = MutableStateFlow<String?>(null)
     private val _uploadingRingtone = MutableStateFlow(false)
@@ -201,6 +232,47 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     private val _canExactAlarm = MutableStateFlow(true)
 
     private val _mascotState = MutableStateFlow(MascotUiState())
+    private val _mascotEyeState = MutableStateFlow(MascotEyeState())
+
+    val clockSecondsFlow: StateFlow<Long> = _clockSeconds.asStateFlow()
+    val exerciseTimersFlow: StateFlow<Map<String, ExerciseTimerUiState>> = _exerciseTimers.asStateFlow()
+    val cooldownSecondsFlow: StateFlow<Int> = _cooldownSeconds.asStateFlow()
+    val mascotEyeFlow: StateFlow<MascotEyeState> = _mascotEyeState.asStateFlow()
+
+    val themeUiFlow: StateFlow<ThemeUiSpec> = combine(prefsStore.state, _timePhase) { prefs, phase ->
+        ThemeUiSpec(prefs = prefs, timePhase = phase)
+    }.distinctUntilChanged().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = ThemeUiSpec(prefs = prefsStore.state.value, timePhase = _timePhase.value)
+    )
+
+    val restTimerDisplayFlow: StateFlow<RestTimerDisplayState> = combine(
+        RestTimerService.state,
+        _restIdleRemaining,
+        _restIdleTotal,
+        _restIdleExercise
+    ) { rest, idleRem, idleTotal, idleLabel ->
+        if (rest.isActive) {
+            RestTimerDisplayState(
+                isActive = true,
+                remainingSeconds = rest.remainingSeconds,
+                totalSeconds = rest.totalSeconds.coerceAtLeast(1),
+                exerciseName = rest.exerciseName
+            )
+        } else {
+            RestTimerDisplayState(
+                isActive = false,
+                remainingSeconds = idleRem,
+                totalSeconds = idleTotal.coerceAtLeast(1),
+                exerciseName = idleLabel
+            )
+        }
+    }.distinctUntilChanged().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = RestTimerDisplayState()
+    )
 
     private val _snackbarEvents = MutableSharedFlow<String>(extraBufferCapacity = 10)
     val snackbarEvents: SharedFlow<String> = _snackbarEvents.asSharedFlow()
@@ -237,14 +309,10 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     private data class WorkoutRuntimeState(
         val todayDayKey: DayKey,
         val todayDateKey: String,
-        val nowMillis: Long,
+        val timePhase: DayTimePhase,
         val todayLog: WorkoutLog?,
         val workoutHistory: List<WorkoutLog>,
-        val exerciseTimers: Map<String, ExerciseTimerUiState>,
-        val restTimer: RestTimerState,
-        val restIdleRemaining: Int,
-        val restIdleTotal: Int,
-        val restIdleExercise: String
+        val weeklyStreak: Int
     )
 
     private data class ShellUiState(
@@ -258,7 +326,6 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
         val tutorialStartWithLang: Boolean,
         val showAboutDialog: Boolean,
         val activeTestAlarm: ActiveTestAlarmState?,
-        val cooldownUntilMs: Long,
         val cooldownAlertTarget: CooldownTarget?,
         val previewingRingtoneId: String?,
         val uploadingRingtone: Boolean,
@@ -293,25 +360,22 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val runtimeFlow = combine(
-        combine(_todayDayKey, _todayDateKey, _nowMillis, _todayLog, _workoutHistory) { d, dt, now, tl, wh ->
-            listOf(d, dt, now, tl, wh)
-        },
-        combine(_exerciseTimers, RestTimerService.state, _restIdleRemaining, _restIdleTotal, _restIdleExercise) { et, rt, ir, it, ie ->
-            listOf(et, rt, ir, it, ie)
-        }
-    ) { g1, g2 ->
+        _todayDayKey,
+        _todayDateKey,
+        _timePhase,
+        _todayLog,
+        _workoutHistory
+    ) { d, dt, phase, tl, wh ->
+        arrayOf(d, dt, phase, tl, wh)
+    }.combine(_weeklyStreak) { arr, streak ->
         @Suppress("UNCHECKED_CAST")
         WorkoutRuntimeState(
-            todayDayKey = g1[0] as DayKey,
-            todayDateKey = g1[1] as String,
-            nowMillis = g1[2] as Long,
-            todayLog = g1[3] as WorkoutLog?,
-            workoutHistory = g1[4] as List<WorkoutLog>,
-            exerciseTimers = g2[0] as Map<String, ExerciseTimerUiState>,
-            restTimer = g2[1] as RestTimerState,
-            restIdleRemaining = g2[2] as Int,
-            restIdleTotal = g2[3] as Int,
-            restIdleExercise = g2[4] as String
+            todayDayKey = arr[0] as DayKey,
+            todayDateKey = arr[1] as String,
+            timePhase = arr[2] as DayTimePhase,
+            todayLog = arr[3] as WorkoutLog?,
+            workoutHistory = arr[4] as List<WorkoutLog>,
+            weeklyStreak = streak
         )
     }
 
@@ -322,8 +386,8 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
         combine(_showNamePrompt, _tutorialOpen, _tutorialStartWithLang, _showAboutDialog, _activeTestAlarm) { np, to, tl, ab, ta ->
             listOf(np, to, tl, ab, ta)
         },
-        combine(_cooldownUntilMs, _cooldownAlertTarget, _previewingRingtoneId, _uploadingRingtone) { cu, ca, pr, up ->
-            listOf(cu, ca, pr, up)
+        combine(_cooldownAlertTarget, _previewingRingtoneId, _uploadingRingtone) { ca, pr, up ->
+            Triple(ca, pr, up)
         },
         combine(_hasNotifPerm, _canExactAlarm, _mascotState) { hn, ce, ms ->
             Triple(hn, ce, ms)
@@ -341,10 +405,9 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
             tutorialStartWithLang = g2[2] as Boolean,
             showAboutDialog = g2[3] as Boolean,
             activeTestAlarm = g2[4] as ActiveTestAlarmState?,
-            cooldownUntilMs = g3[0] as Long,
-            cooldownAlertTarget = g3[1] as CooldownTarget?,
-            previewingRingtoneId = g3[2] as String?,
-            uploadingRingtone = g3[3] as Boolean,
+            cooldownAlertTarget = g3.first,
+            previewingRingtoneId = g3.second,
+            uploadingRingtone = g3.third,
             hasNotifPerm = g4.first,
             canExactAlarm = g4.second,
             mascot = g4.third
@@ -362,15 +425,12 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             emptyList()
         }
-        val cal = Calendar.getInstance().apply { timeInMillis = run.nowMillis }
-        val phase = GymModelHelpers.resolveDayTimePhase(shell.appPrefs.todayThemeMode, cal)
-        val cooldownRem = ((shell.cooldownUntilMs - run.nowMillis + 999L) / 1000L)
-            .toInt()
-            .coerceAtLeast(0)
 
         IronPulseUiState(
             authReady = cloud.authReady,
-            user = cloud.user,
+            userUid = cloud.user?.uid,
+            userEmail = cloud.user?.email,
+            userDisplayName = cloud.user?.displayName,
             dataLoading = cloud.dataLoading,
             historyLoading = cloud.historyLoading,
             authLoading = cloud.authLoading,
@@ -382,16 +442,11 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
             customRingtones = cloud.customRingtones,
             todayDayKey = run.todayDayKey,
             todayDateKey = run.todayDateKey,
-            nowMillis = run.nowMillis,
-            timePhase = phase,
+            timePhase = run.timePhase,
             todayLog = run.todayLog,
             effectiveTodayEntries = entries,
             workoutHistory = run.workoutHistory,
-            exerciseTimers = run.exerciseTimers,
-            restTimer = run.restTimer,
-            restIdleRemainingSeconds = run.restIdleRemaining,
-            restIdleTotalSeconds = run.restIdleTotal,
-            restIdleExerciseLabel = run.restIdleExercise,
+            weeklyStreak = run.weeklyStreak,
             appPrefs = shell.appPrefs,
             activeTab = shell.activeTab,
             focusedWorkoutExerciseId = shell.focusedExerciseId,
@@ -402,7 +457,6 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
             tutorialStartWithLang = shell.tutorialStartWithLang,
             showAboutDialog = shell.showAboutDialog,
             activeTestAlarm = shell.activeTestAlarm,
-            cooldownRemainingSeconds = cooldownRem,
             cooldownAlertTarget = shell.cooldownAlertTarget,
             previewingRingtoneId = shell.previewingRingtoneId,
             uploadingRingtone = shell.uploadingRingtone,
@@ -415,6 +469,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = IronPulseUiState(
             appPrefs = prefsStore.state.value,
+            timePhase = _timePhase.value,
             showLaunchIntro = !prefsStore.state.value.performance.noAnimations
         )
     )
@@ -475,6 +530,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
                     _customRingtones.value = emptyList()
                     _todayLog.value = null
                     _workoutHistory.value = emptyList()
+                    _weeklyStreak.value = 0
                     _dataLoading.value = false
                     _historyLoading.value = false
                     _showNamePrompt.value = false
@@ -567,6 +623,9 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
                     _historyLoading.value = false
                 }.collect { hist ->
                     _workoutHistory.value = hist
+                    _weeklyStreak.value = withContext(Dispatchers.Default) {
+                        GymModelHelpers.computeWeeklyStreak(hist)
+                    }
                     _historyLoading.value = false
                 }
             }
@@ -601,29 +660,45 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     private fun startClockAndExerciseLoop() {
         viewModelScope.launch {
             var rolloverTicks = 0
+            val cal = Calendar.getInstance()
             while (true) {
-                delay(500L)
+                val nowBeforeDelay = System.currentTimeMillis()
+                val sleepMs = (1000L - (nowBeforeDelay % 1000L)).coerceIn(120L, 1000L)
+                delay(sleepMs)
                 val now = System.currentTimeMillis()
-                _nowMillis.value = now
+                _clockSeconds.value = now / 1000L
 
-                // Check cooldown expiry notification or phase change
-                val phase = GymModelHelpers.resolveDayTimePhase(
-                    prefsStore.state.value.todayThemeMode,
-                    Calendar.getInstance().apply { timeInMillis = now }
-                )
+                // Update timePhase ONLY when resolved phase transitions (morning/afternoon/night)
+                cal.timeInMillis = now
+                val phase = GymModelHelpers.resolveDayTimePhase(prefsStore.state.value.todayThemeMode, cal)
+                if (_timePhase.value != phase) {
+                    _timePhase.value = phase
+                }
                 if (lastObservedTimePhase != phase) {
                     lastObservedTimePhase = phase
                     recentPoseIndices.clear()
-                    val hour = Calendar.getInstance().apply { timeInMillis = now }.get(Calendar.HOUR_OF_DAY)
+                    val hour = cal.get(Calendar.HOUR_OF_DAY)
                     mascotPhasePoseIdx = initialPhasePoseIndex(phase, hour)
                     pushRecentPose(mascotPhasePoseIdx)
                     updateMascotSpeech(playChirp = !_showLaunchIntro.value, speakTts = false)
                 }
 
-                // Exercise timer ticker (2x per sec loop, integer delta)
+                // Cooldown countdown updates ONLY its isolated StateFlow while active
+                val untilMs = _cooldownUntilMs.value
+                val nextCooldownSec = if (untilMs > now) {
+                    ((untilMs - now + 999L) / 1000L).toInt().coerceAtLeast(0)
+                } else {
+                    0
+                }
+                if (_cooldownSeconds.value != nextCooldownSec) {
+                    _cooldownSeconds.value = nextCooldownSec
+                }
+
+                // Exercise timer ticker (1Hz while at least one timer is running)
                 val currentTimers = _exerciseTimers.value
                 if (currentTimers.values.any { it.running }) {
                     val completedQueue = mutableListOf<Triple<String, Int, Int>>()
+                    var anyChanged = false
                     val updated = currentTimers.mapValues { (exId, st) ->
                         if (!st.running) {
                             st
@@ -632,6 +707,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
                             if (deltaSec == 0) {
                                 st
                             } else {
+                                anyChanged = true
                                 val newElapsed = st.elapsedSeconds + deltaSec
                                 if (st.direction == TimerDirection.COUNTDOWN && newElapsed >= st.targetSeconds) {
                                     completedQueue += Triple(exId, st.activeSetNumber, st.targetSeconds)
@@ -642,7 +718,9 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                     }
-                    _exerciseTimers.value = updated
+                    if (anyChanged) {
+                        _exerciseTimers.value = updated
+                    }
                     for ((exId, setNum, secs) in completedQueue) {
                         haptics.timerFinished()
                         val restTone = _profile.value?.restRingtoneId ?: "builtin_kettlebell_chime"
@@ -662,7 +740,8 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshDateClock() {
-        _nowMillis.value = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        _clockSeconds.value = now / 1000L
         val nextDate = GymModelHelpers.formatLocalDateKey()
         val nextDay = GymModelHelpers.getTodayDayKey()
         val changed = _todayDayKey.value != nextDay
@@ -782,6 +861,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
         prefsStore.setTodayThemeMode(mode)
         val cal = Calendar.getInstance()
         val nextPhase = GymModelHelpers.resolveDayTimePhase(mode, cal)
+        _timePhase.value = nextPhase
         lastObservedTimePhase = nextPhase
         mascotPhasePoseIdx = initialPhasePoseIndex(nextPhase, cal.get(Calendar.HOUR_OF_DAY))
         updateMascotSpeech(playChirp = true, speakTts = false)
@@ -944,6 +1024,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
             if (becameCompleted) {
                 if (enforceCooldown) {
                     _cooldownUntilMs.value = System.currentTimeMillis() + 30_000L
+                    _cooldownSeconds.value = 30
                 }
                 val pct = if (nextTotalCount > 0) (nextCompletedCount * 100) / nextTotalCount else 0
                 val isAllDone = nextTotalCount > 0 && nextCompletedCount == nextTotalCount
@@ -994,6 +1075,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
             }
             if (becameCompleted) {
                 _cooldownUntilMs.value = System.currentTimeMillis() + 30_000L
+                _cooldownSeconds.value = 30
                 val isAllDone = nextTotalCount > 0 && nextCompletedCount == nextTotalCount
                 val mood = if (isAllDone) MascotMood.CELEBRATE else MascotMood.CLAP
                 triggerAutoRestIfEnabled(exerciseId)
@@ -1669,7 +1751,7 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startMascotLifeLoops() {
-        // 1. Eye Blinking loop (~3.6s)
+        // 1. Eye Blinking loop (~3.6s) — isolated to _mascotEyeState so root UI never recomposes
         viewModelScope.launch {
             while (true) {
                 delay(3600L)
@@ -1679,9 +1761,9 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
                 val closedCalm = current.urgentMood == null &&
                     current.activeTimePose in CLOSED_NIGHT_POSES
                 if (!staticMode && !closedCalm) {
-                    _mascotState.value = _mascotState.value.copy(isBlinking = true)
+                    _mascotEyeState.value = _mascotEyeState.value.copy(isBlinking = true)
                     delay(135L)
-                    _mascotState.value = _mascotState.value.copy(isBlinking = false)
+                    _mascotEyeState.value = _mascotEyeState.value.copy(isBlinking = false)
                 }
             }
         }
@@ -1703,11 +1785,12 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     GLANCE_TARGETS.random()
                 }
-                _mascotState.value = _mascotState.value.copy(
-                    isDialogueLocked = lockActive,
-                    glanceX = gx,
-                    glanceY = gy
-                )
+                if (_mascotEyeState.value.glanceX != gx || _mascotEyeState.value.glanceY != gy) {
+                    _mascotEyeState.value = _mascotEyeState.value.copy(glanceX = gx, glanceY = gy)
+                }
+                if (current.isDialogueLocked != lockActive) {
+                    _mascotState.value = current.copy(isDialogueLocked = lockActive)
+                }
 
                 // Silent ambient expression shifts every ~26s during daytime
                 if (!staticMode && current.urgentMood == null && current.timePhase != DayTimePhase.NIGHT &&
@@ -1756,11 +1839,9 @@ class GymViewModel(application: Application) : AndroidViewModel(application) {
     fun tapMascot() {
         haptics.buttonTap()
         viewModelScope.launch {
-            _mascotState.value = _mascotState.value.copy(tapBounce = true)
-            launch {
-                delay(720L)
-                _mascotState.value = _mascotState.value.copy(tapBounce = false)
-            }
+            _mascotEyeState.value = _mascotEyeState.value.copy(tapBounce = true)
+            delay(720L)
+            _mascotEyeState.value = _mascotEyeState.value.copy(tapBounce = false)
         }
 
         val now = System.currentTimeMillis()

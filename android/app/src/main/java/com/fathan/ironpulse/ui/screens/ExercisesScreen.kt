@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -53,6 +54,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +83,7 @@ import com.fathan.ironpulse.model.GymModelHelpers
 import com.fathan.ironpulse.model.MuscleGroup
 import com.fathan.ironpulse.model.TimerDirection
 import com.fathan.ironpulse.ui.components.ConfirmDeleteDialog
+import com.fathan.ironpulse.ui.components.tactilePress
 import com.fathan.ironpulse.ui.theme.LocalIronPulseTokens
 import com.fathan.ironpulse.ui.theme.ironGlassSurface
 import com.fathan.ironpulse.ui.viewmodel.GymViewModel
@@ -91,10 +94,12 @@ import java.util.Locale
 @Composable
 fun ExercisesScreen(
     state: IronPulseUiState,
-    viewModel: GymViewModel
+    viewModel: GymViewModel,
+    contentPadding: PaddingValues
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
+    val noAnim = tokens.performance.noAnimations
     val selectedDay = state.selectedExerciseDayKey
     val schedule = state.schedules[selectedDay]
     val exercises = schedule?.exercises ?: emptyList()
@@ -105,8 +110,14 @@ fun ExercisesScreen(
     var pendingDeleteExercise by remember { mutableStateOf<ExerciseItem?>(null) }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = contentPadding.calculateTopPadding() + 12.dp,
+            bottom = contentPadding.calculateBottomPadding() + 92.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize()
     ) {
         // Header Card
         item {
@@ -155,7 +166,10 @@ fun ExercisesScreen(
                             containerColor = tokens.accentColor,
                             contentColor = tokens.onAccentColor
                         ),
-                        modifier = Modifier.weight(1f).height(44.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .tactilePress(disabledByPerf = noAnim),
                         contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
                         Icon(Icons.Rounded.LibraryAdd, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -171,7 +185,10 @@ fun ExercisesScreen(
                         onClick = { showCreateCustomModal = true },
                         shape = RoundedCornerShape(tokens.buttonRadius),
                         border = BorderStroke(1.dp, tokens.surfaceBorderColor),
-                        modifier = Modifier.weight(1f).height(44.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .tactilePress(disabledByPerf = noAnim),
                         contentPadding = PaddingValues(horizontal = 12.dp)
                     ) {
                         Icon(Icons.Rounded.Add, contentDescription = null, tint = tokens.accentColor, modifier = Modifier.size(18.dp))
@@ -201,7 +218,7 @@ fun ExercisesScreen(
                     Surface(
                         onClick = { viewModel.setSelectedExerciseDay(day) },
                         shape = RoundedCornerShape(tokens.buttonRadius),
-                        color = if (isSelected) tokens.accentColor else tokens.palette.surfaceContainerLow,
+                        color = if (isSelected) tokens.accentColor else tokens.controlBg,
                         border = BorderStroke(
                             1.dp,
                             when {
@@ -209,7 +226,8 @@ fun ExercisesScreen(
                                 isToday -> tokens.accentColor.copy(alpha = 0.45f)
                                 else -> tokens.surfaceBorderColor
                             }
-                        )
+                        ),
+                        modifier = Modifier.tactilePress(pressedScale = 0.94f, disabledByPerf = noAnim)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
@@ -227,7 +245,7 @@ fun ExercisesScreen(
                                     .clip(RoundedCornerShape(999.dp))
                                     .background(
                                         if (isSelected) tokens.onAccentColor.copy(alpha = 0.18f)
-                                        else Color.White.copy(alpha = 0.08f)
+                                        else tokens.subtleChipBg
                                     )
                                     .padding(horizontal = 6.dp, vertical = 1.dp)
                             ) {
@@ -236,7 +254,7 @@ fun ExercisesScreen(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) tokens.onAccentColor else tokens.palette.onSurfaceVariant
+                                    color = if (isSelected) tokens.onAccentColor else tokens.mutedTextColor
                                 )
                             }
                         }
@@ -363,7 +381,8 @@ fun ExercisesScreen(
                     onMoveUp = { viewModel.moveExerciseInDay(selectedDay, ex.id, moveUp = true) },
                     onMoveDown = { viewModel.moveExerciseInDay(selectedDay, ex.id, moveUp = false) },
                     onEdit = { editingExercise = ex },
-                    onDelete = { pendingDeleteExercise = ex }
+                    onDelete = { pendingDeleteExercise = ex },
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -434,13 +453,14 @@ private fun ScheduledExerciseManageCard(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val tokens = LocalIronPulseTokens.current
     val isTimer = exercise.trackingMode == ExerciseTrackingMode.TIMER
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .ironGlassSurface(tokens)
             .padding(14.dp),
@@ -633,8 +653,8 @@ private fun MetricMiniBox(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.White.copy(alpha = 0.04f))
-            .border(1.dp, Color.White.copy(alpha = 0.07f), RoundedCornerShape(10.dp))
+            .background(tokens.wellBg)
+            .border(1.dp, tokens.subtleBorderColor, RoundedCornerShape(10.dp))
             .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
         Text(
@@ -642,7 +662,7 @@ private fun MetricMiniBox(
             fontSize = 9.5.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 0.6.sp,
-            color = tokens.palette.onSurfaceVariant
+            color = tokens.mutedTextColor
         )
         Text(
             text = value,
@@ -673,17 +693,19 @@ private fun ExerciseLibraryModal(
     var multiSelectMode by remember { mutableStateOf(true) }
     val selectedNames = remember { mutableStateListOf<String>() }
 
-    val filtered = remember(query, selectedMuscle, selectedBucket) {
-        val q = query.trim().lowercase(Locale.ROOT)
-        GymPresets.EXERCISE_LIBRARY.filter { item ->
-            val matchMuscle = selectedMuscle == null || item.muscleGroup == selectedMuscle
-            val matchBucket = selectedBucket.matches(item.equipment)
-            val matchQuery = q.isEmpty() ||
-                item.name.lowercase(Locale.ROOT).contains(q) ||
-                item.equipment.lowercase(Locale.ROOT).contains(q) ||
-                item.muscleGroup.label(lang).lowercase(Locale.ROOT).contains(q) ||
-                item.notes.lowercase(Locale.ROOT).contains(q)
-            matchMuscle && matchBucket && matchQuery
+    val filtered by remember(lang) {
+        derivedStateOf {
+            val q = query.trim().lowercase(Locale.ROOT)
+            GymPresets.EXERCISE_LIBRARY.filter { item ->
+                val matchMuscle = selectedMuscle == null || item.muscleGroup == selectedMuscle
+                val matchBucket = selectedBucket.matches(item.equipment)
+                val matchQuery = q.isEmpty() ||
+                    item.name.lowercase(Locale.ROOT).contains(q) ||
+                    item.equipment.lowercase(Locale.ROOT).contains(q) ||
+                    item.muscleGroup.label(lang).lowercase(Locale.ROOT).contains(q) ||
+                    item.notes.lowercase(Locale.ROOT).contains(q)
+                matchMuscle && matchBucket && matchQuery
+            }
         }
     }
 
@@ -782,7 +804,7 @@ private fun ExerciseLibraryModal(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color.White.copy(alpha = 0.04f))
+                    .background(tokens.wellBg)
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -974,14 +996,15 @@ private fun FilterPill(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(999.dp),
-        color = if (selected) tokens.accentColor.copy(alpha = 0.18f) else tokens.palette.surfaceContainerLow,
-        border = BorderStroke(1.dp, if (selected) tokens.accentColor else tokens.surfaceBorderColor)
+        color = if (selected) tokens.accentColor.copy(alpha = 0.18f) else tokens.controlBg,
+        border = BorderStroke(1.dp, if (selected) tokens.accentColor else tokens.surfaceBorderColor),
+        modifier = Modifier.tactilePress(pressedScale = 0.94f, disabledByPerf = tokens.performance.noAnimations)
     ) {
         Text(
             text = label,
             fontSize = 11.5.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-            color = if (selected) tokens.accentColor else tokens.palette.onSurfaceVariant,
+            color = if (selected) tokens.accentColor else tokens.mutedTextColor,
             modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
         )
     }

@@ -17,6 +17,8 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -99,6 +101,11 @@ data class IronPulseThemeTokens(
     val onAccentColor: Color,
     val effectiveTintColor: Color,
     val canvasBg: Color,
+    val wellBg: Color,
+    val controlBg: Color,
+    val subtleChipBg: Color,
+    val mutedTextColor: Color,
+    val cardTopHighlight: Color,
     val surfaceBorderColor: Color,
     val subtleBorderColor: Color,
     val cardRadius: Dp,
@@ -124,6 +131,11 @@ val LocalIronPulseTokens = staticCompositionLocalOf {
         onAccentColor = DefaultPalette.onPrimary,
         effectiveTintColor = MaterialYouColorEngine.parseColor("#1C1B22"),
         canvasBg = DefaultPalette.surface,
+        wellBg = DefaultPalette.surfaceContainerLowest,
+        controlBg = DefaultPalette.surfaceContainerHigh,
+        subtleChipBg = DefaultPalette.surfaceContainerHigh,
+        mutedTextColor = DefaultPalette.onSurfaceVariant,
+        cardTopHighlight = Color.White.copy(alpha = 0.06f),
         surfaceBorderColor = DefaultPalette.outlineVariant,
         subtleBorderColor = DefaultPalette.outlineVariant.copy(alpha = 0.7f),
         cardRadius = 24.dp,
@@ -147,6 +159,7 @@ fun Modifier.ironGlassSurface(
     val shape = RoundedCornerShape(radius)
     val tint = tokens.effectiveTintColor
     val borderColor = borderOverride ?: if (subtle) tokens.subtleBorderColor else tokens.surfaceBorderColor
+    val noBlur = tokens.performance.noBlur
 
     return when (tokens.uiTheme) {
         UiTheme.MATERIAL_YOU -> {
@@ -160,86 +173,137 @@ fun Modifier.ironGlassSurface(
             val bg = if (subtle) Color(0xFF242424) else Color(0xFF2C2C2C)
             this
                 .clip(shape)
-                .background(bg, shape)
+                .drawWithCache {
+                    val strokePx = 1.dp.toPx()
+                    val bevelColor = Color.White.copy(alpha = 0.06f)
+                    onDrawBehind {
+                        drawRect(bg)
+                        drawLine(
+                            color = bevelColor,
+                            start = Offset(0f, strokePx * 0.5f),
+                            end = Offset(size.width, strokePx * 0.5f),
+                            strokeWidth = strokePx
+                        )
+                    }
+                }
                 .border(1.dp, borderColor, shape)
         }
         UiTheme.CARBON_FORGE -> {
-            val baseBg = tint.copy(alpha = if (subtle) 0.90f else 0.95f)
+            val baseBg = tint.copy(alpha = if (subtle) 0.92f else 0.97f)
             this
                 .clip(shape)
-                .background(baseBg, shape)
                 .drawWithCache {
                     val step = 6.dp.toPx()
-                    val highlight = Color.White.copy(alpha = 0.035f)
-                    val shadow = Color.Black.copy(alpha = 0.25f)
+                    val strokePx = 1.dp.toPx()
+                    val highlight = Color.White.copy(alpha = 0.036f)
+                    val shadow = Color.Black.copy(alpha = 0.26f)
+                    val rimColor = Color.White.copy(alpha = 0.08f)
+                    val highlightPath = Path()
+                    val shadowPath = Path()
+                    var x = -size.height
+                    while (x < size.width + size.height) {
+                        highlightPath.moveTo(x, 0f)
+                        highlightPath.lineTo(x + size.height, size.height)
+                        shadowPath.moveTo(x + step * 0.5f, size.height)
+                        shadowPath.lineTo(x + step * 0.5f + size.height, 0f)
+                        x += step
+                    }
+                    val weaveStroke = Stroke(width = strokePx)
                     onDrawBehind {
-                        var x = -size.height
-                        while (x < size.width + size.height) {
-                            drawLine(
-                                color = highlight,
-                                start = Offset(x, 0f),
-                                end = Offset(x + size.height, size.height),
-                                strokeWidth = 1.dp.toPx()
-                            )
-                            drawLine(
-                                color = shadow,
-                                start = Offset(x + step * 0.5f, size.height),
-                                end = Offset(x + step * 0.5f + size.height, 0f),
-                                strokeWidth = 1.dp.toPx()
-                            )
-                            x += step
-                        }
+                        drawRect(baseBg)
+                        drawPath(highlightPath, color = highlight, style = weaveStroke)
+                        drawPath(shadowPath, color = shadow, style = weaveStroke)
+                        drawLine(
+                            color = rimColor,
+                            start = Offset(0f, strokePx * 0.5f),
+                            end = Offset(size.width, strokePx * 0.5f),
+                            strokeWidth = strokePx
+                        )
                     }
                 }
                 .border(1.dp, borderColor, shape)
         }
         UiTheme.MIDNIGHT_FROSTED -> {
-            val topAlpha = if (subtle) 0.10f else 0.14f
-            val botAlpha = if (subtle) 0.58f else 0.68f
+            val topAlpha = if (noBlur) 0.07f else if (subtle) 0.11f else 0.16f
+            val botAlpha = if (noBlur) 0.86f else if (subtle) 0.56f else 0.68f
+            val rimAlpha = if (subtle) 0.16f else 0.25f
             this
                 .clip(shape)
-                .background(
-                    brush = Brush.linearGradient(
+                .drawWithCache {
+                    val strokePx = 1.dp.toPx()
+                    val brush = Brush.linearGradient(
                         colors = listOf(
                             Color.White.copy(alpha = topAlpha),
                             tint.copy(alpha = botAlpha)
                         ),
                         start = Offset.Zero,
-                        end = Offset(900f, 900f)
-                    ),
-                    shape = shape
-                )
+                        end = Offset(size.width.coerceAtLeast(300f), size.height.coerceAtLeast(300f))
+                    )
+                    val rim = Color.White.copy(alpha = rimAlpha)
+                    onDrawBehind {
+                        drawRect(brush)
+                        drawLine(
+                            color = rim,
+                            start = Offset(0f, strokePx * 0.5f),
+                            end = Offset(size.width, strokePx * 0.5f),
+                            strokeWidth = strokePx
+                        )
+                    }
+                }
                 .border(1.dp, borderColor, shape)
         }
         UiTheme.AEROGLASS -> {
-            val baseAlpha = if (subtle) 0.48f else 0.60f
+            val baseAlpha = if (noBlur) 0.84f else if (subtle) 0.52f else 0.64f
+            val topSheen = if (subtle) 0.18f else 0.27f
             this
                 .clip(shape)
-                .background(tint.copy(alpha = baseAlpha), shape)
-                .background(
-                    brush = Brush.verticalGradient(
-                        0.0f to Color.White.copy(alpha = if (subtle) 0.18f else 0.26f),
-                        0.46f to Color.White.copy(alpha = 0.07f),
-                        0.48f to Color(0xFF0EA5E9).copy(alpha = 0.04f),
-                        1.0f to Color(0xFF38BDF8).copy(alpha = 0.11f)
-                    ),
-                    shape = shape
-                )
+                .drawWithCache {
+                    val strokePx = 1.dp.toPx()
+                    val sheen = Brush.verticalGradient(
+                        0.0f to Color.White.copy(alpha = topSheen),
+                        0.455f to Color.White.copy(alpha = 0.07f),
+                        0.475f to Color(0xFF0EA5E9).copy(alpha = 0.03f),
+                        1.0f to Color(0xFF38BDF8).copy(alpha = 0.13f)
+                    )
+                    val base = tint.copy(alpha = baseAlpha)
+                    val topRim = Color.White.copy(alpha = 0.36f)
+                    onDrawBehind {
+                        drawRect(base)
+                        drawRect(sheen)
+                        drawLine(
+                            color = topRim,
+                            start = Offset(0f, strokePx * 0.5f),
+                            end = Offset(size.width, strokePx * 0.5f),
+                            strokeWidth = strokePx
+                        )
+                    }
+                }
                 .border(1.dp, borderColor, shape)
         }
         UiTheme.OBSIDIAN -> {
-            val alpha = if (subtle) 0.72f else 0.84f
+            val alpha = if (noBlur) 0.94f else if (subtle) 0.74f else 0.86f
             this
                 .clip(shape)
-                .background(
-                    brush = Brush.verticalGradient(
+                .drawWithCache {
+                    val strokePx = 1.dp.toPx()
+                    val brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color.White.copy(alpha = if (subtle) 0.03f else 0.05f),
+                            Color.White.copy(alpha = if (subtle) 0.035f else 0.06f),
                             tint.copy(alpha = alpha)
                         )
-                    ),
-                    shape = shape
-                )
+                    )
+                    val rim = Color.White.copy(alpha = if (subtle) 0.07f else 0.11f)
+                    onDrawBehind {
+                        drawRect(tint.copy(alpha = alpha))
+                        drawRect(brush)
+                        drawLine(
+                            color = rim,
+                            start = Offset(0f, strokePx * 0.5f),
+                            end = Offset(size.width, strokePx * 0.5f),
+                            strokeWidth = strokePx
+                        )
+                    }
+                }
                 .border(1.dp, borderColor, shape)
         }
     }
@@ -247,38 +311,68 @@ fun Modifier.ironGlassSurface(
 
 fun Modifier.ironGlassBar(
     tokens: IronPulseThemeTokens,
-    shapeRadius: Dp = 0.dp
+    shapeRadius: Dp = 0.dp,
+    topHairlineColor: Color? = null,
+    bottomHairlineColor: Color? = null
 ): Modifier {
     val shape = RoundedCornerShape(shapeRadius)
     val tint = tokens.effectiveTintColor
-    val bgModifier = when (tokens.uiTheme) {
-        UiTheme.MATERIAL_YOU -> Modifier.background(tokens.palette.surfaceContainerLow, shape)
-        UiTheme.UBUNTU_YARU -> Modifier.background(Color(0xFF262626), shape)
-        UiTheme.CARBON_FORGE -> Modifier.background(tint.copy(alpha = 0.96f), shape)
-        UiTheme.MIDNIGHT_FROSTED -> Modifier.background(
-            Brush.verticalGradient(
-                colors = listOf(
-                    tint.copy(alpha = 0.88f),
-                    tint.copy(alpha = 0.78f)
-                )
-            ),
-            shape
-        )
-        UiTheme.AEROGLASS -> Modifier
-            .background(tint.copy(alpha = 0.76f), shape)
-            .background(
-                Brush.verticalGradient(
-                    0.0f to Color.White.copy(alpha = 0.16f),
-                    0.5f to Color.White.copy(alpha = 0.04f),
-                    1.0f to Color(0xFF0EA5E9).copy(alpha = 0.09f)
-                ),
-                shape
-            )
-        UiTheme.OBSIDIAN -> Modifier.background(tint.copy(alpha = 0.90f), shape)
-    }
+    val noBlur = tokens.performance.noBlur
+
     return this
         .clip(shape)
-        .then(bgModifier)
+        .drawWithCache {
+            val strokePx = 1.dp.toPx()
+            val brush = when (tokens.uiTheme) {
+                UiTheme.MATERIAL_YOU -> null
+                UiTheme.UBUNTU_YARU -> null
+                UiTheme.CARBON_FORGE -> null
+                UiTheme.MIDNIGHT_FROSTED -> Brush.verticalGradient(
+                    colors = listOf(
+                        tint.copy(alpha = if (noBlur) 0.96f else 0.86f),
+                        tint.copy(alpha = if (noBlur) 0.92f else 0.76f)
+                    )
+                )
+                UiTheme.AEROGLASS -> Brush.verticalGradient(
+                    0.0f to Color.White.copy(alpha = 0.16f),
+                    0.48f to Color.White.copy(alpha = 0.04f),
+                    1.0f to Color(0xFF0EA5E9).copy(alpha = 0.10f)
+                )
+                UiTheme.OBSIDIAN -> null
+            }
+            val solidBg = when (tokens.uiTheme) {
+                UiTheme.MATERIAL_YOU -> tokens.palette.surfaceContainerLow.copy(alpha = if (noBlur) 1f else 0.94f)
+                UiTheme.UBUNTU_YARU -> Color(0xFF262626)
+                UiTheme.CARBON_FORGE -> tint.copy(alpha = 0.97f)
+                UiTheme.AEROGLASS -> tint.copy(alpha = if (noBlur) 0.94f else 0.78f)
+                UiTheme.OBSIDIAN -> tint.copy(alpha = if (noBlur) 0.97f else 0.91f)
+                UiTheme.MIDNIGHT_FROSTED -> Color.Transparent
+            }
+            onDrawBehind {
+                if (solidBg != Color.Transparent) {
+                    drawRect(solidBg)
+                }
+                if (brush != null) {
+                    drawRect(brush)
+                }
+                if (topHairlineColor != null) {
+                    drawLine(
+                        color = topHairlineColor,
+                        start = Offset(0f, strokePx * 0.5f),
+                        end = Offset(size.width, strokePx * 0.5f),
+                        strokeWidth = strokePx
+                    )
+                }
+                if (bottomHairlineColor != null) {
+                    drawLine(
+                        color = bottomHairlineColor,
+                        start = Offset(0f, size.height - strokePx * 0.5f),
+                        end = Offset(size.width, size.height - strokePx * 0.5f),
+                        strokeWidth = strokePx
+                    )
+                }
+            }
+        }
 }
 
 private val IronPulseTypography = Typography(
@@ -412,6 +506,44 @@ fun IronPulseTheme(
             UiTheme.UBUNTU_YARU -> 10.dp
             else -> 12.dp
         }
+        val wellBg = when (uiTheme) {
+            UiTheme.MATERIAL_YOU -> palette.surfaceContainerLowest
+            UiTheme.UBUNTU_YARU -> Color(0xFF242424)
+            UiTheme.CARBON_FORGE -> Color(0xFF090B0E)
+            UiTheme.MIDNIGHT_FROSTED -> Color(0x88080D18)
+            UiTheme.AEROGLASS -> Color(0x780B1C2E)
+            UiTheme.OBSIDIAN -> Color(0xFF0C0E13)
+        }
+        val controlBg = when (uiTheme) {
+            UiTheme.MATERIAL_YOU -> palette.surfaceContainerHigh
+            UiTheme.UBUNTU_YARU -> Color(0xFF353535)
+            UiTheme.CARBON_FORGE -> Color(0xFF161A22)
+            UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.09f)
+            UiTheme.AEROGLASS -> Color(0x2E38BDF8)
+            UiTheme.OBSIDIAN -> Color(0xFF171B24)
+        }
+        val subtleChipBg = when (uiTheme) {
+            UiTheme.MATERIAL_YOU -> palette.surfaceContainerHigh.copy(alpha = 0.75f)
+            UiTheme.UBUNTU_YARU -> Color(0xFF303030)
+            UiTheme.CARBON_FORGE -> Color(0xFF131720)
+            UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.07f)
+            UiTheme.AEROGLASS -> Color(0x227DD3FC)
+            UiTheme.OBSIDIAN -> Color(0xFF141821)
+        }
+        val mutedTextColor = when (uiTheme) {
+            UiTheme.UBUNTU_YARU -> Color(0xFFB5B4B0)
+            UiTheme.MIDNIGHT_FROSTED -> Color(0xFFB8C4DC)
+            UiTheme.AEROGLASS -> Color(0xFFBAD2E8)
+            else -> palette.onSurfaceVariant
+        }
+        val cardTopHighlight = when (uiTheme) {
+            UiTheme.AEROGLASS -> Color.White.copy(alpha = 0.36f)
+            UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.25f)
+            UiTheme.OBSIDIAN -> Color.White.copy(alpha = 0.11f)
+            UiTheme.CARBON_FORGE -> Color.White.copy(alpha = 0.08f)
+            UiTheme.UBUNTU_YARU -> Color.White.copy(alpha = 0.06f)
+            UiTheme.MATERIAL_YOU -> Color.White.copy(alpha = 0.06f)
+        }
         IronPulseThemeTokens(
             uiTheme = uiTheme,
             palette = palette,
@@ -419,6 +551,11 @@ fun IronPulseTheme(
             onAccentColor = palette.onPrimary,
             effectiveTintColor = MaterialYouColorEngine.parseColor(effectiveTintHex, Color(0xFF161A23)),
             canvasBg = canvasBg,
+            wellBg = wellBg,
+            controlBg = controlBg,
+            subtleChipBg = subtleChipBg,
+            mutedTextColor = mutedTextColor,
+            cardTopHighlight = cardTopHighlight,
             surfaceBorderColor = borderColor,
             subtleBorderColor = subtleBorder,
             cardRadius = cardRadius,

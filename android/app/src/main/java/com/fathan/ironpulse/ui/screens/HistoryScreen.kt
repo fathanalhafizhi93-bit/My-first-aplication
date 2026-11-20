@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -58,6 +59,7 @@ import com.fathan.ironpulse.model.DayKey
 import com.fathan.ironpulse.model.ExerciseTrackingMode
 import com.fathan.ironpulse.model.GymModelHelpers
 import com.fathan.ironpulse.model.WorkoutLog
+import com.fathan.ironpulse.ui.components.tactilePress
 import com.fathan.ironpulse.ui.theme.LocalIronPulseTokens
 import com.fathan.ironpulse.ui.theme.ironGlassSurface
 import com.fathan.ironpulse.ui.viewmodel.IronPulseUiState
@@ -75,10 +77,12 @@ private data class CalendarDayCell(
 @Composable
 fun HistoryScreen(
     state: IronPulseUiState,
+    contentPadding: PaddingValues,
     onStartTodayWorkout: () -> Unit
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
+    val noAnim = tokens.performance.noAnimations
     val todayCal = remember(state.todayDateKey) { Calendar.getInstance() }
     val currentYear = todayCal.get(Calendar.YEAR)
     val currentMonth = todayCal.get(Calendar.MONTH)
@@ -100,9 +104,7 @@ fun HistoryScreen(
             log.completed || log.entries.any { entry -> entry.sets.any { it.completed } }
         }
     }
-    val weeklyStreak = remember(state.workoutHistory) {
-        GymModelHelpers.computeWeeklyStreak(state.workoutHistory)
-    }
+    val weeklyStreak = state.weeklyStreak
     val monthlyVolumeKg = remember(state.workoutHistory, monthPrefix) {
         state.workoutHistory
             .filter { it.dateKey.startsWith(monthPrefix) }
@@ -138,8 +140,14 @@ fun HistoryScreen(
     val isViewingCurrentMonth = viewYear == currentYear && viewMonth == currentMonth
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 104.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = contentPadding.calculateTopPadding() + 12.dp,
+            bottom = contentPadding.calculateBottomPadding() + 92.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize()
     ) {
         // Header Card
         item {
@@ -240,14 +248,17 @@ fun HistoryScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = {
-                            if (viewMonth == 0) {
-                                viewMonth = 11
-                                viewYear -= 1
-                            } else {
-                                viewMonth -= 1
-                            }
-                        }) {
+                        IconButton(
+                            onClick = {
+                                if (viewMonth == 0) {
+                                    viewMonth = 11
+                                    viewYear -= 1
+                                } else {
+                                    viewMonth -= 1
+                                }
+                            },
+                            modifier = Modifier.tactilePress(disabledByPerf = noAnim)
+                        ) {
                             Icon(Icons.Rounded.ChevronLeft, contentDescription = "Prev", tint = tokens.palette.onSurface)
                         }
 
@@ -265,6 +276,7 @@ fun HistoryScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = tokens.accentColor,
                                     modifier = Modifier
+                                        .tactilePress(disabledByPerf = noAnim)
                                         .clip(RoundedCornerShape(999.dp))
                                         .clickable {
                                             viewYear = currentYear
@@ -276,14 +288,17 @@ fun HistoryScreen(
                             }
                         }
 
-                        IconButton(onClick = {
-                            if (viewMonth == 11) {
-                                viewMonth = 0
-                                viewYear += 1
-                            } else {
-                                viewMonth += 1
-                            }
-                        }) {
+                        IconButton(
+                            onClick = {
+                                if (viewMonth == 11) {
+                                    viewMonth = 0
+                                    viewYear += 1
+                                } else {
+                                    viewMonth += 1
+                                }
+                            },
+                            modifier = Modifier.tactilePress(disabledByPerf = noAnim)
+                        ) {
                             Icon(Icons.Rounded.ChevronRight, contentDescription = "Next", tint = tokens.palette.onSurface)
                         }
                     }
@@ -325,21 +340,22 @@ fun HistoryScreen(
                                         val bg = when {
                                             isFull -> tokens.accentColor.copy(alpha = 0.20f)
                                             isPartial -> Color(0x2838BDF8)
-                                            isToday -> Color.White.copy(alpha = 0.08f)
-                                            else -> Color.White.copy(alpha = 0.025f)
+                                            isToday -> tokens.subtleChipBg
+                                            else -> tokens.wellBg
                                         }
                                         val border = when {
                                             isSelected -> tokens.accentColor
                                             isToday -> Color.White.copy(alpha = 0.45f)
                                             isFull -> tokens.accentColor.copy(alpha = 0.45f)
                                             isPartial -> Color(0x6638BDF8)
-                                            else -> Color.White.copy(alpha = 0.06f)
+                                            else -> tokens.subtleBorderColor
                                         }
 
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .aspectRatio(1f)
+                                                .tactilePress(pressedScale = 0.90f, disabledByPerf = noAnim)
                                                 .clip(RoundedCornerShape(10.dp))
                                                 .background(bg)
                                                 .border(if (isSelected) 2.dp else 1.dp, border, RoundedCornerShape(10.dp))
@@ -664,8 +680,8 @@ private fun SessionStatPill(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.White.copy(alpha = 0.05f))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+            .background(tokens.wellBg)
+            .border(1.dp, tokens.subtleBorderColor, RoundedCornerShape(10.dp))
             .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)

@@ -1,9 +1,14 @@
 package com.fathan.ironpulse.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -13,19 +18,21 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -42,13 +49,11 @@ import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -76,6 +82,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fathan.ironpulse.model.AppLanguage
 import com.fathan.ironpulse.model.ClockFormat
 import com.fathan.ironpulse.model.DayTimePhase
@@ -85,58 +92,78 @@ import com.fathan.ironpulse.ui.theme.LocalIronPulseTokens
 import com.fathan.ironpulse.ui.theme.ironGlassBar
 import com.fathan.ironpulse.ui.theme.ironGlassSurface
 import com.fathan.ironpulse.ui.viewmodel.AppTab
+import com.fathan.ironpulse.ui.viewmodel.RestTimerDisplayState
+import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+private val clock24Sdf = object : ThreadLocal<SimpleDateFormat>() {
+    override fun initialValue(): SimpleDateFormat = SimpleDateFormat("HH:mm", Locale.US)
+}
+private val clock12Sdf = object : ThreadLocal<SimpleDateFormat>() {
+    override fun initialValue(): SimpleDateFormat = SimpleDateFormat("h:mm", Locale.US)
+}
+private val secSdf = object : ThreadLocal<SimpleDateFormat>() {
+    override fun initialValue(): SimpleDateFormat = SimpleDateFormat("ss", Locale.US)
+}
 
 @Composable
 fun AmbientPhaseBackdrop(modifier: Modifier = Modifier) {
     val tokens = LocalIronPulseTokens.current
     val suppressGlow = tokens.performance.noAmbientGlow ||
         tokens.uiTheme == UiTheme.CARBON_FORGE ||
-        tokens.uiTheme == UiTheme.UBUNTU_YARU ||
-        tokens.uiTheme == UiTheme.MATERIAL_YOU
+        tokens.uiTheme == UiTheme.UBUNTU_YARU
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(tokens.canvasBg)
-    ) {
-        if (!suppressGlow) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                if (tokens.uiTheme == UiTheme.AEROGLASS) Color(0x2E38BDF8) else tokens.phaseTokens.glowPrimary,
-                                Color.Transparent
-                            ),
-                            center = Offset(780f, 120f),
-                            radius = 780f
-                        )
+            .drawWithCache {
+                val canvasColor = tokens.canvasBg
+                val topGlow = when {
+                    suppressGlow -> null
+                    tokens.uiTheme == UiTheme.MATERIAL_YOU -> Brush.radialGradient(
+                        colors = listOf(tokens.accentColor.copy(alpha = 0.08f), Color.Transparent),
+                        center = Offset(size.width * 0.5f, 0f),
+                        radius = size.width.coerceAtLeast(600f) * 0.95f
                     )
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                if (tokens.uiTheme == UiTheme.MIDNIGHT_FROSTED) {
-                                    tokens.accentColor.copy(alpha = 0.12f)
-                                } else {
-                                    tokens.phaseTokens.glowSecondary
-                                },
-                                Color.Transparent
-                            ),
-                            center = Offset(120f, 1100f),
-                            radius = 760f
-                        )
+                    tokens.uiTheme == UiTheme.AEROGLASS -> Brush.radialGradient(
+                        colors = listOf(Color(0x3638BDF8), Color.Transparent),
+                        center = Offset(size.width * 0.85f, size.height * 0.08f),
+                        radius = size.width.coerceAtLeast(500f) * 0.95f
                     )
-            )
-        }
-    }
+                    else -> Brush.radialGradient(
+                        colors = listOf(tokens.phaseTokens.glowPrimary, Color.Transparent),
+                        center = Offset(size.width * 0.84f, size.height * 0.08f),
+                        radius = size.width.coerceAtLeast(500f) * 0.9f
+                    )
+                }
+                val bottomGlow = when {
+                    suppressGlow || tokens.uiTheme == UiTheme.MATERIAL_YOU -> null
+                    tokens.uiTheme == UiTheme.MIDNIGHT_FROSTED -> Brush.radialGradient(
+                        colors = listOf(tokens.accentColor.copy(alpha = 0.13f), Color.Transparent),
+                        center = Offset(size.width * 0.14f, size.height * 0.78f),
+                        radius = size.width.coerceAtLeast(450f) * 0.88f
+                    )
+                    tokens.uiTheme == UiTheme.AEROGLASS -> Brush.radialGradient(
+                        colors = listOf(Color(0x220284C7), Color.Transparent),
+                        center = Offset(size.width * 0.12f, size.height * 0.82f),
+                        radius = size.width.coerceAtLeast(450f) * 0.85f
+                    )
+                    else -> Brush.radialGradient(
+                        colors = listOf(tokens.phaseTokens.glowSecondary, Color.Transparent),
+                        center = Offset(size.width * 0.12f, size.height * 0.82f),
+                        radius = size.width.coerceAtLeast(450f) * 0.85f
+                    )
+                }
+                onDrawBehind {
+                    drawRect(canvasColor)
+                    if (topGlow != null) drawRect(topGlow)
+                    if (bottomGlow != null) drawRect(bottomGlow)
+                }
+            }
+    )
 }
 
 @Composable
@@ -153,7 +180,6 @@ fun IronPulseTopBar(
     val isMaterialYou = tokens.uiTheme == UiTheme.MATERIAL_YOU
     val isFrosted = tokens.uiTheme == UiTheme.MIDNIGHT_FROSTED
     val isAero = tokens.uiTheme == UiTheme.AEROGLASS
-    val isCarbon = tokens.uiTheme == UiTheme.CARBON_FORGE
     val iconShape = RoundedCornerShape(
         when {
             isFrosted || isMaterialYou -> 999.dp
@@ -162,36 +188,51 @@ fun IronPulseTopBar(
         }
     )
     val headerBorder = when (tokens.uiTheme) {
-        UiTheme.AEROGLASS -> Color(0x4D7DD3FC)
+        UiTheme.AEROGLASS -> Color(0x527DD3FC)
         UiTheme.MATERIAL_YOU -> tokens.palette.outlineVariant
-        UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.16f)
+        UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.18f)
         UiTheme.CARBON_FORGE, UiTheme.UBUNTU_YARU -> Color.White.copy(alpha = 0.11f)
         UiTheme.OBSIDIAN -> tokens.phaseTokens.headerBorder
     }
 
     val settingsActive = activeTab == AppTab.SETTINGS && !aboutOpen
+    val metallicIronBrush = remember {
+        Brush.verticalGradient(
+            colors = listOf(Color(0xFFFFFFFF), Color(0xFFB5BDC9))
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .ironGlassBar(tokens)
+            .ironGlassBar(tokens = tokens, bottomHairlineColor = headerBorder)
             .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(62.dp)
+                .height(60.dp)
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Dual-tone brand wordmark
+            // Dual-tone brand wordmark: Metallic gradient "Iron" + glowing accent "Pulse"
             Text(
                 text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = Color(0xFFF4F5F7), fontWeight = FontWeight.ExtraBold)) {
+                    withStyle(
+                        SpanStyle(
+                            brush = metallicIronBrush,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    ) {
                         append("Iron")
                     }
-                    withStyle(SpanStyle(color = tokens.accentColor, fontWeight = FontWeight.ExtraBold)) {
+                    withStyle(
+                        SpanStyle(
+                            color = tokens.accentColor,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    ) {
                         append("Pulse")
                     }
                 },
@@ -199,6 +240,7 @@ fun IronPulseTopBar(
                 letterSpacing = (-0.6).sp,
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
+                    .tactilePress(disabledByPerf = tokens.performance.noAnimations)
                     .clickable(onClick = onLogoClick)
                     .padding(vertical = 4.dp, horizontal = 2.dp)
             )
@@ -221,26 +263,41 @@ fun IronPulseTopBar(
                     shape = iconShape,
                     onClick = onOpenAbout
                 )
-                Button(
-                    onClick = onTestAlarm,
-                    shape = RoundedCornerShape(tokens.buttonRadius),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = tokens.accentColor,
-                        contentColor = tokens.onAccentColor
-                    ),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                    modifier = Modifier.height(40.dp)
+
+                val ctaShape = RoundedCornerShape(tokens.buttonRadius)
+                Box(
+                    modifier = Modifier
+                        .height(38.dp)
+                        .tactilePress(disabledByPerf = tokens.performance.noAnimations)
+                        .clip(ctaShape)
+                        .background(tokens.accentColor, ctaShape)
+                        .then(
+                            if (isAero) {
+                                Modifier.background(
+                                    Brush.verticalGradient(
+                                        0.0f to Color.White.copy(alpha = 0.34f),
+                                        0.48f to Color.White.copy(alpha = 0.08f),
+                                        0.50f to Color.Transparent,
+                                        1.0f to Color.Black.copy(alpha = 0.14f)
+                                    ),
+                                    ctaShape
+                                )
+                            } else Modifier
+                        )
+                        .clickable(onClick = onTestAlarm)
+                        .padding(horizontal = 14.dp),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = lang.t("Tes Alarm", "Test Alarm"),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
+                        color = tokens.onAccentColor,
                         maxLines = 1
                     )
                 }
             }
         }
-        HorizontalDivider(thickness = 1.dp, color = headerBorder)
     }
 }
 
@@ -254,20 +311,23 @@ private fun TopBarIconButton(
 ) {
     val tokens = LocalIronPulseTokens.current
     val isMaterialYou = tokens.uiTheme == UiTheme.MATERIAL_YOU
+    val isAero = tokens.uiTheme == UiTheme.AEROGLASS
+    val isFrosted = tokens.uiTheme == UiTheme.MIDNIGHT_FROSTED
     val containerColor = when {
         active && isMaterialYou -> tokens.palette.secondaryContainer
         active -> tokens.accentColor.copy(alpha = 0.18f)
         isMaterialYou -> tokens.palette.surfaceContainerHigh
-        tokens.uiTheme == UiTheme.UBUNTU_YARU -> Color(0xFF353535)
-        tokens.uiTheme == UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.08f)
-        tokens.uiTheme == UiTheme.AEROGLASS -> Color(0x2838BDF8)
-        else -> Color(0xCC13161C)
+        tokens.uiTheme == UiTheme.UBUNTU_YARU -> tokens.controlBg
+        isFrosted -> Color.White.copy(alpha = 0.09f)
+        isAero -> Color(0x2838BDF8)
+        else -> tokens.controlBg
     }
     val borderColor = when {
         active && isMaterialYou -> tokens.palette.secondaryContainer
         active -> tokens.accentColor.copy(alpha = 0.65f)
         isMaterialYou -> tokens.palette.outlineVariant
-        tokens.uiTheme == UiTheme.AEROGLASS -> Color(0x52BAE6FD)
+        isAero -> Color(0x52BAE6FD)
+        isFrosted -> Color.White.copy(alpha = 0.18f)
         else -> Color.White.copy(alpha = 0.14f)
     }
     val tint = when {
@@ -281,9 +341,23 @@ private fun TopBarIconButton(
         shape = shape,
         color = containerColor,
         border = BorderStroke(1.dp, borderColor),
-        modifier = Modifier.size(40.dp)
+        modifier = Modifier
+            .size(38.dp)
+            .tactilePress(disabledByPerf = tokens.performance.noAnimations)
     ) {
-        Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = if (isAero) {
+                Modifier.background(
+                    Brush.verticalGradient(
+                        0.0f to Color.White.copy(alpha = 0.22f),
+                        0.5f to Color.Transparent
+                    )
+                )
+            } else {
+                Modifier
+            },
+            contentAlignment = Alignment.Center
+        ) {
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
@@ -297,148 +371,204 @@ private fun TopBarIconButton(
 @Composable
 fun IronPulseBottomNav(
     activeTab: AppTab,
-    restRemainingSeconds: Int,
-    restRunning: Boolean,
+    restTimerFlow: StateFlow<RestTimerDisplayState>,
     onSelectTab: (AppTab) -> Unit
 ) {
     val tokens = LocalIronPulseTokens.current
+    val restTimer by restTimerFlow.collectAsStateWithLifecycle()
     val lang = tokens.lang
     val isFrosted = tokens.uiTheme == UiTheme.MIDNIGHT_FROSTED
     val isMaterialYou = tokens.uiTheme == UiTheme.MATERIAL_YOU
     val isAero = tokens.uiTheme == UiTheme.AEROGLASS
     val isCarbon = tokens.uiTheme == UiTheme.CARBON_FORGE
 
-    val items = listOf(
-        Triple(AppTab.TODAY, lang.t("Hari Ini", "Today"), Icons.Rounded.PlayCircle),
-        Triple(AppTab.SCHEDULE, lang.t("Jadwal", "Schedule"), Icons.Rounded.CalendarMonth),
-        Triple(AppTab.HISTORY, lang.t("Riwayat", "History"), Icons.Rounded.History),
-        Triple(AppTab.EXERCISES, lang.t("Gerakan", "Exercises"), Icons.Rounded.FitnessCenter)
-    )
+    val items = remember(lang) {
+        listOf(
+            Triple(AppTab.TODAY, lang.t("Hari Ini", "Today"), Icons.Rounded.PlayCircle),
+            Triple(AppTab.SCHEDULE, lang.t("Jadwal", "Schedule"), Icons.Rounded.CalendarMonth),
+            Triple(AppTab.HISTORY, lang.t("Riwayat", "History"), Icons.Rounded.History),
+            Triple(AppTab.EXERCISES, lang.t("Gerakan", "Exercises"), Icons.Rounded.FitnessCenter)
+        )
+    }
+
+    val activeIdx = when (activeTab) {
+        AppTab.TODAY, AppTab.WORKOUT -> 0
+        AppTab.SCHEDULE -> 1
+        AppTab.HISTORY -> 2
+        AppTab.EXERCISES -> 3
+        AppTab.SETTINGS -> -1
+    }
 
     val outerPadding = if (isFrosted) {
         Modifier
+            .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = 12.dp, end = 12.dp, bottom = 10.dp)
+            .padding(start = 14.dp, end = 14.dp, bottom = 10.dp)
     } else {
-        Modifier
+        Modifier.fillMaxWidth()
     }
 
-    val barModifier = if (isFrosted) {
+    val topBorder = when (tokens.uiTheme) {
+        UiTheme.AEROGLASS -> Color(0x59BAE6FD)
+        UiTheme.MATERIAL_YOU -> tokens.palette.outlineVariant
+        UiTheme.CARBON_FORGE, UiTheme.UBUNTU_YARU -> Color.White.copy(alpha = 0.12f)
+        UiTheme.OBSIDIAN -> tokens.phaseTokens.headerBorder
+        UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.24f)
+    }
+
+    val dockModifier = if (isFrosted) {
         Modifier
             .fillMaxWidth()
             .ironGlassBar(tokens, shapeRadius = 28.dp)
-            .border(1.dp, Color.White.copy(alpha = 0.22f), RoundedCornerShape(28.dp))
+            .border(1.dp, topBorder, RoundedCornerShape(28.dp))
     } else {
-        val topBorder = when (tokens.uiTheme) {
-            UiTheme.AEROGLASS -> Color(0x59BAE6FD)
-            UiTheme.MATERIAL_YOU -> tokens.palette.outlineVariant
-            UiTheme.CARBON_FORGE, UiTheme.UBUNTU_YARU -> Color.White.copy(alpha = 0.12f)
-            UiTheme.OBSIDIAN -> tokens.phaseTokens.headerBorder
-            UiTheme.MIDNIGHT_FROSTED -> Color.White.copy(alpha = 0.2f)
-        }
         Modifier
             .fillMaxWidth()
-            .ironGlassBar(tokens)
-            .border(BorderStroke(1.dp, topBorder))
+            .ironGlassBar(tokens, topHairlineColor = topBorder)
             .navigationBarsPadding()
     }
 
     Box(modifier = outerPadding) {
-        Row(
-            modifier = barModifier
-                .height(if (isFrosted) 60.dp else 64.dp)
-                .padding(horizontal = if (isFrosted || isAero) 6.dp else 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+        BoxWithConstraints(
+            modifier = dockModifier
+                .height(if (isFrosted) 62.dp else 64.dp)
+                .padding(horizontal = if (isFrosted || isAero) 6.dp else 4.dp)
         ) {
-            items.forEach { (tab, label, icon) ->
-                val isActive = activeTab == tab || (tab == AppTab.TODAY && activeTab == AppTab.WORKOUT)
-                val showCompactRest = tab == AppTab.TODAY && restRunning && activeTab != AppTab.WORKOUT
+            val slotWidth = maxWidth / items.size
 
-                val itemContentColor = when {
-                    isActive && isMaterialYou -> tokens.palette.onSurface
-                    isActive -> tokens.accentColor
-                    else -> tokens.palette.onSurfaceVariant
-                }
+            // Gliding GPU spring indicator behind active tab
+            if (activeIdx >= 0) {
+                val indicatorOffset by animateDpAsState(
+                    targetValue = slotWidth * activeIdx,
+                    animationSpec = if (tokens.performance.noAnimations) {
+                        tween(0)
+                    } else {
+                        IronPulseMotion.IndicatorDpSpring
+                    },
+                    label = "navIndicatorOffset"
+                )
 
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .height(54.dp)
-                        .clip(
-                            RoundedCornerShape(
-                                when {
-                                    isFrosted -> 22.dp
-                                    isAero -> 12.dp
-                                    else -> 10.dp
-                                }
-                            )
-                        )
-                        .background(
-                            when {
-                                isActive && isFrosted -> Color.White.copy(alpha = 0.13f)
-                                isActive && isAero -> Color(0x2E38BDF8)
-                                else -> Color.Transparent
-                            }
-                        )
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null
-                        ) { onSelectTab(tab) },
-                    contentAlignment = Alignment.Center
+                        .offset(x = indicatorOffset)
+                        .width(slotWidth)
+                        .fillMaxHeight()
+                        .padding(vertical = if (isFrosted || isAero) 5.dp else 0.dp, horizontal = 3.dp),
+                    contentAlignment = Alignment.TopCenter
                 ) {
-                    // Top accent bar indicator on non-frosted, non-M3, non-Aero themes
-                    if (isActive && !isFrosted && !isMaterialYou && !isAero) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .width(if (isCarbon) 36.dp else 32.dp)
-                                .height(2.5.dp)
-                                .background(
-                                    tokens.accentColor,
-                                    if (isCarbon) RoundedCornerShape(0.dp) else RoundedCornerShape(999.dp)
-                                )
-                        )
-                    }
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .width(52.dp)
-                                .height(28.dp)
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(
-                                    if (isActive && isMaterialYou) {
-                                        tokens.palette.secondaryContainer
-                                    } else {
-                                        Color.Transparent
-                                    }
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = label,
-                                tint = if (isActive && isMaterialYou) {
-                                    tokens.palette.onSecondaryContainer
-                                } else {
-                                    itemContentColor
-                                },
-                                modifier = Modifier.size(21.dp)
+                    when {
+                        isFrosted -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(22.dp))
+                                    .background(Color.White.copy(alpha = 0.14f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.24f), RoundedCornerShape(22.dp))
                             )
                         }
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (showCompactRest) GymModelHelpers.formatRestDuration(restRemainingSeconds) else label,
-                            fontSize = 11.sp,
-                            fontFamily = if (showCompactRest) FontFamily.Monospace else FontFamily.SansSerif,
-                            fontWeight = if (showCompactRest || isActive) FontWeight.Bold else FontWeight.Medium,
-                            color = if (showCompactRest) tokens.accentColor else itemContentColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        isAero -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color(0x2E38BDF8))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            0.0f to Color.White.copy(alpha = 0.24f),
+                                            0.48f to Color.White.copy(alpha = 0.05f),
+                                            0.5f to Color.Transparent,
+                                            1.0f to Color(0xFF0EA5E9).copy(alpha = 0.14f)
+                                        )
+                                    )
+                                    .border(1.dp, Color(0x5EB8E6FE), RoundedCornerShape(12.dp))
+                            )
+                        }
+                        isMaterialYou -> {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 7.dp)
+                                    .width(58.dp)
+                                    .height(30.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(tokens.palette.secondaryContainer)
+                            )
+                        }
+                        else -> {
+                            Box(
+                                modifier = Modifier
+                                    .width(if (isCarbon) 40.dp else 34.dp)
+                                    .height(2.5.dp)
+                                    .background(
+                                        tokens.accentColor,
+                                        if (isCarbon) RoundedCornerShape(0.dp) else RoundedCornerShape(999.dp)
+                                    )
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEachIndexed { idx, (tab, label, icon) ->
+                    val isActive = idx == activeIdx
+                    val showCompactRest = tab == AppTab.TODAY && restTimer.isActive && activeTab != AppTab.WORKOUT
+
+                    val itemContentColor = when {
+                        isActive && isMaterialYou -> tokens.palette.onSurface
+                        isActive -> tokens.accentColor
+                        else -> tokens.mutedTextColor
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .tactilePress(pressedScale = 0.94f, disabledByPerf = tokens.performance.noAnimations)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { onSelectTab(tab) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .width(58.dp)
+                                    .height(30.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    tint = if (isActive && isMaterialYou) {
+                                        tokens.palette.onSecondaryContainer
+                                    } else {
+                                        itemContentColor
+                                    },
+                                    modifier = Modifier.size(21.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (showCompactRest) {
+                                    GymModelHelpers.formatRestDuration(restTimer.remainingSeconds)
+                                } else {
+                                    label
+                                },
+                                fontSize = 11.sp,
+                                fontFamily = if (showCompactRest) FontFamily.Monospace else FontFamily.SansSerif,
+                                fontWeight = if (showCompactRest || isActive) FontWeight.Bold else FontWeight.Medium,
+                                color = if (showCompactRest) tokens.accentColor else itemContentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
@@ -543,30 +673,39 @@ fun PhaseLogoEmblem(
     }
 }
 
+/**
+ * Isolated per-digit fluid clock that collects [clockSecondsFlow] directly so parent screens
+ * do NOT recompose every second, matching JS FluidClockDisplay's per-digit vertical pop.
+ */
 @Composable
-fun LiveFluidClock(
-    nowMillis: Long,
+fun LiveFluidClockSlot(
+    clockSecondsFlow: StateFlow<Long>,
     clockFormat: ClockFormat,
     lang: AppLanguage
 ) {
+    val clockSeconds by clockSecondsFlow.collectAsStateWithLifecycle()
     val tokens = LocalIronPulseTokens.current
-    val date = remember(nowMillis) { Date(nowMillis) }
-    val hhmm = remember(nowMillis / 1000L, clockFormat) {
-        if (clockFormat == ClockFormat.H12) {
-            SimpleDateFormat("h:mm", Locale.US).format(date)
+    val noAnim = tokens.performance.noAnimations
+
+    val date = remember(clockSeconds) { Date(clockSeconds * 1000L) }
+    val hhmm = remember(clockSeconds, clockFormat) {
+        val sdf = if (clockFormat == ClockFormat.H12) {
+            clock12Sdf.get() ?: SimpleDateFormat("h:mm", Locale.US)
         } else {
-            SimpleDateFormat("HH:mm", Locale.US).format(date)
+            clock24Sdf.get() ?: SimpleDateFormat("HH:mm", Locale.US)
         }
+        sdf.format(date)
     }
-    val ss = remember(nowMillis / 1000L) {
-        SimpleDateFormat("ss", Locale.US).format(date)
+    val ss = remember(clockSeconds) {
+        (secSdf.get() ?: SimpleDateFormat("ss", Locale.US)).format(date)
     }
-    val periodLabel = remember(nowMillis / 60_000L, clockFormat, lang) {
+    val minuteBucket = clockSeconds / 60L
+    val periodLabel = remember(minuteBucket, clockFormat, lang) {
         if (clockFormat == ClockFormat.H24) {
             ""
         } else {
-            val cal = java.util.Calendar.getInstance().apply { time = date }
-            val h = cal.get(java.util.Calendar.HOUR_OF_DAY)
+            val cal = Calendar.getInstance().apply { timeInMillis = clockSeconds * 1000L }
+            val h = cal.get(Calendar.HOUR_OF_DAY)
             if (lang == AppLanguage.ID) {
                 when {
                     h < 5 -> "Dini hari"
@@ -582,41 +721,90 @@ fun LiveFluidClock(
     }
 
     Row(verticalAlignment = Alignment.Bottom) {
-        AnimatedContent(
-            targetState = hhmm,
-            transitionSpec = {
-                fadeIn(tween(180)) togetherWith fadeOut(tween(150))
-            },
-            label = "clockDigits"
-        ) { timeText ->
-            Text(
-                text = timeText,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 40.sp,
-                lineHeight = 42.sp,
-                letterSpacing = (-1).sp,
-                color = Color(0xFFF8FAFC)
-            )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            for (idx in hhmm.indices) {
+                val ch = hhmm[idx]
+                if (ch == ':') {
+                    Text(
+                        text = ":",
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 38.sp,
+                        lineHeight = 42.sp,
+                        color = Color(0xFFF8FAFC).copy(alpha = 0.72f),
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                } else {
+                    ClockDigitCell(
+                        digit = ch,
+                        noAnimations = noAnim,
+                        style = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 40.sp,
+                            lineHeight = 42.sp,
+                            color = Color(0xFFF8FAFC)
+                        )
+                    )
+                }
+            }
         }
+
         Spacer(modifier = Modifier.width(6.dp))
+
         Column(modifier = Modifier.padding(bottom = 5.dp)) {
-            Text(
-                text = ":$ss",
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = tokens.phaseTokens.accentBright
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = ":",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = tokens.phaseTokens.accentBright
+                )
+                for (idx in ss.indices) {
+                    ClockDigitCell(
+                        digit = ss[idx],
+                        noAnimations = noAnim,
+                        style = TextStyle(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = tokens.phaseTokens.accentBright
+                        )
+                    )
+                }
+            }
             if (periodLabel.isNotEmpty()) {
                 Text(
                     text = periodLabel,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = tokens.palette.onSurfaceVariant
+                    color = tokens.mutedTextColor
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ClockDigitCell(
+    digit: Char,
+    noAnimations: Boolean,
+    style: TextStyle
+) {
+    AnimatedContent(
+        targetState = digit,
+        transitionSpec = {
+            if (noAnimations) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else {
+                (slideInVertically(tween(170)) { -it / 2 } + fadeIn(tween(150))) togetherWith
+                    (slideOutVertically(tween(130)) { it / 2 } + fadeOut(tween(120)))
+            }
+        },
+        label = "clockDigitCell"
+    ) { ch ->
+        Text(text = ch.toString(), style = style)
     }
 }
 
@@ -639,21 +827,25 @@ fun TactileStepperControl(
                 text = label,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Medium,
-                color = tokens.palette.onSurfaceVariant,
+                color = tokens.mutedTextColor,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
         }
         Row(
             modifier = Modifier
                 .height(44.dp)
-                .ironGlassSurface(tokens, subtle = true, radiusOverride = tokens.inputRadius)
+                .clip(RoundedCornerShape(tokens.inputRadius))
+                .background(tokens.wellBg, RoundedCornerShape(tokens.inputRadius))
+                .border(1.dp, tokens.subtleBorderColor, RoundedCornerShape(tokens.inputRadius))
                 .padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
                     .size(36.dp)
+                    .tactilePress(pressedScale = 0.88f, disabledByPerf = tokens.performance.noAnimations)
                     .clip(RoundedCornerShape(8.dp))
+                    .background(tokens.controlBg)
                     .clickable(onClick = onDecrement),
                 contentAlignment = Alignment.Center
             ) {
@@ -708,7 +900,9 @@ fun TactileStepperControl(
             Box(
                 modifier = Modifier
                     .size(36.dp)
+                    .tactilePress(pressedScale = 0.88f, disabledByPerf = tokens.performance.noAnimations)
                     .clip(RoundedCornerShape(8.dp))
+                    .background(tokens.controlBg)
                     .clickable(onClick = onIncrement),
                 contentAlignment = Alignment.Center
             ) {
@@ -758,7 +952,8 @@ fun ConfirmDeleteDialog(
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFDC2626),
                     contentColor = Color.White
-                )
+                ),
+                modifier = Modifier.tactilePress(disabledByPerf = tokens.performance.noAnimations)
             ) {
                 Text(confirmLabel, fontWeight = FontWeight.Bold)
             }
@@ -767,7 +962,8 @@ fun ConfirmDeleteDialog(
             OutlinedButton(
                 onClick = onDismiss,
                 shape = RoundedCornerShape(tokens.buttonRadius),
-                border = BorderStroke(1.dp, tokens.surfaceBorderColor)
+                border = BorderStroke(1.dp, tokens.surfaceBorderColor),
+                modifier = Modifier.tactilePress(disabledByPerf = tokens.performance.noAnimations)
             ) {
                 Text(cancelLabel, color = tokens.palette.onSurface)
             }

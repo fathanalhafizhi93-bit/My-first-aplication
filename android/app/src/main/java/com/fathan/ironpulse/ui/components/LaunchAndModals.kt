@@ -73,7 +73,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -82,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fathan.ironpulse.model.AppLanguage
 import com.fathan.ironpulse.model.ClockFormat
 import com.fathan.ironpulse.model.GymModelHelpers
@@ -90,25 +93,28 @@ import com.fathan.ironpulse.ui.theme.ironGlassSurface
 import com.fathan.ironpulse.ui.viewmodel.ActiveTestAlarmState
 import com.fathan.ironpulse.ui.viewmodel.AppTab
 import com.fathan.ironpulse.ui.viewmodel.MascotUiState
+import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
 fun LaunchIntroOverlay(
-    nowMillis: Long,
     onDismiss: () -> Unit
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
-    val date = remember(nowMillis) { Date(nowMillis) }
+    val launchMillis = remember { System.currentTimeMillis() }
+    val date = remember(launchMillis) { Date(launchMillis) }
     val loc = if (lang == AppLanguage.EN) Locale.US else Locale.forLanguageTag("id-ID")
-    val dayDate = SimpleDateFormat("EEE, dd MMM", loc).format(date)
-    val timeLabel = GymModelHelpers.formatAlarmTime(
-        SimpleDateFormat("HH:mm", Locale.US).format(date),
-        tokens.clockFormat,
-        lang
-    )
+    val dayDate = remember(launchMillis, lang) { SimpleDateFormat("EEE, dd MMM", loc).format(date) }
+    val timeLabel = remember(launchMillis, tokens.clockFormat, lang) {
+        GymModelHelpers.formatAlarmTime(
+            SimpleDateFormat("HH:mm", Locale.US).format(date),
+            tokens.clockFormat,
+            lang
+        )
+    }
 
     var started by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { started = true }
@@ -226,8 +232,12 @@ fun LaunchIntroOverlay(
                 Spacer(modifier = Modifier.height(24.dp))
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(lineScale)
+                        .fillMaxWidth()
                         .height(3.dp)
+                        .graphicsLayer {
+                            scaleX = lineScale
+                            transformOrigin = TransformOrigin(0f, 0.5f)
+                        }
                         .background(
                             Brush.horizontalGradient(
                                 listOf(tokens.accentColor, tokens.accentColor.copy(alpha = 0.45f), Color.Transparent)
@@ -830,7 +840,7 @@ fun FeatureTutorialModal(
 
 @Composable
 fun CooldownAlertModal(
-    cooldownRemaining: Int,
+    cooldownSecondsFlow: StateFlow<Int>,
     exerciseName: String,
     setNumber: Int,
     onBypass: () -> Unit,
@@ -838,6 +848,7 @@ fun CooldownAlertModal(
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
+    val cooldownRemaining by cooldownSecondsFlow.collectAsStateWithLifecycle()
     val progress = (cooldownRemaining.coerceIn(0, 30) / 30f)
 
     Dialog(onDismissRequest = onDismiss) {

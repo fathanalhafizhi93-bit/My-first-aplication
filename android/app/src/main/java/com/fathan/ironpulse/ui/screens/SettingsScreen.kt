@@ -70,15 +70,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fathan.ironpulse.model.AppLanguage
 import com.fathan.ironpulse.model.ClockFormat
 import com.fathan.ironpulse.model.CustomRingtone
@@ -88,11 +92,13 @@ import com.fathan.ironpulse.model.PerformancePresetId
 import com.fathan.ironpulse.model.RingtoneStorageMode
 import com.fathan.ironpulse.model.UiTheme
 import com.fathan.ironpulse.ui.components.ConfirmDeleteDialog
+import com.fathan.ironpulse.ui.components.tactilePress
 import com.fathan.ironpulse.ui.theme.LocalIronPulseTokens
 import com.fathan.ironpulse.ui.theme.MaterialYouColorEngine
 import com.fathan.ironpulse.ui.theme.ironGlassSurface
 import com.fathan.ironpulse.ui.viewmodel.GymViewModel
 import com.fathan.ironpulse.ui.viewmodel.IronPulseUiState
+import kotlinx.coroutines.flow.StateFlow
 import java.util.Date
 import java.util.Locale
 
@@ -112,6 +118,7 @@ private enum class AppearanceSection {
 fun SettingsScreen(
     state: IronPulseUiState,
     viewModel: GymViewModel,
+    contentPadding: PaddingValues,
     onBack: () -> Unit,
     onRequestNotificationPermission: () -> Unit,
     onOpenExactAlarmSettings: () -> Unit,
@@ -119,13 +126,20 @@ fun SettingsScreen(
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
+    val noAnim = tokens.performance.noAnimations
     var activeSubTab by remember { mutableStateOf(SettingsSubTab.PROFILE) }
     var appearanceSection by remember { mutableStateOf(AppearanceSection.THEMES) }
     var confirmSignOut by remember { mutableStateOf(false) }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 104.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = contentPadding.calculateTopPadding() + 12.dp,
+            bottom = contentPadding.calculateBottomPadding() + 36.dp
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize()
     ) {
         // Back Bar + Settings Title Header
         item {
@@ -144,8 +158,9 @@ fun SettingsScreen(
                     Surface(
                         onClick = onBack,
                         shape = RoundedCornerShape(tokens.buttonRadius),
-                        color = tokens.palette.surfaceContainerLow,
-                        border = BorderStroke(1.dp, tokens.surfaceBorderColor)
+                        color = tokens.controlBg,
+                        border = BorderStroke(1.dp, tokens.surfaceBorderColor),
+                        modifier = Modifier.tactilePress(disabledByPerf = noAnim)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
@@ -189,7 +204,7 @@ fun SettingsScreen(
                             "Account profile, 6 UI themes, alarms & ringtones, and system language."
                         ),
                         fontSize = 12.5.sp,
-                        color = tokens.palette.onSurfaceVariant
+                        color = tokens.mutedTextColor
                     )
                 }
 
@@ -198,8 +213,8 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color.White.copy(alpha = 0.04f))
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                        .background(tokens.wellBg)
+                        .border(1.dp, tokens.subtleBorderColor, RoundedCornerShape(14.dp))
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -213,6 +228,7 @@ fun SettingsScreen(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
+                                .tactilePress(pressedScale = 0.94f, disabledByPerf = noAnim)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(if (selected) tokens.accentColor else Color.Transparent)
                                 .clickable { activeSubTab = tab }
@@ -226,14 +242,14 @@ fun SettingsScreen(
                                 Icon(
                                     imageVector = icon,
                                     contentDescription = label,
-                                    tint = if (selected) tokens.onAccentColor else tokens.palette.onSurfaceVariant,
+                                    tint = if (selected) tokens.onAccentColor else tokens.mutedTextColor,
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
                                     text = label,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (selected) tokens.onAccentColor else tokens.palette.onSurfaceVariant,
+                                    color = if (selected) tokens.onAccentColor else tokens.mutedTextColor,
                                     maxLines = 1
                                 )
                             }
@@ -412,9 +428,9 @@ private fun ProfileSettingsSection(
                         color = tokens.palette.onSurface
                     )
                     Text(
-                        text = profile?.email ?: state.user?.email ?: "-",
+                        text = profile?.email ?: state.userEmail ?: "-",
                         fontSize = 12.5.sp,
-                        color = tokens.palette.onSurfaceVariant
+                        color = tokens.mutedTextColor
                     )
                 }
             }
@@ -888,12 +904,12 @@ private fun ThemePreviewCard(
     Surface(
         onClick = onSelect,
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) previewAccent.copy(alpha = 0.14f) else tokens.palette.surfaceContainerLow,
+        color = if (selected) previewAccent.copy(alpha = 0.14f) else tokens.controlBg,
         border = BorderStroke(
             width = if (selected) 1.5.dp else 1.dp,
             color = if (selected) previewAccent else tokens.surfaceBorderColor
         ),
-        modifier = modifier
+        modifier = modifier.tactilePress(pressedScale = 0.96f, disabledByPerf = tokens.performance.noAnimations)
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
@@ -926,19 +942,25 @@ private fun ThemePreviewCard(
                     )
             ) {
                 if (theme == UiTheme.CARBON_FORGE) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val step = 5.dp.toPx()
-                        var x = -size.height
-                        while (x < size.width + size.height) {
-                            drawLine(
-                                color = Color.White.copy(alpha = 0.06f),
-                                start = Offset(x, 0f),
-                                end = Offset(x + size.height, size.height),
-                                strokeWidth = 1.dp.toPx()
-                            )
-                            x += step
-                        }
-                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .drawWithCache {
+                                val step = 5.dp.toPx()
+                                val weavePath = Path()
+                                var x = -size.height
+                                while (x < size.width + size.height) {
+                                    weavePath.moveTo(x, 0f)
+                                    weavePath.lineTo(x + size.height, size.height)
+                                    x += step
+                                }
+                                val stroke = Stroke(1.dp.toPx())
+                                val col = Color.White.copy(alpha = 0.06f)
+                                onDrawBehind {
+                                    drawPath(weavePath, color = col, style = stroke)
+                                }
+                            }
+                    )
                 } else if (theme == UiTheme.AEROGLASS) {
                     Box(
                         modifier = Modifier
@@ -1625,9 +1647,9 @@ private fun RingtoneAssignChip(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(10.dp),
-        color = if (active) tokens.accentColor.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.04f),
+        color = if (active) tokens.accentColor.copy(alpha = 0.16f) else tokens.wellBg,
         border = BorderStroke(1.dp, if (active) tokens.accentColor else tokens.surfaceBorderColor),
-        modifier = modifier
+        modifier = modifier.tactilePress(pressedScale = 0.95f, disabledByPerf = tokens.performance.noAnimations)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
@@ -1642,11 +1664,35 @@ private fun RingtoneAssignChip(
                 text = label,
                 fontSize = 11.5.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (active) tokens.accentColor else tokens.palette.onSurfaceVariant,
+                color = if (active) tokens.accentColor else tokens.mutedTextColor,
                 maxLines = 1
             )
         }
     }
+}
+
+@Composable
+private fun LiveClockPreviewBadge(
+    clockSecondsFlow: StateFlow<Long>,
+    clockFormat: ClockFormat,
+    lang: AppLanguage,
+    accentColor: Color
+) {
+    val clockSeconds by clockSecondsFlow.collectAsStateWithLifecycle()
+    val livePreviewTime = remember(clockSeconds, clockFormat, lang) {
+        GymModelHelpers.formatAlarmTime(
+            GymModelHelpers.formatHHMM(Date(clockSeconds * 1000L)),
+            clockFormat,
+            lang
+        )
+    }
+    Text(
+        text = livePreviewTime,
+        fontFamily = FontFamily.Monospace,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        color = accentColor
+    )
 }
 
 @Composable
@@ -1657,13 +1703,6 @@ private fun SystemSettingsSection(
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
     val prefs = state.appPrefs
-    val livePreviewTime = remember(state.nowMillis / 1000L, prefs.clockFormat, lang) {
-        GymModelHelpers.formatAlarmTime(
-            GymModelHelpers.formatHHMM(Date(state.nowMillis)),
-            prefs.clockFormat,
-            lang
-        )
-    }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // Language Picker
@@ -1733,12 +1772,11 @@ private fun SystemSettingsSection(
                     fontWeight = FontWeight.Bold,
                     color = tokens.palette.onSurface
                 )
-                Text(
-                    text = livePreviewTime,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = tokens.accentColor
+                LiveClockPreviewBadge(
+                    clockSecondsFlow = viewModel.clockSecondsFlow,
+                    clockFormat = prefs.clockFormat,
+                    lang = lang,
+                    accentColor = tokens.accentColor
                 )
             }
 

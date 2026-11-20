@@ -67,11 +67,12 @@ class MainActivity : ComponentActivity() {
         handleIncomingIntent(intent)
 
         setContent {
-            val state by viewModel.uiState.collectAsStateWithLifecycle()
+            val themeUi by viewModel.themeUiFlow.collectAsStateWithLifecycle()
             IronPulseTheme(
-                prefs = state.appPrefs,
-                timePhase = state.timePhase
+                prefs = themeUi.prefs,
+                timePhase = themeUi.timePhase
             ) {
+                val state by viewModel.uiState.collectAsStateWithLifecycle()
                 IronPulseRoot(
                     state = state,
                     viewModel = viewModel,

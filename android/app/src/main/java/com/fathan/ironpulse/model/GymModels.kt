@@ -1,5 +1,6 @@
 package com.fathan.ironpulse.model
 
+import androidx.compose.runtime.Immutable
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -105,6 +106,7 @@ enum class UiTheme(
     }
 }
 
+@Immutable
 data class ColorPresetOption(
     val id: String,
     val hex: String,
@@ -118,6 +120,7 @@ enum class PerformancePresetId {
     ULTRA
 }
 
+@Immutable
 data class PerformancePreferences(
     val noBlur: Boolean = false,
     val noAnimations: Boolean = false,
@@ -227,6 +230,7 @@ enum class TimerDirection(val wireValue: String) {
     }
 }
 
+@Immutable
 data class ExerciseItem(
     val id: String,
     val name: String,
@@ -243,6 +247,7 @@ data class ExerciseItem(
     val targetDurationSeconds: Int = 60
 )
 
+@Immutable
 data class DaySchedule(
     val userId: String,
     val dayKey: DayKey,
@@ -254,6 +259,7 @@ data class DaySchedule(
     val exercises: List<ExerciseItem> = emptyList()
 )
 
+@Immutable
 data class WorkoutSetLog(
     val setNumber: Int,
     val weightKg: Double,
@@ -262,6 +268,7 @@ data class WorkoutSetLog(
     val completed: Boolean = false
 )
 
+@Immutable
 data class WorkoutLogEntry(
     val exerciseId: String,
     val name: String,
@@ -273,6 +280,7 @@ data class WorkoutLogEntry(
     val sets: List<WorkoutSetLog> = emptyList()
 )
 
+@Immutable
 data class WorkoutLog(
     val userId: String,
     val dateKey: String,
@@ -282,6 +290,7 @@ data class WorkoutLog(
     val completed: Boolean = false
 )
 
+@Immutable
 data class UserProfile(
     val userId: String,
     val displayName: String,
@@ -304,6 +313,7 @@ enum class RingtoneStorageMode(val wireValue: String) {
     }
 }
 
+@Immutable
 data class CustomRingtone(
     val id: String,
     val userId: String,
@@ -315,6 +325,7 @@ data class CustomRingtone(
     val audioDataUrl: String = ""
 )
 
+@Immutable
 data class BuiltinRingtoneSpec(
     val id: String,
     val name: String,
@@ -324,6 +335,7 @@ data class BuiltinRingtoneSpec(
     val patternLabelEn: String
 )
 
+@Immutable
 data class NextAlarmSummary(
     val dayKey: DayKey,
     val dayLabel: String,
@@ -354,6 +366,7 @@ enum class TimePhasePose {
     SLEEP, YAWN, NIGHT_CHILL, STARGAZE, ZEN, COZY, DREAM, MOONLIT, RECHARGE
 }
 
+@Immutable
 data class MascotSpeechLine(
     val id: String,
     val headline: String,
@@ -361,6 +374,25 @@ data class MascotSpeechLine(
 )
 
 object GymModelHelpers {
+
+    private val dateKeySdf = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    }
+    private val hhmmSdf = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("HH:mm", Locale.US)
+    }
+    private val readableEnSdf = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("EEE, dd MMM yyyy", Locale.US)
+    }
+    private val readableIdSdf = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("EEE, dd MMM yyyy", Locale.forLanguageTag("id-ID"))
+    }
+    private val longTodayEnSdf = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("EEEE, d MMMM yyyy", Locale.US)
+    }
+    private val longTodayIdSdf = object : ThreadLocal<SimpleDateFormat>() {
+        override fun initialValue(): SimpleDateFormat = SimpleDateFormat("EEEE, d MMMM yyyy", Locale.forLanguageTag("id-ID"))
+    }
 
     val BUILTIN_RINGTONES: List<BuiltinRingtoneSpec> = listOf(
         BuiltinRingtoneSpec(
@@ -444,15 +476,11 @@ object GymModelHelpers {
         }
     }
 
-    fun formatLocalDateKey(date: Date = Date()): String {
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        return sdf.format(date)
-    }
+    fun formatLocalDateKey(date: Date = Date()): String =
+        (dateKeySdf.get() ?: SimpleDateFormat("yyyy-MM-dd", Locale.US)).format(date)
 
-    fun formatHHMM(date: Date = Date()): String {
-        val sdf = SimpleDateFormat("HH:mm", Locale.US)
-        return sdf.format(date)
-    }
+    fun formatHHMM(date: Date = Date()): String =
+        (hhmmSdf.get() ?: SimpleDateFormat("HH:mm", Locale.US)).format(date)
 
     fun getTodayDayKey(): DayKey = DayKey.fromCalendar(Calendar.getInstance())
 
@@ -482,16 +510,23 @@ object GymModelHelpers {
     }
 
     fun formatReadableDate(dateKey: String, lang: AppLanguage): String {
-        val parsed = runCatching {
-            SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateKey)
-        }.getOrNull() ?: return dateKey
-        val loc = if (lang == AppLanguage.EN) Locale.US else Locale.forLanguageTag("id-ID")
-        return SimpleDateFormat("EEE, dd MMM yyyy", loc).format(parsed)
+        val parser = dateKeySdf.get() ?: SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val parsed = runCatching { parser.parse(dateKey) }.getOrNull() ?: return dateKey
+        val fmt = if (lang == AppLanguage.EN) {
+            readableEnSdf.get() ?: SimpleDateFormat("EEE, dd MMM yyyy", Locale.US)
+        } else {
+            readableIdSdf.get() ?: SimpleDateFormat("EEE, dd MMM yyyy", Locale.forLanguageTag("id-ID"))
+        }
+        return fmt.format(parsed)
     }
 
     fun formatLongTodayDate(now: Date, lang: AppLanguage): String {
-        val loc = if (lang == AppLanguage.EN) Locale.US else Locale.forLanguageTag("id-ID")
-        return SimpleDateFormat("EEEE, d MMMM yyyy", loc).format(now)
+        val fmt = if (lang == AppLanguage.EN) {
+            longTodayEnSdf.get() ?: SimpleDateFormat("EEEE, d MMMM yyyy", Locale.US)
+        } else {
+            longTodayIdSdf.get() ?: SimpleDateFormat("EEEE, d MMMM yyyy", Locale.forLanguageTag("id-ID"))
+        }
+        return fmt.format(now)
     }
 
     fun formatCompactDuration(totalSeconds: Int, lang: AppLanguage): String {
@@ -716,7 +751,7 @@ object GymModelHelpers {
      */
     fun computeWeeklyStreak(logs: List<WorkoutLog>): Int {
         val completedWeeks = mutableSetOf<String>()
-        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val sdf = dateKeySdf.get() ?: SimpleDateFormat("yyyy-MM-dd", Locale.US)
         for (log in logs) {
             val hasCompleted = log.completed || log.entries.any { e -> e.sets.any { s -> s.completed } }
             if (!hasCompleted) continue

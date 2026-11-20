@@ -1,6 +1,8 @@
 package com.fathan.ironpulse.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -63,6 +65,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fathan.ironpulse.model.DayKey
 import com.fathan.ironpulse.model.ExerciseItem
 import com.fathan.ironpulse.model.ExerciseTrackingMode
@@ -70,23 +73,28 @@ import com.fathan.ironpulse.model.GymModelHelpers
 import com.fathan.ironpulse.model.TimerDirection
 import com.fathan.ironpulse.model.WorkoutLogEntry
 import com.fathan.ironpulse.ui.components.TactileStepperControl
+import com.fathan.ironpulse.ui.components.tactilePress
 import com.fathan.ironpulse.ui.theme.LocalIronPulseTokens
 import com.fathan.ironpulse.ui.theme.ironGlassSurface
 import com.fathan.ironpulse.ui.viewmodel.ExerciseTimerUiState
 import com.fathan.ironpulse.ui.viewmodel.GymViewModel
 import com.fathan.ironpulse.ui.viewmodel.IronPulseUiState
+import com.fathan.ironpulse.ui.viewmodel.RestTimerDisplayState
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.roundToInt
 
 @Composable
 fun WorkoutScreen(
     state: IronPulseUiState,
     viewModel: GymViewModel,
+    contentPadding: PaddingValues,
     onBackToToday: () -> Unit,
     onOpenSchedule: () -> Unit,
     onOpenExercisesForDay: (DayKey) -> Unit
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
+    val noAnim = tokens.performance.noAnimations
     val secUnit = lang.t("d", "s")
     val activeSchedule = state.schedules[state.todayDayKey]
     val todayEntries = state.effectiveTodayEntries
@@ -110,31 +118,18 @@ fun WorkoutScreen(
         }
     }
 
-    val restRunning = state.restTimer.isActive
-    val restRemaining = if (restRunning) state.restTimer.remainingSeconds else state.restIdleRemainingSeconds
-    val restTotal = (if (restRunning) state.restTimer.totalSeconds else state.restIdleTotalSeconds).coerceAtLeast(1)
-    val restLabel = if (restRunning) state.restTimer.exerciseName else state.restIdleExerciseLabel
-
-    LaunchedEffect(restRunning) {
-        if (restRunning) restBarDismissed = false
-    }
-
     val totalSets = remember(todayEntries) { todayEntries.sumOf { it.sets.size } }
     val completedSets = remember(todayEntries) { todayEntries.sumOf { e -> e.sets.count { it.completed } } }
     val progressPct = if (totalSets > 0) (completedSets * 100) / totalSets else 0
-
-    val showFloatingRestBar = activeSchedule?.isGymDay == true &&
-        todayEntries.isNotEmpty() &&
-        !restBarDismissed &&
-        (restRunning || (restRemaining in 1 until restTotal))
+    val hasExercises = activeSchedule?.isGymDay == true && todayEntries.isNotEmpty()
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = 14.dp,
-                bottom = if (showFloatingRestBar) 168.dp else 110.dp
+                top = contentPadding.calculateTopPadding() + 12.dp,
+                bottom = contentPadding.calculateBottomPadding() + if (hasExercises) 148.dp else 92.dp
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier.fillMaxSize()
@@ -149,8 +144,9 @@ fun WorkoutScreen(
                     Surface(
                         onClick = onBackToToday,
                         shape = RoundedCornerShape(tokens.buttonRadius),
-                        color = tokens.palette.surfaceContainerLow,
-                        border = BorderStroke(1.dp, tokens.surfaceBorderColor)
+                        color = tokens.controlBg,
+                        border = BorderStroke(1.dp, tokens.surfaceBorderColor),
+                        modifier = Modifier.tactilePress(disabledByPerf = noAnim)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -180,8 +176,8 @@ fun WorkoutScreen(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(999.dp))
-                                .background(Color(0xFF13161C))
-                                .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
+                                .background(tokens.wellBg)
+                                .border(1.dp, tokens.surfaceBorderColor, RoundedCornerShape(999.dp))
                                 .padding(3.dp),
                             horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
@@ -192,6 +188,7 @@ fun WorkoutScreen(
                                 val selected = viewModeFocus == isFocus
                                 Box(
                                     modifier = Modifier
+                                        .tactilePress(pressedScale = 0.94f, disabledByPerf = noAnim)
                                         .clip(RoundedCornerShape(999.dp))
                                         .background(if (selected) tokens.accentColor else Color.Transparent)
                                         .clickable { viewModeFocus = isFocus }
@@ -201,13 +198,18 @@ fun WorkoutScreen(
                                         text = label,
                                         fontSize = 11.5.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (selected) tokens.onAccentColor else Color(0xFF9CA3AF)
+                                        color = if (selected) tokens.onAccentColor else tokens.mutedTextColor
                                     )
                                 }
                             }
                         }
 
                         // Mini Progress Ring
+                        val animProgress by animateFloatAsState(
+                            targetValue = progressPct / 100f,
+                            animationSpec = if (noAnim) tween(0) else tween(260),
+                            label = "workoutRing"
+                        )
                         Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
                                 val stroke = 3.5.dp.toPx()
@@ -221,7 +223,7 @@ fun WorkoutScreen(
                                 drawArc(
                                     color = if (progressPct == 100) Color(0xFF16A34A) else tokens.accentColor,
                                     startAngle = -90f,
-                                    sweepAngle = 360f * (progressPct / 100f),
+                                    sweepAngle = 360f * animProgress,
                                     useCenter = false,
                                     style = Stroke(stroke, cap = StrokeCap.Round)
                                 )
@@ -251,7 +253,7 @@ fun WorkoutScreen(
                         Icon(
                             imageVector = Icons.Rounded.FitnessCenter,
                             contentDescription = null,
-                            tint = Color(0xFF9CA3AF),
+                            tint = tokens.mutedTextColor,
                             modifier = Modifier.size(36.dp)
                         )
                         Text(
@@ -273,7 +275,8 @@ fun WorkoutScreen(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = tokens.accentColor,
                                 contentColor = tokens.onAccentColor
-                            )
+                            ),
+                            modifier = Modifier.tactilePress(disabledByPerf = noAnim)
                         ) {
                             Text(
                                 text = if (activeSchedule?.isGymDay == false) {
@@ -287,74 +290,15 @@ fun WorkoutScreen(
                     }
                 }
             } else {
-                // 2. EXERCISE SWITCHER RAIL
+                // 2. EXERCISE SWITCHER RAIL (isolated timer collection inside rail)
                 if (viewModeFocus && todayEntries.size > 1) {
                     item(key = "exercise_switcher") {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            itemsIndexed(todayEntries, key = { _, e -> e.exerciseId }) { idx, entry ->
-                                val isSelected = entry.exerciseId == selectedExerciseId
-                                val allDone = entry.sets.isNotEmpty() && entry.sets.all { it.completed }
-                                val timerRunning = state.exerciseTimers[entry.exerciseId]?.running == true
-                                Surface(
-                                    onClick = { selectedExerciseId = entry.exerciseId },
-                                    shape = RoundedCornerShape(999.dp),
-                                    color = when {
-                                        isSelected -> tokens.accentColor
-                                        allDone -> Color(0x2616A34A)
-                                        else -> tokens.palette.surfaceContainerLow
-                                    },
-                                    border = BorderStroke(
-                                        1.dp,
-                                        when {
-                                            isSelected -> tokens.accentColor
-                                            timerRunning -> Color(0x9938BDF8)
-                                            allDone -> Color(0x6616A34A)
-                                            else -> tokens.surfaceBorderColor
-                                        }
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        Text(
-                                            text = "${idx + 1}.",
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) tokens.onAccentColor else tokens.accentColor
-                                        )
-                                        Text(
-                                            text = entry.name,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) tokens.onAccentColor else Color(0xFFF4F5F7),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        if (allDone) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.CheckCircle,
-                                                contentDescription = null,
-                                                tint = if (isSelected) tokens.onAccentColor else Color(0xFF4ADE80),
-                                                modifier = Modifier.size(14.dp)
-                                            )
-                                        } else if (timerRunning) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(7.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color(0xFF38BDF8))
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        ExerciseSwitcherRail(
+                            entries = todayEntries,
+                            selectedExerciseId = selectedExerciseId,
+                            exerciseTimersFlow = viewModel.exerciseTimersFlow,
+                            onSelectExercise = { selectedExerciseId = it }
+                        )
                     }
                 }
 
@@ -376,8 +320,8 @@ fun WorkoutScreen(
                         onToggleNotes = {
                             expandedNotes[entry.exerciseId] = !(expandedNotes[entry.exerciseId] ?: false)
                         },
-                        timerState = state.exerciseTimers[entry.exerciseId],
-                        cooldownRemaining = state.cooldownRemainingSeconds,
+                        exerciseTimersFlow = viewModel.exerciseTimersFlow,
+                        cooldownSecondsFlow = viewModel.cooldownSecondsFlow,
                         onStartRest = { secs ->
                             restBarDismissed = false
                             viewModel.startManualRestTimer(secs, entry.name)
@@ -408,120 +352,248 @@ fun WorkoutScreen(
                         },
                         onAddSet = { viewModel.addSetToExercise(entry.exerciseId) },
                         onRemoveSet = { viewModel.removeSetFromExercise(entry.exerciseId) },
-                        secUnit = secUnit
+                        secUnit = secUnit,
+                        modifier = Modifier.animateItem()
                     )
                 }
             }
         }
 
-        // STICKY FLOATING REST BAR
-        if (showFloatingRestBar) {
+        // STICKY FLOATING REST BAR (isolated flow collection so WorkoutScreen doesn't recompose 1Hz)
+        if (hasExercises) {
+            WorkoutFloatingRestBar(
+                restTimerFlow = viewModel.restTimerDisplayFlow,
+                restBarDismissed = restBarDismissed,
+                bottomInset = contentPadding.calculateBottomPadding(),
+                secUnit = secUnit,
+                onUndismiss = { restBarDismissed = false },
+                onAdjust = { viewModel.adjustRestTimer(it) },
+                onTogglePause = { viewModel.toggleRestPauseOrStart() },
+                onDismissAndStop = {
+                    restBarDismissed = true
+                    viewModel.stopRestTimer()
+                },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExerciseSwitcherRail(
+    entries: List<WorkoutLogEntry>,
+    selectedExerciseId: String,
+    exerciseTimersFlow: StateFlow<Map<String, ExerciseTimerUiState>>,
+    onSelectExercise: (String) -> Unit
+) {
+    val tokens = LocalIronPulseTokens.current
+    val noAnim = tokens.performance.noAnimations
+    val exerciseTimers by exerciseTimersFlow.collectAsStateWithLifecycle()
+
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        itemsIndexed(entries, key = { _, e -> e.exerciseId }) { idx, entry ->
+            val isSelected = entry.exerciseId == selectedExerciseId
+            val allDone = entry.sets.isNotEmpty() && entry.sets.all { it.completed }
+            val timerRunning = exerciseTimers[entry.exerciseId]?.running == true
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = tokens.palette.surfaceContainerHigh.copy(alpha = 0.96f),
+                onClick = { onSelectExercise(entry.exerciseId) },
+                shape = RoundedCornerShape(999.dp),
+                color = when {
+                    isSelected -> tokens.accentColor
+                    allDone -> Color(0x2616A34A)
+                    else -> tokens.controlBg
+                },
                 border = BorderStroke(
                     1.dp,
-                    if (restRemaining == 0) Color(0x8016A34A) else tokens.accentColor.copy(alpha = 0.55f)
+                    when {
+                        isSelected -> tokens.accentColor
+                        timerRunning -> Color(0x9938BDF8)
+                        allDone -> Color(0x6616A34A)
+                        else -> tokens.surfaceBorderColor
+                    }
                 ),
-                shadowElevation = 14.dp,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
-                    .fillMaxWidth()
+                modifier = Modifier.tactilePress(pressedScale = 0.95f, disabledByPerf = noAnim)
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Box(modifier = Modifier.size(38.dp), contentAlignment = Alignment.Center) {
-                        val ringColor = if (restRemaining == 0) Color(0xFF4ADE80) else tokens.accentColor
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            val stroke = 3.dp.toPx()
-                            drawArc(Color.White.copy(alpha = 0.1f), 0f, 360f, false, style = Stroke(stroke))
-                            drawArc(
-                                ringColor,
-                                -90f,
-                                360f * (restRemaining.toFloat() / restTotal.toFloat()).coerceIn(0f, 1f),
-                                false,
-                                style = Stroke(stroke, cap = StrokeCap.Round)
-                            )
-                        }
+                    Text(
+                        text = "${idx + 1}.",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) tokens.onAccentColor else tokens.accentColor
+                    )
+                    Text(
+                        text = entry.name,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelected) tokens.onAccentColor else Color(0xFFF4F5F7),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (allDone) {
                         Icon(
-                            imageVector = Icons.Rounded.Timer,
+                            imageVector = Icons.Rounded.CheckCircle,
                             contentDescription = null,
-                            tint = ringColor,
-                            modifier = Modifier.size(16.dp)
+                            tint = if (isSelected) tokens.onAccentColor else Color(0xFF4ADE80),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    } else if (timerRunning) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF38BDF8))
                         )
                     }
+                }
+            }
+        }
+    }
+}
 
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = GymModelHelpers.formatRestDuration(restRemaining),
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (restRemaining == 0) Color(0xFF4ADE80) else Color(0xFFF4F5F7)
-                        )
-                        Text(
-                            text = restLabel.ifBlank { lang.t("Istirahat antar set", "Between-set rest") },
-                            fontSize = 11.5.sp,
-                            color = tokens.palette.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+@Composable
+private fun WorkoutFloatingRestBar(
+    restTimerFlow: StateFlow<RestTimerDisplayState>,
+    restBarDismissed: Boolean,
+    bottomInset: androidx.compose.ui.unit.Dp,
+    secUnit: String,
+    onUndismiss: () -> Unit,
+    onAdjust: (Int) -> Unit,
+    onTogglePause: () -> Unit,
+    onDismissAndStop: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val tokens = LocalIronPulseTokens.current
+    val lang = tokens.lang
+    val noAnim = tokens.performance.noAnimations
+    val rest by restTimerFlow.collectAsStateWithLifecycle()
 
-                    Surface(
-                        onClick = { viewModel.adjustRestTimer(15) },
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF1A1E26),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
-                    ) {
-                        Text(
-                            text = "+15$secUnit",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF4F5F7),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                        )
-                    }
+    LaunchedEffect(rest.isActive) {
+        if (rest.isActive) onUndismiss()
+    }
 
-                    Surface(
-                        onClick = { viewModel.toggleRestPauseOrStart() },
-                        shape = RoundedCornerShape(10.dp),
-                        color = tokens.accentColor
-                    ) {
-                        Box(modifier = Modifier.padding(8.dp)) {
-                            Icon(
-                                imageVector = if (restRunning) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                                contentDescription = null,
-                                tint = tokens.onAccentColor,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
+    val restRunning = rest.isActive
+    val restRemaining = rest.remainingSeconds
+    val restTotal = rest.totalSeconds.coerceAtLeast(1)
+    val restLabel = rest.exerciseName
+    val visible = !restBarDismissed && (restRunning || (restRemaining in 1 until restTotal))
+    if (!visible) return
 
-                    Surface(
-                        onClick = {
-                            restBarDismissed = true
-                            viewModel.stopRestTimer()
-                        },
-                        shape = RoundedCornerShape(10.dp),
-                        color = Color.Transparent
-                    ) {
-                        Box(modifier = Modifier.padding(6.dp)) {
-                            Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = lang.t("Lewati", "Skip"),
-                                tint = Color(0xFF9CA3AF),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = tokens.palette.surfaceContainerHigh.copy(alpha = 0.96f),
+        border = BorderStroke(
+            1.dp,
+            if (restRemaining == 0) Color(0x8016A34A) else tokens.accentColor.copy(alpha = 0.55f)
+        ),
+        shadowElevation = 14.dp,
+        modifier = modifier
+            .padding(start = 16.dp, end = 16.dp, bottom = bottomInset + 14.dp)
+            .fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(modifier = Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+                val ringColor = if (restRemaining == 0) Color(0xFF4ADE80) else tokens.accentColor
+                val frac by animateFloatAsState(
+                    targetValue = (restRemaining.toFloat() / restTotal.toFloat()).coerceIn(0f, 1f),
+                    animationSpec = if (noAnim) tween(0) else tween(220),
+                    label = "floatingRestArc"
+                )
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val stroke = 3.dp.toPx()
+                    drawArc(Color.White.copy(alpha = 0.1f), 0f, 360f, false, style = Stroke(stroke))
+                    drawArc(
+                        ringColor,
+                        -90f,
+                        360f * frac,
+                        false,
+                        style = Stroke(stroke, cap = StrokeCap.Round)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Rounded.Timer,
+                    contentDescription = null,
+                    tint = ringColor,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = GymModelHelpers.formatRestDuration(restRemaining),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (restRemaining == 0) Color(0xFF4ADE80) else Color(0xFFF4F5F7)
+                )
+                Text(
+                    text = restLabel.ifBlank { lang.t("Istirahat antar set", "Between-set rest") },
+                    fontSize = 11.5.sp,
+                    color = tokens.mutedTextColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Surface(
+                onClick = { onAdjust(15) },
+                shape = RoundedCornerShape(10.dp),
+                color = tokens.controlBg,
+                border = BorderStroke(1.dp, tokens.subtleBorderColor),
+                modifier = Modifier.tactilePress(disabledByPerf = noAnim)
+            ) {
+                Text(
+                    text = "+15$secUnit",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFF4F5F7),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                )
+            }
+
+            Surface(
+                onClick = onTogglePause,
+                shape = RoundedCornerShape(10.dp),
+                color = tokens.accentColor,
+                modifier = Modifier.tactilePress(disabledByPerf = noAnim)
+            ) {
+                Box(modifier = Modifier.padding(8.dp)) {
+                    Icon(
+                        imageVector = if (restRunning) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                        contentDescription = null,
+                        tint = tokens.onAccentColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Surface(
+                onClick = onDismissAndStop,
+                shape = RoundedCornerShape(10.dp),
+                color = Color.Transparent,
+                modifier = Modifier.tactilePress(disabledByPerf = noAnim)
+            ) {
+                Box(modifier = Modifier.padding(6.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = lang.t("Lewati", "Skip"),
+                        tint = tokens.mutedTextColor,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
@@ -537,8 +609,8 @@ private fun ExerciseCockpitCard(
     spec: ExerciseItem?,
     notesExpanded: Boolean,
     onToggleNotes: () -> Unit,
-    timerState: ExerciseTimerUiState?,
-    cooldownRemaining: Int,
+    exerciseTimersFlow: StateFlow<Map<String, ExerciseTimerUiState>>,
+    cooldownSecondsFlow: StateFlow<Int>,
     onStartRest: (Int) -> Unit,
     onToggleSetComplete: (Int) -> Unit,
     onUpdateSetMetrics: (Int, Double, Int) -> Unit,
@@ -550,10 +622,12 @@ private fun ExerciseCockpitCard(
     onSaveExerciseTimer: () -> Unit,
     onAddSet: () -> Unit,
     onRemoveSet: () -> Unit,
-    secUnit: String
+    secUnit: String,
+    modifier: Modifier = Modifier
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
+    val noAnim = tokens.performance.noAnimations
     val mode = spec?.trackingMode ?: entry.trackingMode
     val usesWeight = GymModelHelpers.resolveUsesWeight(
         usesWeight = entry.usesWeight,
@@ -570,21 +644,15 @@ private fun ExerciseCockpitCard(
     val firstIncompleteSet = entry.sets.firstOrNull { !it.completed }?.setNumber
         ?: entry.sets.firstOrNull()?.setNumber ?: 1
 
-    val timerDirection = timerState?.direction ?: spec?.timerDirection ?: entry.timerDirection
+    val timerMap = if (mode == ExerciseTrackingMode.TIMER) {
+        exerciseTimersFlow.collectAsStateWithLifecycle().value
+    } else {
+        emptyMap()
+    }
+    val timerState = timerMap[entry.exerciseId]
+    val timerRunning = timerState?.running == true
     val activeSetNumber = timerState?.activeSetNumber?.takeIf { n -> entry.sets.any { it.setNumber == n } }
         ?: firstIncompleteSet
-    val activeSetObj = entry.sets.firstOrNull { it.setNumber == activeSetNumber }
-    val activeTargetSeconds = (activeSetObj?.durationSeconds?.takeIf { it > 0 } ?: defaultTargetDur).coerceAtLeast(5)
-    val elapsedSeconds = timerState?.elapsedSeconds ?: 0
-    val timerRunning = timerState?.running == true
-    val displayClockSeconds = if (timerDirection == TimerDirection.COUNTDOWN) {
-        (activeTargetSeconds - elapsedSeconds).coerceAtLeast(0)
-    } else {
-        elapsedSeconds
-    }
-    val timerProgress = if (activeTargetSeconds > 0) {
-        (elapsedSeconds.toFloat() / activeTargetSeconds.toFloat()).coerceIn(0f, 1f)
-    } else 0f
 
     val cardBorder = when {
         allDone -> Color(0x8016A34A)
@@ -593,7 +661,7 @@ private fun ExerciseCockpitCard(
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .ironGlassSurface(tokens, borderOverride = cardBorder)
             .padding(16.dp),
@@ -612,18 +680,18 @@ private fun ExerciseCockpitCard(
                     fontWeight = FontWeight.Bold,
                     color = tokens.accentColor
                 )
-                Text("·", fontSize = 12.sp, color = Color(0xFF6B7280))
+                Text("·", fontSize = 12.sp, color = tokens.mutedTextColor)
                 Text(
                     text = entry.muscleGroup.label(lang),
                     fontSize = 12.sp,
-                    color = Color(0xFF9CA3AF)
+                    color = tokens.mutedTextColor
                 )
                 if (!spec?.equipment.isNullOrBlank()) {
-                    Text("·", fontSize = 12.sp, color = Color(0xFF6B7280))
+                    Text("·", fontSize = 12.sp, color = tokens.mutedTextColor)
                     Text(
                         text = spec?.equipment ?: "",
                         fontSize = 12.sp,
-                        color = Color(0xFF9CA3AF),
+                        color = tokens.mutedTextColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -655,14 +723,14 @@ private fun ExerciseCockpitCard(
                     )
                 }
                 if (!usesWeight) {
-                    Text("· ${lang.t("Tanpa Beban", "Bodyweight")}", fontSize = 12.sp, color = Color(0xFF9CA3AF))
+                    Text("· ${lang.t("Tanpa Beban", "Bodyweight")}", fontSize = 12.sp, color = tokens.mutedTextColor)
                 }
                 if (spec != null) {
                     Text(
                         text = "· ${lang.t("Istirahat", "Rest")} ${spec.restSeconds}$secUnit",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 12.sp,
-                        color = Color(0xFF9CA3AF)
+                        color = tokens.mutedTextColor
                     )
                 }
                 Text(
@@ -684,7 +752,8 @@ private fun ExerciseCockpitCard(
                 onClick = { onStartRest(spec?.restSeconds ?: 60) },
                 shape = RoundedCornerShape(999.dp),
                 color = tokens.accentColor.copy(alpha = 0.14f),
-                border = BorderStroke(1.dp, tokens.accentColor.copy(alpha = 0.38f))
+                border = BorderStroke(1.dp, tokens.accentColor.copy(alpha = 0.38f)),
+                modifier = Modifier.tactilePress(disabledByPerf = noAnim)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
@@ -710,8 +779,9 @@ private fun ExerciseCockpitCard(
                 Surface(
                     onClick = onToggleNotes,
                     shape = RoundedCornerShape(999.dp),
-                    color = Color(0xFF1A1E26),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+                    color = tokens.controlBg,
+                    border = BorderStroke(1.dp, tokens.subtleBorderColor),
+                    modifier = Modifier.tactilePress(disabledByPerf = noAnim)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -727,7 +797,7 @@ private fun ExerciseCockpitCard(
                         Icon(
                             imageVector = if (notesExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
                             contentDescription = null,
-                            tint = Color(0xFF9CA3AF),
+                            tint = tokens.mutedTextColor,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -740,8 +810,8 @@ private fun ExerciseCockpitCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xA60A0B0E))
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
+                    .background(tokens.wellBg)
+                    .border(1.dp, tokens.subtleBorderColor, RoundedCornerShape(14.dp))
                     .padding(12.dp)
             ) {
                 Text(
@@ -755,14 +825,27 @@ private fun ExerciseCockpitCard(
 
         // DEDICATED EXERCISE TIMER STAGE (Timer Mode Movements)
         if (mode == ExerciseTrackingMode.TIMER) {
+            val timerDirection = timerState?.direction ?: spec?.timerDirection ?: entry.timerDirection
+            val activeSetObj = entry.sets.firstOrNull { it.setNumber == activeSetNumber }
+            val activeTargetSeconds = (activeSetObj?.durationSeconds?.takeIf { it > 0 } ?: defaultTargetDur).coerceAtLeast(5)
+            val elapsedSeconds = timerState?.elapsedSeconds ?: 0
+            val displayClockSeconds = if (timerDirection == TimerDirection.COUNTDOWN) {
+                (activeTargetSeconds - elapsedSeconds).coerceAtLeast(0)
+            } else {
+                elapsedSeconds
+            }
+            val timerProgress = if (activeTargetSeconds > 0) {
+                (elapsedSeconds.toFloat() / activeTargetSeconds.toFloat()).coerceIn(0f, 1f)
+            } else 0f
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(if (timerRunning) Color(0xB30C1924) else Color(0xA60A0B0E))
+                    .background(if (timerRunning) Color(0xB30C1924) else tokens.wellBg)
                     .border(
                         1.dp,
-                        if (timerRunning) Color(0x8C38BDF8) else Color.White.copy(alpha = 0.12f),
+                        if (timerRunning) Color(0x8C38BDF8) else tokens.subtleBorderColor,
                         RoundedCornerShape(16.dp)
                     )
                     .padding(14.dp),
@@ -785,12 +868,13 @@ private fun ExerciseCockpitCard(
                             val isActiveSet = s.setNumber == activeSetNumber
                             Box(
                                 modifier = Modifier
+                                    .tactilePress(pressedScale = 0.92f, disabledByPerf = noAnim)
                                     .clip(RoundedCornerShape(999.dp))
                                     .background(
                                         when {
                                             isActiveSet -> Color(0xFF38BDF8)
                                             s.completed -> Color(0x3316A34A)
-                                            else -> Color.White.copy(alpha = 0.06f)
+                                            else -> tokens.subtleChipBg
                                         }
                                     )
                                     .clickable { onSelectExerciseTimerSet(s.setNumber) }
@@ -804,7 +888,7 @@ private fun ExerciseCockpitCard(
                                     color = when {
                                         isActiveSet -> Color(0xFF0A0B0E)
                                         s.completed -> Color(0xFF86EFAC)
-                                        else -> Color(0xFF9CA3AF)
+                                        else -> tokens.mutedTextColor
                                     }
                                 )
                             }
@@ -817,8 +901,8 @@ private fun ExerciseCockpitCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(999.dp))
-                        .background(Color(0xFF13161C))
-                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(999.dp))
+                        .background(tokens.controlBg)
+                        .border(1.dp, tokens.subtleBorderColor, RoundedCornerShape(999.dp))
                         .padding(3.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -830,6 +914,7 @@ private fun ExerciseCockpitCard(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
+                                .tactilePress(pressedScale = 0.96f, disabledByPerf = noAnim)
                                 .clip(RoundedCornerShape(999.dp))
                                 .background(
                                     when {
@@ -849,7 +934,7 @@ private fun ExerciseCockpitCard(
                                 color = when {
                                     active && dir == TimerDirection.COUNTDOWN -> Color(0xFF0A0B0E)
                                     active -> tokens.onAccentColor
-                                    else -> Color(0xFF9CA3AF)
+                                    else -> tokens.mutedTextColor
                                 }
                             )
                         }
@@ -871,7 +956,7 @@ private fun ExerciseCockpitCard(
                     },
                     fontFamily = FontFamily.Monospace,
                     fontSize = 12.sp,
-                    color = Color(0xFF9CA3AF)
+                    color = tokens.mutedTextColor
                 )
 
                 FlowRow(
@@ -893,7 +978,9 @@ private fun ExerciseCockpitCard(
                                 tokens.onAccentColor
                             }
                         ),
-                        modifier = Modifier.height(46.dp)
+                        modifier = Modifier
+                            .height(46.dp)
+                            .tactilePress(disabledByPerf = noAnim)
                     ) {
                         Icon(
                             imageVector = if (timerRunning) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -908,11 +995,24 @@ private fun ExerciseCockpitCard(
                                 else -> lang.t("Mulai Timer", "Start Timer")
                             },
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.5.sp
+                            fontSize = 13.sp
                         )
                     }
 
-                    if (elapsedSeconds > 0) {
+                    OutlinedButton(
+                        onClick = onResetExerciseTimer,
+                        shape = RoundedCornerShape(999.dp),
+                        border = BorderStroke(1.dp, tokens.subtleBorderColor),
+                        modifier = Modifier
+                            .height(46.dp)
+                            .tactilePress(disabledByPerf = noAnim)
+                    ) {
+                        Icon(Icons.Rounded.Refresh, contentDescription = null, tint = Color(0xFFD1D5DB), modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(lang.t("Reset", "Reset"), fontSize = 12.5.sp, color = Color(0xFFD1D5DB))
+                    }
+
+                    if (elapsedSeconds > 0 || timerRunning) {
                         Button(
                             onClick = onSaveExerciseTimer,
                             shape = RoundedCornerShape(999.dp),
@@ -920,28 +1020,13 @@ private fun ExerciseCockpitCard(
                                 containerColor = Color(0xFF16A34A),
                                 contentColor = Color.White
                             ),
-                            modifier = Modifier.height(46.dp)
+                            modifier = Modifier
+                                .height(46.dp)
+                                .tactilePress(disabledByPerf = noAnim)
                         ) {
                             Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(lang.t("Selesai & Simpan", "Done & Save"), fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
-                        }
-                    }
-
-                    Surface(
-                        onClick = onResetExerciseTimer,
-                        shape = CircleShape,
-                        color = Color(0xFF1A1E26),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f)),
-                        modifier = Modifier.size(46.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = lang.t("Reset timer", "Reset timer"),
-                                tint = Color(0xFF9CA3AF),
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Text(lang.t("Simpan Set #$activeSetNumber", "Save Set #$activeSetNumber"), fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
                         }
                     }
                 }
@@ -967,21 +1052,20 @@ private fun ExerciseCockpitCard(
         // SET ROWS
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             entry.sets.forEach { setRow ->
-                val isBlockedByCooldown = !setRow.completed && cooldownRemaining > 0
                 val isNextActiveSet = !allDone && setRow.setNumber == firstIncompleteSet
                 val rowDur = if (setRow.durationSeconds > 0) setRow.durationSeconds else defaultTargetDur
 
                 val rowBg = when {
                     setRow.completed -> Color(0x1A16A34A)
                     mode == ExerciseTrackingMode.TIMER && setRow.setNumber == activeSetNumber -> Color(0x1238BDF8)
-                    isNextActiveSet -> Color.White.copy(alpha = 0.04f)
-                    else -> Color(0xBF0E1117)
+                    isNextActiveSet -> tokens.subtleChipBg
+                    else -> tokens.wellBg
                 }
                 val rowBorder = when {
                     setRow.completed -> Color(0x7316A34A)
                     mode == ExerciseTrackingMode.TIMER && setRow.setNumber == activeSetNumber -> Color(0x7338BDF8)
-                    isNextActiveSet -> tokens.accentColor.copy(alpha = 0.45f)
-                    else -> Color.White.copy(alpha = 0.09f)
+                    isNextActiveSet -> tokens.accentColor.copy(alpha = 0.48f)
+                    else -> tokens.subtleBorderColor
                 }
 
                 Column(
@@ -993,7 +1077,7 @@ private fun ExerciseCockpitCard(
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Top Line: SET N + Done/Cooldown Button
+                    // Top Line: SET N + Isolated Cooldown/Done Button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1032,62 +1116,13 @@ private fun ExerciseCockpitCard(
                             }
                         }
 
-                        Surface(
-                            onClick = { onToggleSetComplete(setRow.setNumber) },
-                            shape = RoundedCornerShape(999.dp),
-                            color = when {
-                                setRow.completed -> Color(0xFF16A34A)
-                                isBlockedByCooldown -> Color(0xFF16202C)
-                                isNextActiveSet -> tokens.accentColor
-                                else -> Color(0xFF1A1E26)
-                            },
-                            border = BorderStroke(
-                                1.dp,
-                                when {
-                                    setRow.completed -> Color(0xFF16A34A)
-                                    isBlockedByCooldown -> Color(0x7338BDF8)
-                                    isNextActiveSet -> tokens.accentColor
-                                    else -> Color.White.copy(alpha = 0.16f)
-                                }
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(5.dp)
-                            ) {
-                                if (isBlockedByCooldown) {
-                                    Text(
-                                        text = "$cooldownRemaining$secUnit",
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF38BDF8)
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Check,
-                                        contentDescription = null,
-                                        tint = when {
-                                            setRow.completed -> Color.White
-                                            isNextActiveSet -> tokens.onAccentColor
-                                            else -> Color(0xFFE5E7EB)
-                                        },
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = lang.t("Selesai", "Done"),
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = when {
-                                            setRow.completed -> Color.White
-                                            isNextActiveSet -> tokens.onAccentColor
-                                            else -> Color(0xFFE5E7EB)
-                                        }
-                                    )
-                                }
-                            }
-                        }
+                        SetCompletePillButton(
+                            completed = setRow.completed,
+                            isNextActiveSet = isNextActiveSet,
+                            cooldownSecondsFlow = cooldownSecondsFlow,
+                            secUnit = secUnit,
+                            onClick = { onToggleSetComplete(setRow.setNumber) }
+                        )
                     }
 
                     // Bottom Line: Weight + Reps/Duration Steppers
@@ -1166,6 +1201,7 @@ private fun ExerciseCockpitCard(
                 modifier = Modifier
                     .weight(1f)
                     .height(42.dp)
+                    .tactilePress(enabled = entry.sets.size < 12, disabledByPerf = noAnim)
             ) {
                 Icon(Icons.Rounded.Add, contentDescription = null, tint = tokens.accentColor, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
@@ -1180,10 +1216,88 @@ private fun ExerciseCockpitCard(
                 modifier = Modifier
                     .weight(1f)
                     .height(42.dp)
+                    .tactilePress(enabled = entry.sets.size > 1, disabledByPerf = noAnim)
             ) {
-                Icon(Icons.Rounded.Remove, contentDescription = null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(16.dp))
+                Icon(Icons.Rounded.Remove, contentDescription = null, tint = tokens.mutedTextColor, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(lang.t("Kurangi Set", "Remove Set"), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFD1D5DB))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SetCompletePillButton(
+    completed: Boolean,
+    isNextActiveSet: Boolean,
+    cooldownSecondsFlow: StateFlow<Int>,
+    secUnit: String,
+    onClick: () -> Unit
+) {
+    val tokens = LocalIronPulseTokens.current
+    val lang = tokens.lang
+    val noAnim = tokens.performance.noAnimations
+    val cooldownRemaining = if (!completed) {
+        cooldownSecondsFlow.collectAsStateWithLifecycle().value
+    } else {
+        0
+    }
+    val isBlockedByCooldown = !completed && cooldownRemaining > 0
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(999.dp),
+        color = when {
+            completed -> Color(0xFF16A34A)
+            isBlockedByCooldown -> tokens.wellBg
+            isNextActiveSet -> tokens.accentColor
+            else -> tokens.controlBg
+        },
+        border = BorderStroke(
+            1.dp,
+            when {
+                completed -> Color(0xFF16A34A)
+                isBlockedByCooldown -> Color(0x7338BDF8)
+                isNextActiveSet -> tokens.accentColor
+                else -> tokens.subtleBorderColor
+            }
+        ),
+        modifier = Modifier.tactilePress(pressedScale = 0.94f, disabledByPerf = noAnim)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            if (isBlockedByCooldown) {
+                Text(
+                    text = "$cooldownRemaining$secUnit",
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF38BDF8)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = when {
+                        completed -> Color.White
+                        isNextActiveSet -> tokens.onAccentColor
+                        else -> Color(0xFFE5E7EB)
+                    },
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    text = lang.t("Selesai", "Done"),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when {
+                        completed -> Color.White
+                        isNextActiveSet -> tokens.onAccentColor
+                        else -> Color(0xFFE5E7EB)
+                    }
+                )
             }
         }
     }

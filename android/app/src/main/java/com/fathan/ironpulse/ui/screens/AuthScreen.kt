@@ -39,7 +39,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fathan.ironpulse.R
 import com.fathan.ironpulse.model.AppLanguage
+import com.fathan.ironpulse.ui.components.rememberScaledResourceBitmap
+import com.fathan.ironpulse.ui.components.tactilePress
 import com.fathan.ironpulse.ui.theme.LocalIronPulseTokens
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -60,21 +61,24 @@ fun AuthScreen(
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
+    val noAnim = tokens.performance.noAnimations
+    val backdropBitmap = rememberScaledResourceBitmap(R.drawable.gym_arena_backdrop, 1024)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(tokens.canvasBg)
     ) {
-        // Full-bleed atmospheric gym backdrop matching web AuthGate
-        Image(
-            painter = painterResource(id = R.drawable.gym_arena_backdrop),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(0.45f)
-        )
+        if (backdropBitmap != null) {
+            Image(
+                bitmap = backdropBitmap,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(0.45f)
+            )
+        }
 
         Box(
             modifier = Modifier
@@ -82,9 +86,9 @@ fun AuthScreen(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xB30A0B0E),
-                            Color(0xCC0A0B0E),
-                            Color(0xF50A0B0E)
+                            tokens.canvasBg.copy(alpha = 0.70f),
+                            tokens.canvasBg.copy(alpha = 0.80f),
+                            tokens.canvasBg.copy(alpha = 0.96f)
                         )
                     )
                 )
@@ -95,9 +99,9 @@ fun AuthScreen(
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color(0xEB0A0B0E),
-                            Color(0xB80A0B0E),
-                            Color(0x730A0B0E)
+                            tokens.canvasBg.copy(alpha = 0.92f),
+                            tokens.canvasBg.copy(alpha = 0.72f),
+                            tokens.canvasBg.copy(alpha = 0.45f)
                         )
                     )
                 )
@@ -133,8 +137,8 @@ fun AuthScreen(
 
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color(0xCC13161C),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                    color = tokens.wellBg.copy(alpha = 0.85f),
+                    border = BorderStroke(1.dp, tokens.surfaceBorderColor)
                 ) {
                     Row(
                         modifier = Modifier.padding(4.dp),
@@ -144,6 +148,7 @@ fun AuthScreen(
                             val selected = lang == option
                             Box(
                                 modifier = Modifier
+                                    .tactilePress(pressedScale = 0.94f, disabledByPerf = noAnim)
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(if (selected) tokens.accentColor else Color.Transparent)
                                     .clickable { onSelectLang(option) }
@@ -154,7 +159,7 @@ fun AuthScreen(
                                     text = label,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (selected) tokens.onAccentColor else Color(0xFF9CA3AF)
+                                    color = if (selected) tokens.onAccentColor else tokens.mutedTextColor
                                 )
                             }
                         }
@@ -216,7 +221,7 @@ fun AuthScreen(
                         Text(
                             text = if (idx == 0) item else "·  $item",
                             fontSize = 13.sp,
-                            color = Color(0xFF9CA3AF)
+                            color = tokens.mutedTextColor
                         )
                     }
                 }
@@ -232,7 +237,9 @@ fun AuthScreen(
                         contentColor = tokens.onAccentColor
                     ),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp),
-                    modifier = Modifier.height(52.dp)
+                    modifier = Modifier
+                        .height(52.dp)
+                        .tactilePress(enabled = !authLoading, disabledByPerf = noAnim)
                 ) {
                     if (authLoading) {
                         CircularProgressIndicator(

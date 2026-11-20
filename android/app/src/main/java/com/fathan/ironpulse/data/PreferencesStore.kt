@@ -1,6 +1,7 @@
 package com.fathan.ironpulse.data
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import com.fathan.ironpulse.model.AppLanguage
 import com.fathan.ironpulse.model.ClockFormat
 import com.fathan.ironpulse.model.DayTimeMode
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+@Immutable
 data class AppPreferences(
     val lang: AppLanguage = AppLanguage.ID,
     val clockFormat: ClockFormat = ClockFormat.H24,

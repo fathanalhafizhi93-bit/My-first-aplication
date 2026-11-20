@@ -1,5 +1,6 @@
 package com.fathan.ironpulse.ui.theme
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import com.fathan.ironpulse.model.UiTheme
 import kotlin.math.abs
@@ -8,6 +9,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
+@Immutable
 data class MaterialYouPalette(
     val seed: String,
     val primaryHex: String,

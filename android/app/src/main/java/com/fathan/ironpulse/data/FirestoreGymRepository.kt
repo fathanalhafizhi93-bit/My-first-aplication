@@ -22,10 +22,14 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.atomic.AtomicLong
 
 class FirestoreGymRepository {
 
@@ -139,6 +143,8 @@ class FirestoreGymRepository {
         uid: String,
         onError: (Exception) -> Unit = {}
     ): Flow<Map<DayKey, DaySchedule>> = callbackFlow {
+        val parseSeq = AtomicLong(0L)
+        var parseJob: Job? = null
         val reg: ListenerRegistration = db.collection("users").document(uid)
             .collection("schedules")
             .whereEqualTo("userId", uid)
@@ -149,22 +155,34 @@ class FirestoreGymRepository {
                     trySend(GymPresets.createDefaultSchedules(uid))
                     return@addSnapshotListener
                 }
-                val defaults = GymPresets.createDefaultSchedules(uid).toMutableMap()
-                snapshot?.documents?.forEach { doc ->
-                    val parsed = parseDaySchedule(doc, uid)
-                    if (parsed != null) {
-                        defaults[parsed.dayKey] = parsed
+                val docs = snapshot?.documents
+                val ticket = parseSeq.incrementAndGet()
+                parseJob?.cancel()
+                parseJob = launch(Dispatchers.Default) {
+                    val defaults = GymPresets.createDefaultSchedules(uid).toMutableMap()
+                    docs?.forEach { doc ->
+                        val parsed = parseDaySchedule(doc, uid)
+                        if (parsed != null) {
+                            defaults[parsed.dayKey] = parsed
+                        }
+                    }
+                    if (parseSeq.get() == ticket) {
+                        trySend(defaults.toMap())
                     }
                 }
-                trySend(defaults.toMap())
             }
-        awaitClose { reg.remove() }
+        awaitClose {
+            parseJob?.cancel()
+            reg.remove()
+        }
     }
 
     fun observeRingtones(
         uid: String,
         onError: (Exception) -> Unit = {}
     ): Flow<List<CustomRingtone>> = callbackFlow {
+        val parseSeq = AtomicLong(0L)
+        var parseJob: Job? = null
         val reg: ListenerRegistration = db.collection("users").document(uid)
             .collection("ringtones")
             .whereEqualTo("userId", uid)
@@ -174,13 +192,23 @@ class FirestoreGymRepository {
                     onError(error)
                     return@addSnapshotListener
                 }
-                val list = snapshot?.documents
-                    ?.mapNotNull { parseCustomRingtone(it, uid) }
-                    ?.sortedBy { it.name.lowercase() }
-                    ?: emptyList()
-                trySend(list)
+                val docs = snapshot?.documents
+                val ticket = parseSeq.incrementAndGet()
+                parseJob?.cancel()
+                parseJob = launch(Dispatchers.Default) {
+                    val list = docs
+                        ?.mapNotNull { parseCustomRingtone(it, uid) }
+                        ?.sortedBy { it.name.lowercase() }
+                        ?: emptyList()
+                    if (parseSeq.get() == ticket) {
+                        trySend(list)
+                    }
+                }
             }
-        awaitClose { reg.remove() }
+        awaitClose {
+            parseJob?.cancel()
+            reg.remove()
+        }
     }
 
     suspend fun addCustomRingtone(uid: String, ringtone: CustomRingtone) {
@@ -211,6 +239,8 @@ class FirestoreGymRepository {
     }
 
     fun observeTodayLog(uid: String, dateKey: String): Flow<WorkoutLog?> = callbackFlow {
+        val parseSeq = AtomicLong(0L)
+        var parseJob: Job? = null
         val reg: ListenerRegistration = db.collection("users").document(uid)
             .collection("workoutLogs")
             .document(dateKey)
@@ -219,19 +249,31 @@ class FirestoreGymRepository {
                     Log.e(TAG, "Today log listener error for users/$uid/workoutLogs/$dateKey: ${error.message}", error)
                     return@addSnapshotListener
                 }
-                if (snapshot != null && snapshot.exists()) {
-                    trySend(parseWorkoutLog(snapshot, uid))
-                } else {
-                    trySend(null)
+                val ticket = parseSeq.incrementAndGet()
+                parseJob?.cancel()
+                parseJob = launch(Dispatchers.Default) {
+                    val parsed = if (snapshot != null && snapshot.exists()) {
+                        parseWorkoutLog(snapshot, uid)
+                    } else {
+                        null
+                    }
+                    if (parseSeq.get() == ticket) {
+                        trySend(parsed)
+                    }
                 }
             }
-        awaitClose { reg.remove() }
+        awaitClose {
+            parseJob?.cancel()
+            reg.remove()
+        }
     }
 
     fun observeWorkoutHistory(
         uid: String,
         onError: (Exception) -> Unit = {}
     ): Flow<List<WorkoutLog>> = callbackFlow {
+        val parseSeq = AtomicLong(0L)
+        var parseJob: Job? = null
         val reg: ListenerRegistration = db.collection("users").document(uid)
             .collection("workoutLogs")
             .whereEqualTo("userId", uid)
@@ -242,13 +284,23 @@ class FirestoreGymRepository {
                     onError(error)
                     return@addSnapshotListener
                 }
-                val logs = snapshot?.documents
-                    ?.mapNotNull { parseWorkoutLog(it, uid) }
-                    ?.sortedByDescending { it.dateKey }
-                    ?: emptyList()
-                trySend(logs)
+                val docs = snapshot?.documents
+                val ticket = parseSeq.incrementAndGet()
+                parseJob?.cancel()
+                parseJob = launch(Dispatchers.Default) {
+                    val logs = docs
+                        ?.mapNotNull { parseWorkoutLog(it, uid) }
+                        ?.sortedByDescending { it.dateKey }
+                        ?: emptyList()
+                    if (parseSeq.get() == ticket) {
+                        trySend(logs)
+                    }
+                }
             }
-        awaitClose { reg.remove() }
+        awaitClose {
+            parseJob?.cancel()
+            reg.remove()
+        }
     }
 
     suspend fun updateProfile(

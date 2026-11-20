@@ -1,8 +1,9 @@
 package com.fathan.ironpulse.ui.screens
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,6 +26,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.NotificationsOff
 import androidx.compose.material.icons.rounded.Schedule
@@ -42,7 +45,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberTimePickerState
@@ -62,10 +64,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fathan.ironpulse.model.ClockFormat
 import com.fathan.ironpulse.model.CustomRingtone
 import com.fathan.ironpulse.model.DayKey
 import com.fathan.ironpulse.model.DaySchedule
 import com.fathan.ironpulse.model.GymModelHelpers
+import com.fathan.ironpulse.ui.components.tactilePress
 import com.fathan.ironpulse.ui.theme.LocalIronPulseTokens
 import com.fathan.ironpulse.ui.theme.ironGlassSurface
 import com.fathan.ironpulse.ui.viewmodel.GymViewModel
@@ -77,6 +81,7 @@ import java.util.Locale
 fun ScheduleScreen(
     state: IronPulseUiState,
     viewModel: GymViewModel,
+    contentPadding: PaddingValues,
     onOpenExercisesForDay: (DayKey) -> Unit
 ) {
     val tokens = LocalIronPulseTokens.current
@@ -89,9 +94,15 @@ fun ScheduleScreen(
     }
 
     var timePickerDay by remember { mutableStateOf<DayKey?>(null) }
+    var editingFocusDay by remember { mutableStateOf<DayKey?>(null) }
 
     LazyColumn(
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 110.dp),
+        contentPadding = PaddingValues(
+            start = 16.dp,
+            end = 16.dp,
+            top = contentPadding.calculateTopPadding() + 14.dp,
+            bottom = contentPadding.calculateBottomPadding() + 92.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.fillMaxSize()
     ) {
@@ -121,7 +132,7 @@ fun ScheduleScreen(
                     ),
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
-                    color = Color(0xFF9CA3AF)
+                    color = tokens.mutedTextColor
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -141,10 +152,14 @@ fun ScheduleScreen(
                 day = day,
                 sched = sched,
                 isToday = day == state.todayDayKey,
+                isEditingFocus = editingFocusDay == day,
                 defaultRingtoneId = state.profile?.defaultRingtoneId ?: "builtin_athletic_bell",
                 customRingtones = state.customRingtones,
+                onStartEditingFocus = { editingFocusDay = day },
+                onStopEditingFocus = { if (editingFocusDay == day) editingFocusDay = null },
                 onToggleGymDay = {
                     val nextGym = !sched.isGymDay
+                    if (!nextGym && editingFocusDay == day) editingFocusDay = null
                     viewModel.updateScheduleFields(
                         dayKey = day,
                         isGymDay = nextGym,
@@ -154,6 +169,7 @@ fun ScheduleScreen(
                 onOpenExercises = { onOpenExercisesForDay(day) },
                 onSaveFocusTitle = { nextTitle ->
                     viewModel.updateScheduleFields(dayKey = day, focusTitle = nextTitle)
+                    editingFocusDay = null
                 },
                 onOpenTimePicker = { timePickerDay = day },
                 onToggleAlarmEnabled = {
@@ -161,7 +177,8 @@ fun ScheduleScreen(
                 },
                 onSelectRingtone = { nextId ->
                     viewModel.updateScheduleFields(dayKey = day, ringtoneId = nextId)
-                }
+                },
+                modifier = Modifier.animateItem()
             )
         }
     }
@@ -175,7 +192,7 @@ fun ScheduleScreen(
         val pickerState = rememberTimePickerState(
             initialHour = initHour,
             initialMinute = initMinute,
-            is24Hour = tokens.clockFormat == com.fathan.ironpulse.model.ClockFormat.H24
+            is24Hour = tokens.clockFormat == ClockFormat.H24
         )
 
         AlertDialog(
@@ -241,18 +258,23 @@ private fun DayScheduleCard(
     day: DayKey,
     sched: DaySchedule,
     isToday: Boolean,
+    isEditingFocus: Boolean,
     defaultRingtoneId: String,
     customRingtones: List<CustomRingtone>,
+    onStartEditingFocus: () -> Unit,
+    onStopEditingFocus: () -> Unit,
     onToggleGymDay: () -> Unit,
     onOpenExercises: () -> Unit,
     onSaveFocusTitle: (String) -> Unit,
     onOpenTimePicker: () -> Unit,
     onToggleAlarmEnabled: () -> Unit,
-    onSelectRingtone: (String) -> Unit
+    onSelectRingtone: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val tokens = LocalIronPulseTokens.current
     val lang = tokens.lang
-    var focusDraft by remember(sched.focusTitle) { mutableStateOf(sched.focusTitle) }
+    val noAnim = tokens.performance.noAnimations
+    var focusDraft by remember(sched.focusTitle, isEditingFocus) { mutableStateOf(sched.focusTitle) }
     var ringtoneMenuOpen by remember { mutableStateOf(false) }
 
     val toneDisplayName = remember(sched.ringtoneId, defaultRingtoneId, customRingtones, lang) {
@@ -264,10 +286,11 @@ private fun DayScheduleCard(
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .alpha(if (sched.isGymDay) 1f else 0.8f)
             .ironGlassSurface(tokens, subtle = !sched.isGymDay)
+            .then(if (noAnim) Modifier else Modifier.animateContentSize(tween(200)))
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -304,7 +327,7 @@ private fun DayScheduleCard(
                         lang.t("Hari istirahat · alarm nonaktif", "Rest day · alarm off")
                     },
                     fontSize = 12.sp,
-                    color = Color(0xFF9CA3AF)
+                    color = tokens.mutedTextColor
                 )
             }
 
@@ -315,14 +338,15 @@ private fun DayScheduleCard(
                 Surface(
                     onClick = onToggleGymDay,
                     shape = RoundedCornerShape(10.dp),
-                    color = if (sched.isGymDay) tokens.accentColor else Color(0xFF1A1E26),
-                    border = if (sched.isGymDay) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+                    color = if (sched.isGymDay) tokens.accentColor else tokens.controlBg,
+                    border = if (sched.isGymDay) null else BorderStroke(1.dp, tokens.subtleBorderColor),
+                    modifier = Modifier.tactilePress(disabledByPerf = noAnim)
                 ) {
                     Text(
                         text = if (sched.isGymDay) lang.t("Hari Gym", "Gym Day") else "Rest Day",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (sched.isGymDay) tokens.onAccentColor else Color(0xFF9CA3AF),
+                        color = if (sched.isGymDay) tokens.onAccentColor else tokens.mutedTextColor,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp)
                     )
                 }
@@ -331,8 +355,9 @@ private fun DayScheduleCard(
                     Surface(
                         onClick = onOpenExercises,
                         shape = RoundedCornerShape(10.dp),
-                        color = Color(0xFF1A1E26),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.12f))
+                        color = tokens.controlBg,
+                        border = BorderStroke(1.dp, tokens.subtleBorderColor),
+                        modifier = Modifier.tactilePress(disabledByPerf = noAnim)
                     ) {
                         Row(
                             modifier = Modifier.padding(start = 10.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
@@ -347,7 +372,7 @@ private fun DayScheduleCard(
                             Icon(
                                 imageVector = Icons.Rounded.ChevronRight,
                                 contentDescription = null,
-                                tint = Color(0xFF9CA3AF),
+                                tint = tokens.mutedTextColor,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -360,47 +385,91 @@ private fun DayScheduleCard(
         if (sched.isGymDay) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
 
-            // Focus Title input
+            // Lightweight Tap-to-Edit Focus Title (only mounts OutlinedTextField when editing)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = lang.t("Fokus Latihan", "Workout Focus"),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
-                    color = Color(0xFF9CA3AF)
+                    color = tokens.mutedTextColor
                 )
-                OutlinedTextField(
-                    value = focusDraft,
-                    onValueChange = { focusDraft = it.take(80) },
-                    singleLine = true,
-                    placeholder = {
-                        Text(lang.t("Misal: Push — Dada & Bahu", "e.g. Push — Chest & Shoulders"))
-                    },
-                    trailingIcon = {
-                        val trimmed = focusDraft.trim()
-                        if (trimmed.isNotEmpty() && trimmed != sched.focusTitle) {
-                            IconButton(onClick = { onSaveFocusTitle(trimmed) }) {
-                                Icon(Icons.Rounded.Check, contentDescription = null, tint = tokens.accentColor)
+                if (isEditingFocus) {
+                    OutlinedTextField(
+                        value = focusDraft,
+                        onValueChange = { focusDraft = it.take(80) },
+                        singleLine = true,
+                        placeholder = {
+                            Text(lang.t("Misal: Push — Dada & Bahu", "e.g. Push — Chest & Shoulders"))
+                        },
+                        trailingIcon = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                val trimmed = focusDraft.trim()
+                                if (trimmed.isNotEmpty()) {
+                                    IconButton(onClick = { onSaveFocusTitle(trimmed) }) {
+                                        Icon(Icons.Rounded.Check, contentDescription = null, tint = tokens.accentColor)
+                                    }
+                                }
+                                IconButton(onClick = onStopEditingFocus) {
+                                    Icon(Icons.Rounded.Close, contentDescription = null, tint = tokens.mutedTextColor, modifier = Modifier.size(18.dp))
+                                }
                             }
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            val trimmed = focusDraft.trim()
+                            if (trimmed.isNotEmpty() && trimmed != sched.focusTitle) {
+                                onSaveFocusTitle(trimmed)
+                            } else {
+                                onStopEditingFocus()
+                            }
+                        }),
+                        shape = RoundedCornerShape(tokens.inputRadius),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = tokens.accentColor,
+                            unfocusedBorderColor = tokens.subtleBorderColor,
+                            focusedTextColor = Color(0xFFF4F5F7),
+                            unfocusedTextColor = Color(0xFFF4F5F7),
+                            focusedContainerColor = tokens.wellBg,
+                            unfocusedContainerColor = tokens.wellBg
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Surface(
+                        onClick = onStartEditingFocus,
+                        shape = RoundedCornerShape(tokens.inputRadius),
+                        color = tokens.wellBg,
+                        border = BorderStroke(1.dp, tokens.subtleBorderColor),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .tactilePress(pressedScale = 0.985f, disabledByPerf = noAnim)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = sched.focusTitle.ifBlank {
+                                    lang.t("Ketuk untuk atur fokus latihan...", "Tap to set workout focus...")
+                                },
+                                fontSize = 13.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (sched.focusTitle.isBlank()) tokens.mutedTextColor else Color(0xFFF4F5F7),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                imageVector = Icons.Rounded.Edit,
+                                contentDescription = null,
+                                tint = tokens.accentColor,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
-                    },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = {
-                        val trimmed = focusDraft.trim()
-                        if (trimmed.isNotEmpty() && trimmed != sched.focusTitle) {
-                            onSaveFocusTitle(trimmed)
-                        }
-                    }),
-                    shape = RoundedCornerShape(tokens.inputRadius),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = tokens.accentColor,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                        focusedTextColor = Color(0xFFF4F5F7),
-                        unfocusedTextColor = Color(0xFFF4F5F7),
-                        focusedContainerColor = Color(0xFF0A0B0E),
-                        unfocusedContainerColor = Color(0xFF0A0B0E)
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    }
+                }
             }
 
             // Alarm Time + Bell Toggle & Ringtone Dropdown
@@ -418,7 +487,7 @@ private fun DayScheduleCard(
                         text = lang.t("Jam Alarm", "Alarm Time"),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF9CA3AF)
+                        color = tokens.mutedTextColor
                     )
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -427,11 +496,12 @@ private fun DayScheduleCard(
                         Surface(
                             onClick = onOpenTimePicker,
                             shape = RoundedCornerShape(tokens.inputRadius),
-                            color = Color(0xFF0A0B0E),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                            color = tokens.wellBg,
+                            border = BorderStroke(1.dp, tokens.subtleBorderColor),
                             modifier = Modifier
                                 .weight(1f)
                                 .height(46.dp)
+                                .tactilePress(disabledByPerf = noAnim)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp),
@@ -459,12 +529,14 @@ private fun DayScheduleCard(
                         Surface(
                             onClick = onToggleAlarmEnabled,
                             shape = RoundedCornerShape(tokens.inputRadius),
-                            color = if (sched.alarmEnabled) tokens.accentColor.copy(alpha = 0.16f) else Color(0xFF1A1E26),
+                            color = if (sched.alarmEnabled) tokens.accentColor.copy(alpha = 0.16f) else tokens.controlBg,
                             border = BorderStroke(
                                 1.dp,
-                                if (sched.alarmEnabled) tokens.accentColor.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f)
+                                if (sched.alarmEnabled) tokens.accentColor.copy(alpha = 0.5f) else tokens.subtleBorderColor
                             ),
-                            modifier = Modifier.size(46.dp)
+                            modifier = Modifier
+                                .size(46.dp)
+                                .tactilePress(disabledByPerf = noAnim)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(
@@ -474,7 +546,7 @@ private fun DayScheduleCard(
                                         Icons.Rounded.NotificationsOff
                                     },
                                     contentDescription = null,
-                                    tint = if (sched.alarmEnabled) tokens.accentColor else Color(0xFF6B7280),
+                                    tint = if (sched.alarmEnabled) tokens.accentColor else tokens.mutedTextColor,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -491,17 +563,18 @@ private fun DayScheduleCard(
                         text = lang.t("Nada Alarm", "Alarm Tone"),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF9CA3AF)
+                        color = tokens.mutedTextColor
                     )
                     Box {
                         Surface(
                             onClick = { ringtoneMenuOpen = true },
                             shape = RoundedCornerShape(tokens.inputRadius),
-                            color = Color(0xFF0A0B0E),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                            color = tokens.wellBg,
+                            border = BorderStroke(1.dp, tokens.subtleBorderColor),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(46.dp)
+                                .tactilePress(disabledByPerf = noAnim)
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp),
@@ -519,7 +592,7 @@ private fun DayScheduleCard(
                                 Icon(
                                     imageVector = Icons.Rounded.ArrowDropDown,
                                     contentDescription = null,
-                                    tint = Color(0xFF9CA3AF)
+                                    tint = tokens.mutedTextColor
                                 )
                             }
                         }

@@ -29,10 +29,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,7 +39,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -61,30 +57,38 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.fathan.ironpulse.model.DayTimePhase
 import com.fathan.ironpulse.model.MascotMood
 import com.fathan.ironpulse.model.TimePhasePose
 import com.fathan.ironpulse.ui.theme.LocalIronPulseTokens
 import com.fathan.ironpulse.ui.theme.MaterialYouColorEngine
 import com.fathan.ironpulse.ui.theme.ironGlassSurface
+import com.fathan.ironpulse.ui.viewmodel.MascotEyeState
 import com.fathan.ironpulse.ui.viewmodel.MascotUiState
-import kotlin.math.roundToInt
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun MascotOrbFace(
     mascot: MascotUiState,
+    eyeStateFlow: StateFlow<MascotEyeState>? = null,
     size: Dp = 64.dp,
     modifier: Modifier = Modifier
 ) {
     val tokens = LocalIronPulseTokens.current
     val staticMode = tokens.performance.staticMascot || tokens.performance.noAnimations
+    val eyeState = if (eyeStateFlow != null) {
+        eyeStateFlow.collectAsStateWithLifecycle().value
+    } else {
+        MascotEyeState()
+    }
     val phaseColor = remember(mascot.phaseColorHex) {
         MaterialYouColorEngine.parseColor(mascot.phaseColorHex, Color(0xFFFBBF24))
     }
@@ -126,39 +130,52 @@ fun MascotOrbFace(
     val isRechargePose = urgent == null && pose == TimePhasePose.RECHARGE
 
     val isClosedCalmPose = isSleepPose || isZenPose || isCozyPose || isDreamPose
+    val density = LocalDensity.current
 
-    val infinite = rememberInfiniteTransition(label = "orbAnim")
-    val ringScale by infinite.animateFloat(
-        initialValue = 0.96f,
-        targetValue = if (isCelebration || mascot.tapBounce) 1.24f else 1.14f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (isCelebration) 1100 else 2200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "ringScale"
-    )
-    val bobOffset by infinite.animateFloat(
-        initialValue = -2f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(if (isMusicPose || isWhistlePose || isProteinPose) 1400 else 2300, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bobOffset"
-    )
+    val ringScale = if (staticMode) {
+        1f
+    } else {
+        val infinite = rememberInfiniteTransition(label = "orbAnim")
+        val animRing by infinite.animateFloat(
+            initialValue = 0.96f,
+            targetValue = if (isCelebration || eyeState.tapBounce) 1.24f else 1.14f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(if (isCelebration) 1100 else 2200, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "ringScale"
+        )
+        animRing
+    }
+    val bobOffsetDp = if (staticMode) {
+        0f
+    } else {
+        val infinite = rememberInfiniteTransition(label = "orbBob")
+        val animBob by infinite.animateFloat(
+            initialValue = -2f,
+            targetValue = 2f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(if (isMusicPose || isWhistlePose || isProteinPose) 1400 else 2300, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "bobOffset"
+        )
+        animBob
+    }
+    val bobOffsetPx = with(density) { bobOffsetDp.dp.toPx() }
     val tapScale by animateFloatAsState(
-        targetValue = if (mascot.tapBounce) 1.14f else 1f,
-        animationSpec = tween(180),
+        targetValue = if (!staticMode && eyeState.tapBounce) 1.14f else 1f,
+        animationSpec = IronPulseMotion.OrbSnapSpring,
         label = "tapScale"
     )
 
     val glanceX by animateFloatAsState(
-        targetValue = if (isClosedCalmPose || isMusicPose || isSparklePose) 0f else mascot.glanceX,
+        targetValue = if (staticMode || isClosedCalmPose || isMusicPose || isSparklePose) 0f else eyeState.glanceX,
         animationSpec = tween(260),
         label = "glanceX"
     )
     val glanceY by animateFloatAsState(
-        targetValue = if (isClosedCalmPose || isMusicPose || isSparklePose) 0f else mascot.glanceY,
+        targetValue = if (staticMode || isClosedCalmPose || isMusicPose || isSparklePose) 0f else eyeState.glanceY,
         animationSpec = tween(260),
         label = "glanceY"
     )
@@ -167,20 +184,26 @@ fun MascotOrbFace(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // Outer breathing pulse ring
+        // Outer breathing pulse ring (GPU graphicsLayer)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .scale(if (staticMode) 1f else ringScale)
+                .graphicsLayer {
+                    scaleX = ringScale
+                    scaleY = ringScale
+                }
                 .border(2.dp, phaseColor.copy(alpha = if (staticMode) 0.45f else 0.55f), CircleShape)
         )
 
-        // Core dark circular orb
+        // Core dark circular orb (GPU graphicsLayer)
         Box(
             modifier = Modifier
                 .size(size * 0.875f)
-                .offset(y = if (staticMode) 0.dp else bobOffset.dp)
-                .scale(if (staticMode) 1f else tapScale)
+                .graphicsLayer {
+                    translationY = bobOffsetPx
+                    scaleX = tapScale
+                    scaleY = tapScale
+                }
                 .clip(CircleShape)
                 .background(Color(0xF2121620))
                 .border(2.dp, phaseColor, CircleShape),
@@ -380,7 +403,7 @@ fun MascotOrbFace(
                         drawCircle(phaseColor, px(1.15f), gpt(21f, 25.9f))
                         drawCircle(phaseColor, px(1.15f), gpt(41f, 25.9f))
                     }
-                    isCalmEyes || isRechargePose || mascot.isBlinking -> {
+                    isCalmEyes || isRechargePose || eyeState.isBlinking -> {
                         val lCalm = Path().apply {
                             moveTo(px(18f) + gx, px(28.2f) + gy)
                             cubicTo(px(20f) + gx, px(30.8f) + gy, px(24f) + gx, px(30.8f) + gy, px(26f) + gx, px(28.2f) + gy)
@@ -592,6 +615,7 @@ fun MascotOrbFace(
 @Composable
 fun TodayMascot(
     mascot: MascotUiState,
+    eyeStateFlow: StateFlow<MascotEyeState>,
     voiceEnabled: Boolean,
     onTapMascot: () -> Unit,
     onReplayVoice: () -> Unit,
@@ -605,6 +629,7 @@ fun TodayMascot(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .tactilePress(pressedScale = 0.98f, disabledByPerf = tokens.performance.noAnimations)
             .ironGlassSurface(
                 tokens = tokens,
                 subtle = true,
@@ -616,7 +641,7 @@ fun TodayMascot(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        MascotOrbFace(mascot = mascot, size = 62.dp)
+        MascotOrbFace(mascot = mascot, eyeStateFlow = eyeStateFlow, size = 62.dp)
 
         Column(modifier = Modifier.weight(1f)) {
             AnimatedContent(
@@ -639,7 +664,7 @@ fun TodayMascot(
                         Text(
                             text = line.subline,
                             fontSize = 12.sp,
-                            color = tokens.palette.onSurfaceVariant,
+                            color = tokens.mutedTextColor,
                             lineHeight = 16.sp
                         )
                     }
@@ -650,7 +675,9 @@ fun TodayMascot(
         if (voiceEnabled) {
             IconButton(
                 onClick = onReplayVoice,
-                modifier = Modifier.size(36.dp)
+                modifier = Modifier
+                    .size(36.dp)
+                    .tactilePress(disabledByPerf = tokens.performance.noAnimations)
             ) {
                 Icon(
                     imageVector = Icons.Rounded.VolumeUp,
@@ -666,6 +693,7 @@ fun TodayMascot(
 @Composable
 fun FloatingMascotDock(
     mascot: MascotUiState,
+    eyeStateFlow: StateFlow<MascotEyeState>,
     anchorSideRight: Boolean,
     anchorYRatio: Float,
     visible: Boolean,
@@ -696,78 +724,84 @@ fun FloatingMascotDock(
 
         val displayX by animateFloatAsState(
             targetValue = if (dragging) dragX else targetX,
-            animationSpec = tween(if (dragging) 0 else 220),
+            animationSpec = if (dragging || tokens.performance.noAnimations) tween(0) else IronPulseMotion.OrbSnapSpring,
             label = "orbX"
         )
         val displayY by animateFloatAsState(
             targetValue = if (dragging) dragY else targetY,
-            animationSpec = tween(if (dragging) 0 else 220),
+            animationSpec = if (dragging || tokens.performance.noAnimations) tween(0) else IronPulseMotion.OrbSnapSpring,
             label = "orbY"
         )
 
-        // Expanded speech bubble next to orb
+        // Expanded speech bubble next to orb (GPU translationX/Y — zero layout relayout)
+        val bubbleW = with(density) { 248.dp.toPx() }
         AnimatedVisibility(
             visible = bubbleOpen,
             enter = fadeIn(tween(160)) + scaleIn(initialScale = 0.92f),
             exit = fadeOut(tween(120)) + scaleOut(targetScale = 0.92f),
-            modifier = Modifier.offset {
-                val bubbleW = with(density) { 248.dp.toPx() }
+            modifier = Modifier.graphicsLayer {
                 val bx = if (anchorSideRight) {
                     (displayX - bubbleW - 10f).coerceAtLeast(marginPx)
                 } else {
                     (displayX + orbSizePx + 10f).coerceAtMost(widthPx - bubbleW - marginPx)
                 }
                 val by = (displayY - 24f).coerceIn(marginPx + 70f, heightPx - 190f)
-                IntOffset(bx.roundToInt(), by.roundToInt())
+                translationX = bx
+                translationY = by
             }
         ) {
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = tokens.palette.surfaceContainerHigh.copy(alpha = 0.96f),
-                border = BorderStroke(1.dp, phaseColor.copy(alpha = 0.45f)),
-                shadowElevation = 12.dp,
-                modifier = Modifier.widthIn(min = 200.dp, max = 248.dp)
+            Column(
+                modifier = Modifier
+                    .widthIn(min = 200.dp, max = 248.dp)
+                    .ironGlassSurface(
+                        tokens = tokens,
+                        borderOverride = phaseColor.copy(alpha = 0.45f),
+                        radiusOverride = 18.dp
+                    )
+                    .padding(12.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Text(
-                            text = mascot.activeLine.headline,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFF4F5F7),
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            imageVector = Icons.Rounded.Close,
-                            contentDescription = "Tutup",
-                            tint = tokens.palette.onSurfaceVariant,
-                            modifier = Modifier
-                                .size(18.dp)
-                                .clickable { bubbleOpen = false }
-                        )
-                    }
-                    if (mascot.activeLine.subline.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = mascot.activeLine.subline,
-                            fontSize = 11.5.sp,
-                            lineHeight = 15.sp,
-                            color = tokens.palette.onSurfaceVariant
-                        )
-                    }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = mascot.activeLine.headline,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFF4F5F7),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.Rounded.Close,
+                        contentDescription = "Tutup",
+                        tint = tokens.mutedTextColor,
+                        modifier = Modifier
+                            .size(18.dp)
+                            .clickable { bubbleOpen = false }
+                    )
+                }
+                if (mascot.activeLine.subline.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = mascot.activeLine.subline,
+                        fontSize = 11.5.sp,
+                        lineHeight = 15.sp,
+                        color = tokens.mutedTextColor
+                    )
                 }
             }
         }
 
-        // Draggable Floating Orb
+        // Draggable Floating Orb (GPU translationX/Y — 120 FPS drag & snap)
         Box(
             modifier = Modifier
-                .offset { IntOffset(displayX.roundToInt(), displayY.roundToInt()) }
+                .graphicsLayer {
+                    translationX = displayX
+                    translationY = displayY
+                }
                 .size(56.dp)
+                .tactilePress(pressedScale = 0.92f, disabledByPerf = tokens.performance.noAnimations)
                 .pointerInput(widthPx, heightPx) {
                     detectDragGestures(
                         onDragStart = { dragging = true },
@@ -792,7 +826,7 @@ fun FloatingMascotDock(
                 },
             contentAlignment = Alignment.Center
         ) {
-            MascotOrbFace(mascot = mascot, size = 54.dp)
+            MascotOrbFace(mascot = mascot, eyeStateFlow = eyeStateFlow, size = 54.dp)
         }
     }
 }
